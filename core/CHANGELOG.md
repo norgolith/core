@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/norgolith/core/compare/norgolith-v0.5.0...norgolith-v0.6.0) (2026-07-01)
+
+
+### Features
+
+* **flake:** add norgolith-plugin-sdk build ([a3ad5d1](https://github.com/norgolith/core/commit/a3ad5d1b63fbfb57ff1ff620e42a1bc5844b702c))
+
 ## [0.5.0](https://github.com/norgolith/core/compare/norgolith-v0.4.0...norgolith-v0.5.0) (2026-07-01)
 
 
