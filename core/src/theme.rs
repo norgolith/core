@@ -28,6 +28,8 @@ pub struct ThemeMetadata {
     pub description: String,
     pub version: String,
     pub license: String,
+    #[serde(default)]
+    pub min_version: Option<String>,
 }
 
 /// .metadata.toml file contents
