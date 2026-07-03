@@ -196,6 +196,23 @@ async fn init_theme() -> Result<()> {
     .with_help_message("Choose a license for your theme")
     .prompt()?;
 
+    let min_version = Text::new("Minimum supported Norgolith version (optional):")
+        .with_help_message("e.g. '0.5.0' - warns users running older norgolith versions that the theme may not work properly")
+        .with_validator(|v: &str| {
+            if v.is_empty() {
+                return Ok(Validation::Valid);
+            }
+            match semver::Version::parse(v) {
+                Ok(_) => Ok(Validation::Valid),
+                Err(_) => Ok(Validation::Invalid(
+                    "Invalid semantic version format".into(),
+                )),
+            }
+        })
+        .prompt()
+        .ok()
+        .filter(|s| !s.is_empty());
+
     let repository = Text::new("Repository URL (optional):")
         .with_help_message(
             "Format: 'github:user/repo', 'codeberg:user/repo' or 'sourcehut:user/repo'",
@@ -208,6 +225,7 @@ async fn init_theme() -> Result<()> {
         description,
         version,
         license: license.to_string(),
+        min_version,
     };
 
     // Theme directory structure
@@ -295,7 +313,7 @@ async fn show_theme_info() -> Result<()> {
             tokio::fs::read_to_string(theme_dir.join("theme.toml")).await?;
         let theme_toml: ThemeMetadata = toml::from_str(&theme_toml_content)?;
 
-        let theme_info: Vec<String> = vec![
+        let mut theme_info: Vec<String> = vec![
             format!("\n{}", "Metadata".bold().green()),
             format!("  {} {}:\t {}", "→".blue(), "Name".bold(), theme_toml.name),
             format!(
@@ -330,6 +348,14 @@ async fn show_theme_info() -> Result<()> {
                 if theme_metadata.pin { "yes" } else { "no" }
             ),
         ];
+        if let Some(ref min_ver) = theme_toml.min_version {
+            theme_info.push(format!(
+                "  {} {}:\t {}",
+                "→".blue(),
+                "Minimum Norgolith version".bold(),
+                min_ver
+            ));
+        }
         println!(
             "{}:\n{}",
             "Current theme information".bold(),
