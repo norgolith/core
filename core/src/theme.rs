@@ -177,6 +177,49 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
     Ok(())
 }
 
+/// Check theme's min_version against installed norgolith version.
+/// Warns (not blocks) if norgolith version is older than min_version.
+fn check_min_version(theme_toml_path: &Path, sp: &mut Spinner) {
+    let Ok(content) = std::fs::read_to_string(theme_toml_path) else {
+        debug!("Could not read theme.toml for min_version check");
+        return;
+    };
+    let Ok(metadata) = toml::from_str::<ThemeMetadata>(&content) else {
+        debug!("Could not parse theme.toml for min_version check");
+        return;
+    };
+    let Some(min_version_str) = metadata.min_version else {
+        debug!("No min_version in theme.toml, skipping check");
+        return;
+    };
+    let Ok(min_ver) = Version::parse(&min_version_str) else {
+        debug!("min_version '{}' is not valid semver, skipping", min_version_str);
+        return;
+    };
+
+    let lith_raw = option_env!("LITH_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+    let lith_clean = lith_raw.split('+').next().unwrap_or(lith_raw);
+    let Ok(lith_ver) = Version::parse(lith_clean) else {
+        debug!("Could not parse lith version '{}'", lith_clean);
+        return;
+    };
+
+    if lith_ver < min_ver {
+        sp.stop_and_persist(
+            "⚠",
+            &format!(
+                "Theme requires norgolith >= {}. Current: {}. \
+                 Update via 'cargo install --git https://github.com/norgolith/core' \
+                 or 'cargo install --release --path .' from cloned repo. \
+                 See README for AUR/Nix methods.",
+                min_version_str, lith_clean
+            ),
+        );
+    } else {
+        debug!("min_version {} satisfied by lith {}", min_version_str, lith_clean);
+    }
+}
+
 impl ThemeManager {
     #[instrument(skip(self, sp))]
     pub async fn pull(&mut self, sp: &mut Spinner) -> Result<Self> {
@@ -204,6 +247,9 @@ impl ThemeManager {
         };
         debug!(selected_version = %version, "Found version");
         checkout_version(&repo, &version).await?;
+
+        // Check theme's min_version against current norgolith version
+        check_min_version(&temp_dir.path().join("theme.toml"), sp);
 
         // Backup existing theme files before installing a new one
         let backup_dir = self.theme_dir.parent().unwrap_or(Path::new(".")).join(".theme_backup");
