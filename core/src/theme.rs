@@ -306,6 +306,9 @@ impl ThemeManager {
                 .await
                 .context("Failed to checkout new theme version")?;
 
+            // Check theme's min_version against current norgolith version
+            check_min_version(&temp_dir.path().join("theme.toml"), sp);
+
             // Backup current theme files
             let backup_dir = self.theme_dir.parent().unwrap_or(Path::new(".")).join(".theme_backup");
             backup_theme_files(&self.theme_dir, &backup_dir, sp)
