@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
         .with_target(false)
         .with_file(false)
         .with_ansi(true)
+        .with_ansi_sanitization(false)
         .with_timer(logging_timer)
         .with_env_filter(logging_env)
         .finish();
