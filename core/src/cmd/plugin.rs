@@ -611,7 +611,7 @@ priority = 100
         index.write().unwrap();
         let tree_id = index.write_tree().unwrap();
         let tree = work_repo.find_tree(tree_id).unwrap();
-        let sig = work_repo.signature().unwrap();
+        let sig = git2::Signature::now("test", "test@test.com").unwrap();
         work_repo.commit(Some("HEAD"), &sig, &sig, "init plugin", &tree, &[]).unwrap();
 
         // Push to bare (origin remote was already added by clone)
