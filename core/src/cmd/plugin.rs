@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 use clap::Subcommand;
 use colored::Colorize;
 use eyre::{bail, Result};
+use flate2::read::GzDecoder;
 use git2::Repository;
+use serde::Deserialize;
+use tar::Archive;
 use tempfile::tempdir;
 
 use crate::plugin::{self, PluginManifest, CORE_ABI_VERSION};
@@ -253,10 +256,11 @@ fn install(source: &str, git: bool, tag: Option<&str>, branch: Option<&str>) -> 
         return install_from_local(Path::new(source));
     }
     // crates.io: parse "name@version" or "name" (latest)
-    if source.contains('@') {
-        bail!("crates.io source not yet implemented (Layer 4)");
+    if let Some((name, version)) = source.split_once('@') {
+        install_from_crates_io(name, Some(version))
+    } else {
+        install_from_crates_io(source, None)
     }
-    bail!("crates.io source not yet implemented (Layer 4)");
 }
 
 fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Result<()> {
@@ -327,6 +331,111 @@ fn install_from_local(source_dir: &Path) -> Result<()> {
     build_plugin(source_dir)?;
     let lib_path = find_built_library(source_dir, &manifest.plugin.name)?;
     install_to_plugins(&lib_path, &manifest_path, &manifest.plugin.name)?;
+
+    println!(
+        "Plugin '{}' v{} installed",
+        manifest.plugin.name.bold(),
+        manifest.plugin.version
+    );
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct CrateResponse {
+    #[serde(rename = "crate")]
+    krate: CrateInfo,
+}
+
+#[derive(Deserialize)]
+struct CrateInfo {
+    max_stable_version: Option<String>,
+}
+
+fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
+    let version = match version {
+        Some(v) => v.to_string(),
+        None => {
+            println!("{}", "Fetching crate info...".dimmed());
+            let url = format!("https://crates.io/api/v1/crates/{}", name);
+            let resp: CrateResponse = ureq::get(&url)
+                .header("User-Agent", "norgolith (https://github.com/norgolith)")
+                .call()
+                .map_err(|e| eyre::eyre!("Failed to fetch crate info: {}", e))?
+                .body_mut()
+                .read_json()
+                .map_err(|e| eyre::eyre!("Failed to parse crate info: {}", e))?;
+            resp.krate
+                .max_stable_version
+                .ok_or_else(|| eyre::eyre!("No versions found for crate '{}'", name))?
+        }
+    };
+
+    let tmp = tempdir()?;
+    let dl_path = tmp.path().join("plugin.crate");
+
+    println!("{}", "Downloading crate...".dimmed());
+    let url = format!(
+        "https://crates.io/api/v1/crates/{}/{}/download",
+        name, version
+    );
+    let mut resp = ureq::get(&url)
+        .header("User-Agent", "norgolith (https://github.com/norgolith)")
+        .call()
+        .map_err(|e| eyre::eyre!("Failed to download crate: {}", e))?;
+
+    let body = resp
+        .body_mut()
+        .read_to_vec()
+        .map_err(|e| eyre::eyre!("Failed to read response: {}", e))?;
+    std::fs::write(&dl_path, &body)?;
+
+    println!("{}", "Extracting crate...".dimmed());
+    let tar_gz = std::fs::File::open(&dl_path)?;
+    let decoder = GzDecoder::new(tar_gz);
+    let mut archive = Archive::new(decoder);
+    archive.unpack(tmp.path()).map_err(|e| eyre::eyre!("Failed to extract crate: {}", e))?;
+
+    // Crate tarball extracts to <name>-<version>/ directory
+    let crate_dir = tmp.path().join(format!("{}-{}", name, version));
+    if !crate_dir.is_dir() {
+        // Try without version suffix
+        let alt_dir = tmp.path().join(name);
+        if alt_dir.is_dir() {
+            // Found it
+        } else {
+            bail!(
+                "Could not find extracted crate directory in {}",
+                tmp.path().display()
+            );
+        }
+    }
+
+    let source_dir = if crate_dir.is_dir() {
+        crate_dir
+    } else {
+        tmp.path().join(name)
+    };
+
+    // Validate: must have plugin.toml
+    let manifest_path = source_dir.join("plugin.toml");
+    if !manifest_path.is_file() {
+        bail!(
+            "Crate '{}' is not a norgolith plugin (no plugin.toml found)",
+            name
+        );
+    }
+
+    let manifest = PluginManifest::load(&manifest_path)?;
+    validate_plugin_name(&manifest.plugin.name)?;
+    manifest.validate_abi()?;
+    manifest.validate_semver()?;
+
+    build_plugin(&source_dir)?;
+    let lib_path = find_built_library(&source_dir, &manifest.plugin.name)?;
+    install_to_plugins(&lib_path, &manifest_path, &manifest.plugin.name)?;
+
+    // Cleanup on success
+    tmp.close().ok();
 
     println!(
         "Plugin '{}' v{} installed",

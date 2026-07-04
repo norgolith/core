@@ -60,6 +60,9 @@ dirs = "6.0"
 rayon = "1.12.0"
 libloading = "0.9"
 libc = "0.2"
+ureq = { version = "3.3.0", features = ["json"] }
+tar = "0.4.46"
+flate2 = "1.1.9"
 
 [dev-dependencies]
 mockall = "0.15.0"
