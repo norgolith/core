@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use clap::Subcommand;
 use colored::Colorize;
 use eyre::{bail, Result};
+use git2::Repository;
+use tempfile::tempdir;
 
 use crate::plugin::{self, PluginManifest, CORE_ABI_VERSION};
 
@@ -242,9 +244,9 @@ fn install_to_plugins(lib_path: &Path, manifest_path: &Path, name: &str) -> Resu
     Ok(())
 }
 
-fn install(source: &str, git: bool, _tag: Option<&str>, _branch: Option<&str>) -> Result<()> {
+fn install(source: &str, git: bool, tag: Option<&str>, branch: Option<&str>) -> Result<()> {
     if git {
-        bail!("Git source not yet implemented (Layer 3)");
+        return install_from_git(source, tag, branch);
     }
     // Auto-detect: starts with . or / → local, contains @ → crates.io + version, else → crates.io latest
     if source.starts_with('.') || source.starts_with('/') {
@@ -255,6 +257,53 @@ fn install(source: &str, git: bool, _tag: Option<&str>, _branch: Option<&str>) -
         bail!("crates.io source not yet implemented (Layer 4)");
     }
     bail!("crates.io source not yet implemented (Layer 4)");
+}
+
+fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Result<()> {
+    let tmp = tempdir()?;
+    let clone_path = tmp.path();
+
+    println!("{}", "Cloning repository...".dimmed());
+    Repository::clone(url, clone_path)
+        .map_err(|e| eyre::eyre!("Failed to clone {}: {}", url, e))?;
+
+    // Checkout tag or branch if specified
+    if let Some(tag_name) = tag {
+        let repo = Repository::open(clone_path)?;
+        let obj = repo.revparse_single(tag_name)?;
+        repo.checkout_tree(&obj, None)?;
+    } else if let Some(branch_name) = branch {
+        let repo = Repository::open(clone_path)?;
+        let reference = repo.find_branch(branch_name, git2::BranchType::Local)?;
+        repo.checkout_tree(reference.get().peel_to_tree()?.as_object(), None)?;
+    }
+
+    let manifest_path = clone_path.join("plugin.toml");
+    if !manifest_path.is_file() {
+        bail!(
+            "No plugin.toml found in {} (not a norgolith plugin?)",
+            url
+        );
+    }
+
+    let manifest = PluginManifest::load(&manifest_path)?;
+    validate_plugin_name(&manifest.plugin.name)?;
+    manifest.validate_abi()?;
+    manifest.validate_semver()?;
+
+    build_plugin(clone_path)?;
+    let lib_path = find_built_library(clone_path, &manifest.plugin.name)?;
+    install_to_plugins(&lib_path, &manifest_path, &manifest.plugin.name)?;
+
+    // Cleanup on success
+    tmp.close().ok();
+
+    println!(
+        "Plugin '{}' v{} installed",
+        manifest.plugin.name.bold(),
+        manifest.plugin.version
+    );
+    Ok(())
 }
 
 fn install_from_local(source_dir: &Path) -> Result<()> {
