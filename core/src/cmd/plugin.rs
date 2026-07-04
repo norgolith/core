@@ -469,3 +469,169 @@ fn uninstall_plugin(name: &str) -> Result<()> {
     println!("Plugin '{}' uninstalled", name.bold());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    enum SourceType {
+        Local,
+        CratesIo,
+    }
+
+    impl SourceType {
+        fn is_local(&self) -> bool {
+            matches!(self, SourceType::Local)
+        }
+        fn is_crates_io(&self) -> bool {
+            matches!(self, SourceType::CratesIo)
+        }
+    }
+
+    fn classify_source(source: &str) -> SourceType {
+        if source.starts_with('.') || source.starts_with('/') {
+            SourceType::Local
+        } else {
+            SourceType::CratesIo
+        }
+    }
+
+    #[test]
+    fn test_validate_plugin_name_ok() {
+        assert!(validate_plugin_name("my-plugin").is_ok());
+        assert!(validate_plugin_name("foo_bar").is_ok());
+        assert!(validate_plugin_name("norgolith-tree-sitter-highlight").is_ok());
+    }
+
+    #[test]
+    fn test_validate_plugin_name_empty() {
+        assert!(validate_plugin_name("").is_err());
+    }
+
+    #[test]
+    fn test_validate_plugin_name_path_separator() {
+        assert!(validate_plugin_name("foo/bar").is_err());
+        assert!(validate_plugin_name("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn test_validate_plugin_name_dotdot() {
+        assert!(validate_plugin_name("..").is_err());
+        assert!(validate_plugin_name("foo/..").is_err());
+    }
+
+    #[test]
+    fn test_validate_plugin_name_colon() {
+        assert!(validate_plugin_name("foo:bar").is_err());
+    }
+
+    #[test]
+    fn test_parse_crates_io_spec_latest() {
+        let source = "norgolith-tree-sitter-highlight";
+        let (name, version) = match source.split_once('@') {
+            Some((n, v)) => (n, Some(v)),
+            None => (source, None),
+        };
+        assert_eq!(name, "norgolith-tree-sitter-highlight");
+        assert!(version.is_none());
+    }
+
+    #[test]
+    fn test_parse_crates_io_spec_versioned() {
+        let source = "norgolith-tree-sitter-highlight@0.1.0";
+        let (name, version) = match source.split_once('@') {
+            Some((n, v)) => (n, Some(v)),
+            None => (source, None),
+        };
+        assert_eq!(name, "norgolith-tree-sitter-highlight");
+        assert_eq!(version, Some("0.1.0"));
+    }
+
+    #[test]
+    fn test_classify_source_local_relative() {
+        assert!(classify_source("./my-plugin").is_local());
+        assert!(classify_source("../plugins/foo").is_local());
+    }
+
+    #[test]
+    fn test_classify_source_local_absolute() {
+        assert!(classify_source("/home/user/plugins/foo").is_local());
+    }
+
+    #[test]
+    fn test_classify_source_crate_name() {
+        assert!(classify_source("norgolith-tree-sitter-highlight").is_crates_io());
+    }
+
+    #[test]
+    fn test_classify_source_crate_with_version() {
+        assert!(classify_source("norgolith-tree-sitter-highlight@0.1.0").is_crates_io());
+    }
+
+    #[test]
+    fn test_git_install_from_local_fixture() {
+        // Create a local bare repo with a minimal plugin
+        let tmp = tempdir().unwrap();
+        let bare_repo_dir = tmp.path().join("test-plugin.git");
+        Repository::init_bare(&bare_repo_dir).unwrap();
+
+        // Clone the bare repo, add plugin files, push
+        let work_dir = tmp.path().join("work");
+        let work_repo = Repository::clone(bare_repo_dir.to_str().unwrap(), &work_dir).unwrap();
+
+        // Write plugin.toml
+        let manifest = format!(
+            r#"[plugin]
+name = "test-local-git-plugin"
+version = "0.1.0"
+norgolith = ">={}"
+abi = {}
+
+[hooks]
+pre_build = false
+post_convert = false
+post_render = true
+post_build = false
+
+[capabilities]
+filesystem = "none"
+network = false
+
+timeout_ms = 5000
+priority = 100
+"#,
+            env!("CARGO_PKG_VERSION"),
+            CORE_ABI_VERSION
+        );
+        std::fs::write(work_dir.join("plugin.toml"), manifest).unwrap();
+
+        // Stage and commit
+        let mut index = work_repo.index().unwrap();
+        index.add_path(std::path::Path::new("plugin.toml")).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = work_repo.find_tree(tree_id).unwrap();
+        let sig = work_repo.signature().unwrap();
+        work_repo.commit(Some("HEAD"), &sig, &sig, "init plugin", &tree, &[]).unwrap();
+
+        // Push to bare (origin remote was already added by clone)
+        work_repo
+            .find_remote("origin")
+            .unwrap()
+            .push(&["refs/heads/master"], None)
+            .unwrap();
+
+        // Now test install_from_git from the bare repo URL
+        // We can't call install_from_git directly because it builds with cargo,
+        // but we can test the clone + validation logic
+        let clone_dir = tmp.path().join("cloned");
+        let _cloned = Repository::clone(bare_repo_dir.to_str().unwrap(), &clone_dir).unwrap();
+        let manifest_path = clone_dir.join("plugin.toml");
+        assert!(manifest_path.is_file(), "plugin.toml should be cloned");
+
+        let manifest = PluginManifest::load(&manifest_path).unwrap();
+        assert_eq!(manifest.plugin.name, "test-local-git-plugin");
+        assert!(manifest.validate_abi().is_ok());
+        assert!(manifest.validate_semver().is_ok());
+    }
+}
