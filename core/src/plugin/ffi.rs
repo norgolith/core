@@ -5,6 +5,22 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use eyre::{bail, Result};
+use tracing::{debug, error, info, trace, warn};
+
+/// Core-provided logging callback for plugins. Level: 0=trace, 1=debug, 2=info, 3=warn, 4=error.
+pub extern "C" fn core_log_handler(level: u32, msg: *const c_char) {
+    if msg.is_null() {
+        return;
+    }
+    let text = unsafe { CStr::from_ptr(msg) }.to_string_lossy();
+    match level {
+        0 => trace!(target: "plugin", "{}", text),
+        1 => debug!(target: "plugin", "{}", text),
+        2 => info!(target: "plugin", "{}", text),
+        3 => warn!(target: "plugin", "{}", text),
+        _ => error!(target: "plugin", "{}", text),
+    }
+}
 
 /// Wrapper to make raw pointer results Send-safe across threads
 struct HookResult(Option<*mut c_char>);
@@ -21,6 +37,9 @@ pub struct PluginInfo {
     pub name: *const c_char,
     /// Semantic version for debugging (not validation)
     pub version: *const c_char,
+    /// Core-provided logging callback. Level: 0=trace, 1=debug, 2=info, 3=warn, 4=error.
+    /// Set by core before calling `norgolith_plugin_init`. Plugins may use it or leave it null.
+    pub log_fn: Option<extern "C" fn(u32, *const c_char)>,
 }
 
 /// Function pointer type for plugin hooks

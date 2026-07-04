@@ -241,6 +241,54 @@ fn finalize(json: serde_json::Value) -> Result<Option<String>, String> {
 }
 @end
 
+** Logging
+
+Plugins can log messages through core's tracing system using the `plugin_log!` macro.
+
+@code rust
+plugin_log!("info", "Plugin loaded successfully");
+plugin_log!("warn", "Config key missing: {}", key);
+plugin_log!("error", "Failed to read file: {}", err);
+@end
+
+Levels: `"trace"`, `"debug"`, `"info"`, `"warn"`, `"error"`.
+
+**** C/FFI Plugins
+
+For C plugins, the log callback is available as `info->log_fn` during initialization. Store it in a global variable:
+
+@code c
+static void (*plugin_log)(unsigned int, const char*) = NULL;
+
+void norgolith_plugin_init(struct PluginInfo* info, unsigned int* mask,
+                           void* hooks[4]) {
+    plugin_log = info->log_fn;  // NULL if core doesn't provide
+    // ...
+}
+
+void post_render(const char* input, char** output) {
+    if (plugin_log) {
+        plugin_log(2, "rendering page");  // 2 = info
+    }
+    // ...
+}
+@end
+
+The `PluginInfo` struct layout (`#[repr(C)]`):
+
+@code c
+typedef void (*LogFn)(unsigned int level, const char* msg);
+
+struct PluginInfo {
+    unsigned int abi_version;
+    const char* name;
+    const char* version;
+    LogFn log_fn;  // set by core before init, NULL if unavailable
+};
+@end
+
+Level mapping: `0`=trace, `1`=debug, `2`=info, `3`=warn, `4`=error.
+
 ** CLI Commands
 
 *** lith plugin new \<name\>
@@ -276,7 +324,7 @@ lith plugin install --git https://github.com/user/my-plugin --branch main
 
 **** crates.io
 
-Install from crates.io (norgolith plugin convention: package names start with @code{rust}norgolith-plugin-@{end}):
+Install from crates.io (norgolith plugin convention: package names start with `norgolith-plugin-`):
 
 @code bash
 lith plugin install norgolith-plugin-my-plugin

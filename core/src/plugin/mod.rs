@@ -257,6 +257,7 @@ fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
         abi_version: 0,
         name: std::ptr::null(),
         version: std::ptr::null(),
+        log_fn: Some(ffi::core_log_handler),
     };
     let mut hook_mask = 0u32;
     let mut hooks: [Option<PluginFn>; 4] = [None, None, None, None];

@@ -1,5 +1,6 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::sync::OnceLock;
 
 /// Current ABI version that plugins must target
 pub const CORE_ABI_VERSION: u32 = 1;
@@ -19,6 +20,9 @@ pub struct PluginInfo {
     pub name: *const c_char,
     /// Semantic version for debugging (not validation)
     pub version: *const c_char,
+    /// Core-provided logging callback. Level: 0=trace, 1=debug, 2=info, 3=warn, 4=error.
+    /// Set by core before calling `norgolith_plugin_init`. Plugins may use it or leave it null.
+    pub log_fn: Option<extern "C" fn(u32, *const c_char)>,
 }
 
 /// Function pointer type for plugin hooks
@@ -111,6 +115,46 @@ pub fn __set_hook(
     }
 }
 
+/// Store the core-provided log callback. Called during plugin init.
+pub fn __set_log_fn(f: extern "C" fn(u32, *const c_char)) {
+    let _ = PLUGIN_LOG_FN.set(f);
+}
+
+static PLUGIN_LOG_FN: OnceLock<extern "C" fn(u32, *const c_char)> = OnceLock::new();
+
+/// Log a message through the core logging system.
+///
+/// Level must be one of: "trace", "debug", "info", "warn", "error".
+///
+/// # Example
+/// ```ignore
+/// plugin_log!("info", "something happened");
+/// plugin_log!("error", "something broke: {}", err);
+/// ```
+#[macro_export]
+macro_rules! plugin_log {
+    ($level:expr, $($arg:tt)*) => {
+        if let Some(f) = $crate::__log_fn() {
+            let msg = format!($($arg)*);
+            let level_num = match $level {
+                "trace" => 0u32,
+                "debug" => 1u32,
+                "info" => 2u32,
+                "warn" => 3u32,
+                _ => 4u32,
+            };
+            if let Ok(c_msg) = std::ffi::CString::new(msg) {
+                f(level_num, c_msg.as_ptr());
+            }
+        }
+    };
+}
+
+/// Get the stored log function, if any.
+pub fn __log_fn() -> Option<extern "C" fn(u32, *const c_char)> {
+    PLUGIN_LOG_FN.get().copied()
+}
+
 /// Register a plugin with the given name and version.
 ///
 /// Generates the `norgolith_plugin_init` function and bridge functions for each hook.
@@ -147,10 +191,16 @@ macro_rules! register_plugin {
             mask: &mut u32,
             hooks: &mut [Option<$crate::PluginFn>; 4],
         ) {
+            // Store the core-provided log callback
+            if let Some(f) = info.log_fn {
+                $crate::__set_log_fn(f);
+            }
+
             *info = $crate::PluginInfo {
                 abi_version: $crate::CORE_ABI_VERSION,
                 name: concat!($name, "\0").as_ptr() as *const ::std::os::raw::c_char,
                 version: concat!($version, "\0").as_ptr() as *const ::std::os::raw::c_char,
+                log_fn: None,
             };
             *mask = 0;
             *hooks = [None, None, None, None];
