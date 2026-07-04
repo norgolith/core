@@ -31,7 +31,7 @@ pub fn handle(subcommand: &PluginCommands) -> Result<()> {
     match subcommand {
         PluginCommands::List => list_plugins(),
         PluginCommands::New { name } => new_plugin(name),
-        PluginCommands::Install { path } => install_plugin(path),
+        PluginCommands::Install { path } => install_from_local(path),
         PluginCommands::Uninstall { name } => uninstall_plugin(name),
     }
 }
@@ -185,7 +185,53 @@ register_plugin!("{name}", "0.1.0")
     Ok(())
 }
 
-fn install_plugin(source_dir: &Path) -> Result<()> {
+fn build_plugin(source_dir: &Path) -> Result<()> {
+    println!("{}", "Building plugin...".dimmed());
+    let status = std::process::Command::new("cargo")
+        .arg("build")
+        .arg("--release")
+        .current_dir(source_dir)
+        .status()?;
+    if !status.success() {
+        bail!("cargo build failed");
+    }
+    Ok(())
+}
+
+fn find_built_library(source_dir: &Path, name: &str) -> Result<PathBuf> {
+    let target_dir = source_dir.join("target").join("release");
+    let lib_name = plugin::library_filename(name);
+    let lib_path = target_dir.join(&lib_name);
+    if lib_path.is_file() {
+        return Ok(lib_path);
+    }
+    // Fallback: scan for any matching library
+    let ext = plugin::library_extension();
+    std::fs::read_dir(&target_dir)
+        .ok()
+        .and_then(|entries| {
+            entries.filter_map(|e| e.ok()).find(|e| {
+                e.path()
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s == ext)
+                    .unwrap_or(false)
+            })
+        })
+        .map(|e| e.path())
+        .ok_or_else(|| eyre::eyre!("Built library not found in {}", target_dir.display()))
+}
+
+fn install_to_plugins(lib_path: &Path, manifest_path: &Path, name: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let dest_dir = cwd.join("plugins").join(name);
+    std::fs::create_dir_all(&dest_dir)?;
+    std::fs::copy(lib_path, dest_dir.join(lib_path.file_name().unwrap()))?;
+    std::fs::copy(manifest_path, dest_dir.join("plugin.toml"))?;
+    Ok(())
+}
+
+fn install_from_local(source_dir: &Path) -> Result<()> {
     if !source_dir.is_dir() {
         bail!("Not a directory: {}", source_dir.display());
     }
@@ -203,63 +249,9 @@ fn install_plugin(source_dir: &Path) -> Result<()> {
     manifest.validate_abi()?;
     manifest.validate_semver()?;
 
-    // Build the plugin
-    println!("{}", "Building plugin...".dimmed());
-    let status = std::process::Command::new("cargo")
-        .arg("build")
-        .arg("--release")
-        .current_dir(source_dir)
-        .status()?;
-
-    if !status.success() {
-        bail!("cargo build failed");
-    }
-
-    // Find the built library
-    let target_dir = source_dir.join("target").join("release");
-    let lib_name = plugin::library_filename(&manifest.plugin.name);
-    let lib_path = target_dir.join(&lib_name);
-
-    if !lib_path.is_file() {
-        // Fallback: scan for any matching library
-        let ext = plugin::library_extension();
-        let found = std::fs::read_dir(&target_dir)
-            .ok()
-            .and_then(|entries| {
-                entries
-                    .filter_map(|e| e.ok())
-                    .find(|e| {
-                        e.path()
-                            .extension()
-                            .and_then(|s| s.to_str())
-                            .map(|s| s == ext)
-                            .unwrap_or(false)
-                    })
-                    .map(|e| e.path())
-            });
-
-        match found {
-            Some(path) => {
-                let cwd = std::env::current_dir()?;
-                let dest_dir = cwd.join("plugins").join(&manifest.plugin.name);
-                std::fs::create_dir_all(&dest_dir)?;
-                std::fs::copy(&path, dest_dir.join(path.file_name().unwrap()))?;
-                std::fs::copy(&manifest_path, dest_dir.join("plugin.toml"))?;
-            }
-            None => {
-                bail!(
-                    "Built library not found in {}",
-                    target_dir.display()
-                );
-            }
-        }
-    } else {
-        let cwd = std::env::current_dir()?;
-        let dest_dir = cwd.join("plugins").join(&manifest.plugin.name);
-        std::fs::create_dir_all(&dest_dir)?;
-        std::fs::copy(&lib_path, dest_dir.join(&lib_name))?;
-        std::fs::copy(&manifest_path, dest_dir.join("plugin.toml"))?;
-    }
+    build_plugin(source_dir)?;
+    let lib_path = find_built_library(source_dir, &manifest.plugin.name)?;
+    install_to_plugins(&lib_path, &manifest_path, &manifest.plugin.name)?;
 
     println!(
         "Plugin '{}' v{} installed",
