@@ -38,6 +38,8 @@ pub struct TransformContext {
     pub html: String,
     pub metadata: serde_json::Value,
     pub rel_path: String,
+    #[serde(default)]
+    pub config: Option<serde_json::Value>,
 }
 
 /// Context for the post_build hook

@@ -193,6 +193,7 @@ fn transform(json: serde_json::Value) -> Result<Option<String>, String> {
     // ctx.html       -> the HTML content
     // ctx.metadata   -> page metadata as JSON (title, date, tags, etc.)
     // ctx.rel_path   -> relative path (e.g. "posts/hello.norg")
+    // ctx.config     -> per-plugin config from norgolith.toml (optional)
 
     // Return the modified HTML
     Ok(Some(ctx.html.replace("<p>", "<p class=\"lead\">")))
@@ -208,6 +209,9 @@ Runs after Tera layout is applied. The input is the complete HTML page (includin
 fn inject(json: serde_json::Value) -> Result<Option<String>, String> {
     let ctx: TransformContext = serde_json::from_value(json)
         .map_err(|e| e.to_string())?;
+
+    // ctx.html     -> the complete HTML page
+    // ctx.config   -> per-plugin config from norgolith.toml (optional)
 
     // Inject before </head>
     if let Some(pos) = ctx.html.find("</head>") {
