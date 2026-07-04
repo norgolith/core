@@ -247,13 +247,39 @@ Create a new plugin project with the basic structure.
 lith plugin new my-plugin
 @end
 
-*** lith plugin install \<path\>
+*** lith plugin install \<source\>
 
-Build a plugin from source and install it into your site's `plugins/` directory.
+Build and install a plugin from a local path, git repository, or crates.io package.
+
+**** Local (development)
+
+Install from a local directory:
 
 @code bash
-lith plugin install plugins/my-plugin
+lith plugin install ./plugins/my-plugin
+lith plugin install /absolute/path/to/plugin
 @end
+
+**** Git repository
+
+Install from a git repository:
+
+@code bash
+lith plugin install --git https://github.com/user/my-plugin
+lith plugin install --git https://github.com/user/my-plugin --tag v1.0.0
+lith plugin install --git https://github.com/user/my-plugin --branch main
+@end
+
+**** crates.io
+
+Install from crates.io (norgolith plugin convention: package names start with @code{rust}norgolith-plugin-@{end}):
+
+@code bash
+lith plugin install norgolith-plugin-my-plugin
+lith plugin install norgolith-plugin-my-plugin@0.1.0
+@end
+
+If no version is specified, the latest stable version is installed.
 
 *** lith plugin list
 
