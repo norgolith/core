@@ -15,10 +15,19 @@ pub enum PluginCommands {
         /// Plugin name (used for directory and crate name)
         name: String,
     },
-    /// Build and install a plugin from a local path
+    /// Build and install a plugin
     Install {
-        /// Path to the plugin directory (containing Cargo.toml)
-        path: PathBuf,
+        /// Plugin source: local path, crates.io name, or git URL (with --git)
+        source: String,
+        /// Install from a git repository
+        #[arg(long)]
+        git: bool,
+        /// Git tag to checkout
+        #[arg(long)]
+        tag: Option<String>,
+        /// Git branch to checkout
+        #[arg(long)]
+        branch: Option<String>,
     },
     /// Remove an installed plugin
     Uninstall {
@@ -31,7 +40,9 @@ pub fn handle(subcommand: &PluginCommands) -> Result<()> {
     match subcommand {
         PluginCommands::List => list_plugins(),
         PluginCommands::New { name } => new_plugin(name),
-        PluginCommands::Install { path } => install_from_local(path),
+        PluginCommands::Install { source, git, tag, branch } => {
+            install(source, *git, tag.as_deref(), branch.as_deref())
+        }
         PluginCommands::Uninstall { name } => uninstall_plugin(name),
     }
 }
@@ -229,6 +240,21 @@ fn install_to_plugins(lib_path: &Path, manifest_path: &Path, name: &str) -> Resu
     std::fs::copy(lib_path, dest_dir.join(lib_path.file_name().unwrap()))?;
     std::fs::copy(manifest_path, dest_dir.join("plugin.toml"))?;
     Ok(())
+}
+
+fn install(source: &str, git: bool, _tag: Option<&str>, _branch: Option<&str>) -> Result<()> {
+    if git {
+        bail!("Git source not yet implemented (Layer 3)");
+    }
+    // Auto-detect: starts with . or / → local, contains @ → crates.io + version, else → crates.io latest
+    if source.starts_with('.') || source.starts_with('/') {
+        return install_from_local(Path::new(source));
+    }
+    // crates.io: parse "name@version" or "name" (latest)
+    if source.contains('@') {
+        bail!("crates.io source not yet implemented (Layer 4)");
+    }
+    bail!("crates.io source not yet implemented (Layer 4)");
 }
 
 fn install_from_local(source_dir: &Path) -> Result<()> {
