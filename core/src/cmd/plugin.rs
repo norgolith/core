@@ -180,6 +180,10 @@ norgolith-plugin-sdk = "0.1"
 
 register_plugin!("{name}", "0.1.0")
     .on_post_render(|ctx| {{
+        // Access per-plugin config from norgolith.toml
+        // if let Some(theme) = ctx.config.as_ref().and_then(|c| c.get("theme")) {{
+        //     println!("Config theme: {{theme}}");
+        // }}
         Ok(Some(ctx.html))
     }})
     .register();

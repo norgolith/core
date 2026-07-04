@@ -88,6 +88,8 @@ pub struct SiteConfig {
     #[serde(default)]
     pub seo: Option<SiteConfigSeo>,
     pub robots: Option<SiteConfigRobots>,
+    #[serde(default, rename = "plugins")]
+    pub plugins: Option<HashMap<String, toml::Value>>,
 }
 
 impl Default for SiteConfig {
@@ -105,6 +107,7 @@ impl Default for SiteConfig {
             categories_dir: default_categories_dir(),
             seo: None,
             robots: None,
+            plugins: None,
         }
     }
 }

@@ -350,14 +350,21 @@ fn build_content_entry(
     // post_convert hook: modify HTML after Norg conversion, before Tera
     if plugin_mgr.has_hook(plugin::HOOK_POST_CONVERT) {
         if let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) {
-            let input = serde_json::json!({
-                "html": html,
-                "metadata": metadata,
-                "rel_path": rel_path.to_string_lossy(),
-            })
-            .to_string();
+            let html = html.to_string();
             for p in plugin_mgr.plugins() {
                 if let Some(f) = p.hooks.post_convert {
+                    let plugin_config = site_config
+                        .plugins
+                        .as_ref()
+                        .and_then(|m| m.get(&p.name))
+                        .cloned();
+                    let input = serde_json::json!({
+                        "html": html,
+                        "metadata": metadata,
+                        "rel_path": rel_path.to_string_lossy(),
+                        "config": plugin_config,
+                    })
+                    .to_string();
                     match plugin_mgr.call_hook(p, f, &input) {
                         Ok(Some(new_html)) => {
                             if let toml::Value::Table(ref mut table) = metadata {
@@ -388,14 +395,20 @@ fn build_content_entry(
 
     // post_render hook: modify final HTML after Tera, before write
     if plugin_mgr.has_hook(plugin::HOOK_POST_RENDER) {
-        let input = serde_json::json!({
-            "html": rendered,
-            "metadata": metadata,
-            "rel_path": rel_path.to_string_lossy(),
-        })
-        .to_string();
         for p in plugin_mgr.plugins() {
             if let Some(f) = p.hooks.post_render {
+                let plugin_config = site_config
+                    .plugins
+                    .as_ref()
+                    .and_then(|m| m.get(&p.name))
+                    .cloned();
+                let input = serde_json::json!({
+                    "html": rendered,
+                    "metadata": metadata,
+                    "rel_path": rel_path.to_string_lossy(),
+                    "config": plugin_config,
+                })
+                .to_string();
                 match plugin_mgr.call_hook(p, f, &input) {
                     Ok(Some(new_html)) => {
                         rendered = new_html;
