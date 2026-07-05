@@ -18,45 +18,8 @@ fn href_root_re() -> &'static regex::Regex {
 }
 
 use crate::{cache::BuildCache, config, fs, plugin, shared};
+use crate::shared::{BuildContext, SitePaths};
 use super::seo;
-
-/// Represents the directory structure of a Norgolith site.
-///
-/// This struct defines paths to key directories used during the build process,
-/// including build artifacts, public output, content sources, and theme resources.
-#[derive(Debug)]
-struct SitePaths {
-    public: PathBuf,
-    content: PathBuf,
-    assets: PathBuf,
-    theme_assets: PathBuf,
-    templates: PathBuf,
-    theme_templates: PathBuf,
-}
-
-impl SitePaths {
-    /// Creates a new `SitePaths` instance based on the provided root directory.
-    ///
-    /// Initializes paths for build artifacts, public output, content sources,
-    /// assets, theme assets, and templates by combining with root subdirectories.
-    ///
-    /// # Arguments
-    /// * `root` - Root directory containing norgolith.toml config file
-    #[instrument]
-    fn new(root: PathBuf) -> Self {
-        debug!("Initializing site paths");
-        let paths = Self {
-            public: root.join("public"),
-            content: root.join("content"),
-            assets: root.join("assets"),
-            theme_assets: root.join("theme/assets"),
-            theme_templates: root.join("theme/templates"),
-            templates: root.join("templates"),
-        };
-        debug!(?paths, "Configured site directories");
-        paths
-    }
-}
 
 /// Prepares the build directory by cleaning existing artifacts
 ///
@@ -185,25 +148,20 @@ fn generate_xml_feeds(
 /// Performs concurrent processing of build artifacts with validation.
 ///
 /// # Arguments
-/// * `tera` - Template engine instance
-/// * `paths` - Site directory paths
-/// * `site_config` - Site configuration
+/// * `ctx` - Shared build context (tera, paths, site_config, plugins)
+/// * `shared_context` - Pre-built Tera context for templates
+/// * `cache` - Build cache for incremental builds
 /// * `minify` - Enable minification of output
-#[allow(clippy::too_many_arguments)]
-#[instrument(level = "debug", skip(tera, paths, site_config, shared_context, cache, plugin_mgr))]
+#[instrument(level = "debug", skip(ctx, shared_context, cache))]
 fn build_contents(
-    tera: &Tera,
-    paths: &SitePaths,
-    posts: &[toml::Value],
-    site_config: &config::SiteConfig,
+    ctx: BuildContext<'_>,
     shared_context: &Context,
     cache: &mut BuildCache,
     minify: bool,
-    plugin_mgr: &plugin::PluginManager,
 ) -> Result<(usize, Vec<String>, BuildTimings)> {
     use rayon::prelude::*;
 
-    let entries: Vec<_> = WalkDir::new(&paths.content)
+    let entries: Vec<_> = WalkDir::new(&ctx.paths.content)
         .into_iter()
         .filter_map(|e| match e {
             Ok(e) => Some(e),
@@ -220,16 +178,7 @@ fn build_contents(
         .par_iter()
         .map(|entry| {
             let path = entry.path();
-            build_content_entry(
-                path,
-                tera,
-                paths,
-                site_config,
-                minify,
-                shared_context,
-                cache,
-                plugin_mgr,
-            )
+            build_content_entry(path, ctx, shared_context, cache, minify)
         })
         .collect();
 
@@ -277,23 +226,19 @@ type BuildResult = Result<Option<(PathBuf, String, String, Option<CacheInsert>)>
 /// Handles template rendering, metadata validation, and output path determination.
 /// Skips draft content and applies minification when enabled.
 /// Returns `(public_path, rendered_content)` for deferred writing.
-#[allow(clippy::too_many_arguments)]
 #[instrument(
     level = "debug",
-    skip(tera, paths, site_config, shared_context, cache, plugin_mgr)
+    skip(path, ctx, shared_context, cache)
 )]
 fn build_content_entry(
     path: &Path,
-    tera: &Tera,
-    paths: &SitePaths,
-    site_config: &config::SiteConfig,
-    minify: bool,
+    ctx: BuildContext<'_>,
     shared_context: &Context,
     cache: &BuildCache,
-    plugin_mgr: &plugin::PluginManager,
+    minify: bool,
 ) -> BuildResult {
     let rel_path = path
-        .strip_prefix(&paths.content)
+        .strip_prefix(&ctx.paths.content)
         .wrap_err("Failed to strip prefix")?;
 
     // Read file
@@ -307,13 +252,13 @@ fn build_content_entry(
     };
 
     // Lightweight metadata extraction
-    let metadata = shared::extract_metadata_from_content(&content, rel_path, &site_config.root_url);
+    let metadata = shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
 
     // Schema validation
-    if let Some(schema) = &site_config.content_schema {
-        if !rel_path.starts_with(&site_config.categories_dir) {
+    if let Some(schema) = &ctx.site_config.content_schema {
+        if !rel_path.starts_with(&ctx.site_config.categories_dir) {
             let errors =
-                shared::validate_content_metadata(&paths.content, path, &metadata, schema, false)?;
+                shared::validate_content_metadata(&ctx.paths.content, path, &metadata, schema, false)?;
             if !errors.is_empty() {
                 return Err(eyre!("{}", errors));
             }
@@ -336,24 +281,24 @@ fn build_content_entry(
         match serde_json::from_value::<toml::Value>(cached.clone()) {
             Ok(md) => (md, None),
             Err(_) => {
-                let md = shared::load_metadata_from_content(&content, rel_path, &site_config.root_url);
+                let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
                 let cache_val = serde_json::to_value(&md).unwrap_or_default();
                 (md, Some((cache_key, content.clone(), cache_val)))
             }
         }
     } else {
-        let md = shared::load_metadata_from_content(&content, rel_path, &site_config.root_url);
+        let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
         let cache_val = serde_json::to_value(&md).unwrap_or_default();
         (md, Some((cache_key, content.clone(), cache_val)))
     };
 
     // post_convert hook: modify HTML after Norg conversion, before Tera
-    if plugin_mgr.has_hook(plugin::HOOK_POST_CONVERT) {
+    if ctx.plugins.has_hook(plugin::HOOK_POST_CONVERT) {
         if let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) {
             let html = html.to_string();
-            for p in plugin_mgr.plugins() {
+            for p in ctx.plugins.plugins() {
                 if let Some(f) = p.hooks.post_convert {
-                    let plugin_config = site_config
+                    let plugin_config = ctx.site_config
                         .plugins
                         .as_ref()
                         .and_then(|m| m.get(&p.name))
@@ -365,7 +310,7 @@ fn build_content_entry(
                         "config": plugin_config,
                     })
                     .to_string();
-                    match plugin_mgr.call_hook(p, f, &input) {
+                    match ctx.plugins.call_hook(p, f, &input) {
                         Ok(Some(new_html)) => {
                             if let toml::Value::Table(ref mut table) = metadata {
                                 table.insert("raw".to_string(), toml::Value::String(new_html));
@@ -388,16 +333,16 @@ fn build_content_entry(
     }
 
     // Determine output path
-    let public_path = determine_public_path(&paths.public, rel_path)?;
+    let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
 
     // Template render
-    let mut rendered = shared::render_norg_page(tera, &metadata, shared_context)?;
+    let mut rendered = shared::render_norg_page(ctx.tera, &metadata, shared_context)?;
 
     // post_render hook: modify final HTML after Tera, before write
-    if plugin_mgr.has_hook(plugin::HOOK_POST_RENDER) {
-        for p in plugin_mgr.plugins() {
+    if ctx.plugins.has_hook(plugin::HOOK_POST_RENDER) {
+        for p in ctx.plugins.plugins() {
             if let Some(f) = p.hooks.post_render {
-                let plugin_config = site_config
+                let plugin_config = ctx.site_config
                     .plugins
                     .as_ref()
                     .and_then(|m| m.get(&p.name))
@@ -409,7 +354,7 @@ fn build_content_entry(
                     "config": plugin_config,
                 })
                 .to_string();
-                match plugin_mgr.call_hook(p, f, &input) {
+                match ctx.plugins.call_hook(p, f, &input) {
                     Ok(Some(new_html)) => {
                         rendered = new_html;
                     }
@@ -431,7 +376,7 @@ fn build_content_entry(
     // Href rewrite
     let href_re = href_root_re();
     rendered = href_re
-        .replace_all(&rendered, format!("href=\"{}/", site_config.root_url))
+        .replace_all(&rendered, format!("href=\"{}/", ctx.site_config.root_url))
         .into_owned();
 
     // Minify
@@ -1060,7 +1005,8 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Build content
     let t = Instant::now();
-    let (page_count, permalinks, content_timings) = build_contents(&tera, &paths, &posts, &site_config, &shared_context, &mut cache, minify, &plugin_mgr)?;
+    let ctx = BuildContext { tera: &tera, paths: &paths, site_config: &site_config, plugins: &plugin_mgr };
+    let (page_count, permalinks, content_timings) = build_contents(ctx, &shared_context, &mut cache, minify)?;
     timings.content_ms = t.elapsed().as_millis();
     timings.page_count = page_count;
     // Copy per-page sub-timings from the concurrent build

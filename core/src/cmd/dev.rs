@@ -28,49 +28,7 @@ use tracing::{debug, error, info, instrument, warn};
 use walkdir::WalkDir;
 
 use crate::{config, fs, plugin, shared};
-
-/// Represents the directory structure of a Norgolith site.
-///
-/// This struct defines the paths to key directories in a Norgolith site, including
-/// content, assets, templates, and theme-specific assets and templates. It is used
-/// to organize and manage the file structure of the site.
-#[derive(Debug)]
-struct SitePaths {
-    config_file: PathBuf,
-    content: PathBuf,
-    assets: PathBuf,
-    templates: PathBuf,
-    theme_assets: PathBuf,
-    theme_templates: PathBuf,
-}
-
-impl SitePaths {
-    /// Creates a new `SitePaths` instance based on the provided root directory.
-    ///
-    /// This function initializes the paths for the content, assets, templates, and
-    /// theme-specific directories by joining the root directory with the respective
-    /// subdirectories.
-    ///
-    /// # Arguments
-    /// * `root` - The root directory of the Norgolith site.
-    ///
-    /// # Returns
-    /// * `SitePaths` - A new instance of `SitePaths` with the initialized directory paths.
-    #[instrument(skip(root))]
-    fn new(root: PathBuf) -> Self {
-        debug!("Initializing site paths");
-        let paths = Self {
-            config_file: root.join("norgolith.toml"),
-            content: root.join("content"),
-            assets: root.join("assets"),
-            theme_assets: root.join("theme/assets"),
-            templates: root.join("templates"),
-            theme_templates: root.join("theme/templates"),
-        };
-        debug!(?paths, "Configured site directories");
-        paths
-    }
-}
+use crate::shared::{BuildContext, SitePaths};
 
 /// Global state for the server, including reloading functionality.
 ///
@@ -162,13 +120,10 @@ impl ServerState {
         let cache = self.cache.read().await;
 
         match render_all_pages(
-            &tera,
-            &self.paths,
-            &config,
-            &self.routes_url,
+            BuildContext { tera: &tera, paths: &self.paths, site_config: &config, plugins: &self.plugin_mgr },
             &posts,
+            &self.routes_url,
             &cache,
-            &self.plugin_mgr,
         ) {
             Ok(new_pages) => {
                 let mut pages = self.rendered_pages.write().await;
@@ -1152,29 +1107,25 @@ async fn handle_server_request(
 /// Walks the content directory, renders each .norg file through the Tera template
 /// pipeline, and stores the HTML indexed by URL path. Also pre-renders category
 /// pages and XML feed templates.
-#[allow(clippy::too_many_arguments)]
 fn render_all_pages(
-    tera: &Tera,
-    paths: &SitePaths,
-    config: &config::SiteConfig,
-    routes_url: &str,
+    ctx: BuildContext<'_>,
     posts: &[toml::Value],
+    routes_url: &str,
     cache: &crate::cache::BuildCache,
-    plugin_mgr: &plugin::PluginManager,
 ) -> Result<HashMap<String, String>> {
     let mut pages = HashMap::new();
 
-    let collections = shared::precompute_collection_subsets(posts, config);
-    let shared_context = shared::build_shared_context(posts, config, &collections);
+    let collections = shared::precompute_collection_subsets(posts, ctx.site_config);
+    let shared_context = shared::build_shared_context(posts, ctx.site_config, &collections);
 
     // Render content pages
-    for entry in WalkDir::new(&paths.content)
+    for entry in WalkDir::new(&ctx.paths.content)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "norg"))
     {
         let path = entry.path();
-        let rel_path = match path.strip_prefix(&paths.content) {
+        let rel_path = match path.strip_prefix(&ctx.paths.content) {
             Ok(p) => p,
             Err(_) => continue,
         };
@@ -1204,12 +1155,12 @@ fn render_all_pages(
         };
 
         // post_convert hook: modify HTML after Norg conversion, before Tera
-        if plugin_mgr.has_hook(plugin::HOOK_POST_CONVERT) {
+        if ctx.plugins.has_hook(plugin::HOOK_POST_CONVERT) {
             if let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) {
                 let html = html.to_string();
-                for p in plugin_mgr.plugins() {
+                for p in ctx.plugins.plugins() {
                     if let Some(f) = p.hooks.post_convert {
-                        let plugin_config = config
+                        let plugin_config = ctx.site_config
                             .plugins
                             .as_ref()
                             .and_then(|m| m.get(&p.name))
@@ -1221,7 +1172,7 @@ fn render_all_pages(
                             "config": plugin_config,
                         })
                         .to_string();
-                        match plugin_mgr.call_hook(p, f, &input) {
+                        match ctx.plugins.call_hook(p, f, &input) {
                             Ok(Some(new_html)) => {
                                 if let toml::Value::Table(ref mut table) = metadata {
                                     table.insert("raw".to_string(), toml::Value::String(new_html));
@@ -1243,13 +1194,13 @@ fn render_all_pages(
             }
         }
 
-        let mut body = shared::render_norg_page(tera, &metadata, &shared_context)?;
+        let mut body = shared::render_norg_page(ctx.tera, &metadata, &shared_context)?;
 
         // post_render hook: modify final HTML after Tera, before URL rewrite
-        if plugin_mgr.has_hook(plugin::HOOK_POST_RENDER) {
-            for p in plugin_mgr.plugins() {
+        if ctx.plugins.has_hook(plugin::HOOK_POST_RENDER) {
+            for p in ctx.plugins.plugins() {
                 if let Some(f) = p.hooks.post_render {
-                    let plugin_config = config
+                    let plugin_config = ctx.site_config
                         .plugins
                         .as_ref()
                         .and_then(|m| m.get(&p.name))
@@ -1261,7 +1212,7 @@ fn render_all_pages(
                         "config": plugin_config,
                     })
                     .to_string();
-                    match plugin_mgr.call_hook(p, f, &input) {
+                    match ctx.plugins.call_hook(p, f, &input) {
                         Ok(Some(new_html)) => {
                             body = new_html;
                         }
@@ -1282,7 +1233,7 @@ fn render_all_pages(
 
         // Always use the proper URL to the development server for template links that refers
         // to the local URL, this is useful when running the server exposed to LAN network
-        body = body.replace(&config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
+        body = body.replace(&ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
 
         // URL path: /{rel_path_without_extension}
         let url_path = format!("/{}", rel_path.with_extension("").display());
@@ -1291,9 +1242,9 @@ fn render_all_pages(
 
     // Pre-render category index
     if !posts.is_empty() {
-        if let Ok(body) = shared::render_category_index(tera, posts, config, &collections) {
-            let body = body.replace(&config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
-            pages.insert(format!("/{}", config.categories_dir), body);
+        if let Ok(body) = shared::render_category_index(ctx.tera, posts, ctx.site_config, &collections) {
+            let body = body.replace(&ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
+            pages.insert(format!("/{}", ctx.site_config.categories_dir), body);
         }
 
         // Pre-render individual category pages
@@ -1310,7 +1261,7 @@ fn render_all_pages(
                 .collect();
 
             let mut context = Context::new();
-            context.insert("config", config);
+            context.insert("config", ctx.site_config);
             context.insert("category", category);
             context.insert("posts", &category_posts);
             context.insert(
@@ -1318,23 +1269,23 @@ fn render_all_pages(
                 option_env!("LITH_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
             );
 
-            if let Ok(body) = tera.render("category.html", &context) {
+            if let Ok(body) = ctx.tera.render("category.html", &context) {
                 let body =
-                    body.replace(&config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
-                let url_path = format!("/{}/{}", config.categories_dir, category);
+                    body.replace(&ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
+                let url_path = format!("/{}/{}", ctx.site_config.categories_dir, category);
                 pages.insert(url_path, body);
             }
         }
     }
 
     // Pre-render XML feed templates
-    for template_name in tera.get_template_names() {
+    for template_name in ctx.tera.get_template_names() {
         if !template_name.ends_with(".xml") {
             continue;
         }
         let mut context = shared_context.clone();
         context.insert("now", &Utc::now());
-        if let Ok(body) = tera.render(template_name, &context) {
+        if let Ok(body) = ctx.tera.render(template_name, &context) {
             let url_path = format!("/{}", template_name);
             pages.insert(url_path, body);
         }
@@ -1433,13 +1384,10 @@ async fn setup_server_state(
 
     // Pre-render all pages into memory for instant serving
     let rendered_pages = render_all_pages(
-        &tera,
-        &paths,
-        &site_config,
-        &routes_url,
+        BuildContext { tera: &tera, paths: &paths, site_config: &site_config, plugins: &plugin_mgr },
         &posts,
+        &routes_url,
         &cache,
-        &plugin_mgr,
     )?;
 
     let tera = Arc::new(RwLock::new(tera));
