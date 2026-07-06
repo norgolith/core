@@ -1,0 +1,121 @@
+@document.meta
+title: Tera v2 Migration Guide
+description: Breaking changes and migration steps for Tera v2
+authors: [
+  NTBBloodbath
+]
+categories: [
+  docs
+]
+created: 2026-07-06T00:00:00-0400
+updated: 2026-07-06T00:00:00-0400
+draft: false
+layout: docs
+version: 1.1.1
+@end
+
+Norgolith has migrated from Tera v1 to Tera v2. This guide covers what changed
+and how to update your templates.
+
+** What changed
+
+*** Optional chaining
+
+Tera v2 replaces the is defined test with optional chaining via the ?.
+operator. Undefined fields in root position cause errors. The ?.? operator
+returns undefined (falsy) instead of erroring.
+
+Before:
+@code django
+{% if config.highlighter is defined and config.highlighter.enable %}
+@end
+
+After:
+@code django
+{% if config.highlighter?.enable %}
+@end
+
+The ?.? operator works anywhere a field might be undefined for safe access.
+
+*** now() function
+
+Built-in now() was removed. Use tera-contrib date functions instead.
+
+Before:
+@code django
+{{ now(format="%Y") }}
+@end
+
+After:
+@code django
+{{ now() | date(format="%Y") }}
+@end
+
+*** matching test
+
+The matching test now requires a keyword argument named pat.
+
+Before:
+@code django
+{% if value is matching("^nil$") %}
+@end
+
+After:
+@code django
+{% if value is matching(pat="^nil$") %}
+@end
+
+*** Removed filters
+
+These filters were removed from Tera v2 core: concat, map, addslashes,
+and get_env. Norgolith provides backward-compatible shims for two commonly
+used filters: the attribute-based filter and the slice filter.
+
+*** Renamed filters
+
+- escape was renamed to escape_html
+- as_str was renamed to str
+- linebreaksbr was renamed to newlines_to_br
+- divisibleby was renamed to divisible_by
+- object was renamed to map
+
+The following filters remain unchanged and built-in: default, safe,
+join, sort, truncate, replace, title, upper, lower,
+length, first, last, trim, int, float, abs, round,
+split, reverse, indent, capitalize, wordcount, pluralize,
+escape_xml, newlines_to_br.
+
+*** Tera-contrib filters
+
+date, striptags, matching, regex_replace, and spaceless are
+provided by tera-contrib and registered automatically.
+
+*** Template loading
+
+The old parse method was replaced by glob-based loading. Theme templates
+are loaded via a batch file method to preserve cross-directory inheritance.
+The manual inheritance chain builder was removed (automatic in v2).
+
+*** Error pages
+
+Error templates (404.html, 500.html) are registered after all
+user and theme templates load. The base template guards metadata access
+with ?.? so error pages render without metadata context.
+
+** What stays the same
+
+- Template variable syntax and all standard Tera delimiters
+- Conditional and loop constructs
+- Template inheritance via extends and block
+- The generate toc function
+- All built-in filters listed above
+
+** Quick migration checklist
+
+1. Search for is defined and replace with ?.?
+2. Search for now(format and replace with now() piped to date
+3. Search for is matching with positional arg and add pat keyword
+4. Search for the old escape filter and rename to escape html
+5. Search for the old as str filter and rename to str
+6. Search for the old linebreaksbr filter and rename to newlines to br
+7. Search for the old divisibleby filter and rename to divisible by

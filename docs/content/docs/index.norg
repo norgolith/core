@@ -43,4 +43,5 @@ Transform your Norg content into high-performance websites with /opt-in/ validat
    - {:/docs/configuration:}[Configuration Reference]
    - {:/docs/commands:}[Commands Reference]
    - {:/docs/templating:}[Templating]
+   - {:/docs/templating-migration:}[Tera v2 Migration Guide]
    - {:/docs/content-schemas:}[Content Schemas]
