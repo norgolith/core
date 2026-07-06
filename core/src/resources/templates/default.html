@@ -11,7 +11,7 @@
     class="flex justify-between items-center font-medium text-xs md:text-sm text-grey"
   >
     <span
-        >Copyright &copy; {{ now(format="%Y") }}
+        >Copyright &copy; {{ now() | date(format="%Y") }}
       <a
         href="https://github.com/NTBBloodbath"
         class="text-blue-400 hover:underline">NTBBloodbath</a

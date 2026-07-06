@@ -86,7 +86,7 @@
     <div id="content">{% block content %}{% endblock content %}</div>
     <div id="footer">
         {% block footer %}
-        &copy; Copyright {{ now(format="%Y") }} by {{ config.author }}.
+        &copy; Copyright {{ now() | date(format="%Y") }} by {{ config.author }}.
         {% endblock footer %}
     </div>
 </body>

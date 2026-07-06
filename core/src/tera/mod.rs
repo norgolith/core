@@ -1,39 +1,16 @@
-use std::collections::HashMap;
 use std::path::Path;
 
 use colored::Colorize;
 use eyre::eyre;
-use tera::{Error, Function, Tera, Value};
+use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+use tera::{Error, Function, Kwargs, State, Tera, Value};
 
-// ─── Custom Tera functions ──────────────────────────────────────────────────
-
-fn encode_uri_component(s: &str) -> String {
-    s.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                String::from(b as char)
-            }
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
-}
-
-/// Now function
-/// Template usage: {{ now(format="%A, %B %d") }} → "Thursday, October 05"
-pub(crate) struct NowFunction;
-impl Function for NowFunction {
-    fn call(&self, args: &HashMap<String, Value>) -> tera::Result<Value> {
-        let format = match args.get("format") {
-            Some(v) => v
-                .as_str()
-                .ok_or(tera::Error::msg("`format` must be a string"))?,
-            None => "%Y-%m-%d %H:%M:%S", // Default format
-        };
-
-        let now = chrono::Local::now();
-        Ok(Value::String(now.format(format).to_string()))
-    }
-}
+// ponytail: RFC 3986 unreserved characters — keeps id anchors clean
+const UNRESERVED: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'~');
 
 #[derive(Debug, Clone)]
 struct TocNode {
@@ -120,7 +97,7 @@ fn generate_nested_html(tree: &TocTree, list_type: &str) -> String {
 
         let mut html = format!(
             "<li><a href=\"#{}\">{}</a>",
-            encode_uri_component(&node.id),
+            utf8_percent_encode(&node.id, UNRESERVED),
             tera::escape_html(&node.title)
         );
 
@@ -165,12 +142,12 @@ impl Function for GenerateToc {
     }
 }
 
-// ─── Tera engine construction ───────────────────────────────────────────────
+// Tera engine construction
 
 /// Constructs a Tera engine with the given template directories.
 ///
 /// Loads default error templates, then theme templates, then user templates,
-/// and registers the custom functions `now` and `generate_toc`.
+/// and registers the custom function `generate_toc`.
 pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> eyre::Result<Tera> {
     let mut tera = Tera::default();
 
@@ -209,7 +186,6 @@ pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> eyre::Res
         .map_err(|e| eyre!("{}: {}", "Failed to build templates inheritance".bold(), e))?;
 
     // Register functions
-    tera.register_function("now", NowFunction);
     tera.register_function("generate_toc", GenerateToc);
 
     Ok(tera)

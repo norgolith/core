@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::Utc;
 use colored::Colorize;
 use eyre::{Result, bail, eyre};
 use tera::{Context, Tera};
@@ -234,7 +233,6 @@ pub fn render_all_pages(
             continue;
         }
         let mut context = shared_context.clone();
-        context.insert("now", &Utc::now());
         if let Ok(body) = ctx.tera.render(template_name, &context) {
             let url_path = format!("/{}", template_name);
             pages.insert(url_path, body);
@@ -302,15 +300,15 @@ pub(super) async fn setup_server_state(
         })
         .to_string();
         for p in plugin_mgr.plugins() {
-            if let Some(f) = p.hooks.pre_build {
-                if let Err(e) = plugin_mgr.call_hook(p, f, &input) {
-                    error!(
-                        "{} plugin '{}': {}",
-                        "Plugin error:".red().bold(),
-                        p.name.bold(),
-                        e
-                    );
-                }
+            if let Some(f) = p.hooks.pre_build
+                && let Err(e) = plugin_mgr.call_hook(p, f, &input)
+            {
+                error!(
+                    "{} plugin '{}': {}",
+                    "Plugin error:".red().bold(),
+                    p.name.bold(),
+                    e
+                );
             }
         }
     }

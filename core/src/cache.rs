@@ -151,10 +151,10 @@ fn compute_global_hash(site_root: &Path) -> Result<String> {
 
     // Hash config file
     let config_path = site_root.join("norgolith.toml");
-    if config_path.exists() {
-        if let Ok(content) = std::fs::read(&config_path) {
-            hasher.update(&content);
-        }
+    if config_path.exists()
+        && let Ok(content) = std::fs::read(&config_path)
+    {
+        hasher.update(&content);
     }
 
     // Hash templates directory
@@ -199,13 +199,12 @@ fn load_entries(cache_dir: &Path) -> Result<HashMap<PathBuf, CacheEntry>> {
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
     {
         let path = entry.path();
-        if let Ok(content) = std::fs::read_to_string(path) {
-            if let Ok(cache_entry) = serde_json::from_str::<CacheEntry>(&content) {
-                if let Ok(rel) = path.strip_prefix(cache_dir) {
-                    let rel_no_ext = rel.with_extension("");
-                    entries.insert(rel_no_ext, cache_entry);
-                }
-            }
+        if let Ok(content) = std::fs::read_to_string(path)
+            && let Ok(cache_entry) = serde_json::from_str::<CacheEntry>(&content)
+            && let Ok(rel) = path.strip_prefix(cache_dir)
+        {
+            let rel_no_ext = rel.with_extension("");
+            entries.insert(rel_no_ext, cache_entry);
         }
     }
 

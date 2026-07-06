@@ -110,10 +110,10 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
     let mut dirs = std::collections::HashSet::new();
     for entry in entries {
         let rel_path = entry.path().strip_prefix(&paths.content)?;
-        if let Ok(public_path) = determine_public_path(&paths.public, rel_path) {
-            if let Some(parent) = public_path.parent() {
-                dirs.insert(parent.to_path_buf());
-            }
+        if let Ok(public_path) = determine_public_path(&paths.public, rel_path)
+            && let Some(parent) = public_path.parent()
+        {
+            dirs.insert(parent.to_path_buf());
         }
     }
     for dir in &dirs {
@@ -124,10 +124,10 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
 
 #[instrument(skip(rendered))]
 fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
-    if let Ok(existing) = std::fs::read(public_path) {
-        if existing == rendered.as_bytes() {
-            return Ok(false);
-        }
+    if let Ok(existing) = std::fs::read(public_path)
+        && existing == rendered.as_bytes()
+    {
+        return Ok(false);
     }
     std::fs::write(public_path, rendered).wrap_err(format!(
         "{}: {}",
@@ -222,18 +222,18 @@ fn build_content_entry(
     let metadata =
         shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
 
-    if let Some(schema) = &ctx.site_config.content_schema {
-        if !rel_path.starts_with(&ctx.site_config.categories_dir) {
-            let errors = shared::validate_content_metadata(
-                &ctx.paths.content,
-                path,
-                &metadata,
-                schema,
-                false,
-            )?;
-            if !errors.is_empty() {
-                return Err(eyre!("{}", errors));
-            }
+    if let Some(schema) = &ctx.site_config.content_schema
+        && !rel_path.starts_with(&ctx.site_config.categories_dir)
+    {
+        let errors = shared::validate_content_metadata(
+            &ctx.paths.content,
+            path,
+            &metadata,
+            schema,
+            false,
+        )?;
+        if !errors.is_empty() {
+            return Err(eyre!("{}", errors));
         }
     }
 
@@ -361,15 +361,15 @@ pub fn build(minify: bool) -> Result<()> {
     if plugin_mgr.has_hook(plugin::HOOK_PRE_BUILD) {
         let config_json = serde_json::to_string(&site_config).unwrap_or_default();
         for p in plugin_mgr.plugins() {
-            if let Some(f) = p.hooks.pre_build {
-                if let Err(e) = plugin_mgr.call_hook(p, f, &config_json) {
-                    error!(
-                        "{} plugin '{}': {}",
-                        "Plugin error:".red().bold(),
-                        p.name.bold(),
-                        e
-                    );
-                }
+            if let Some(f) = p.hooks.pre_build
+                && let Err(e) = plugin_mgr.call_hook(p, f, &config_json)
+            {
+                error!(
+                    "{} plugin '{}': {}",
+                    "Plugin error:".red().bold(),
+                    p.name.bold(),
+                    e
+                );
             }
         }
     }
@@ -528,14 +528,14 @@ pub fn build(minify: bool) -> Result<()> {
             seo_count += 1;
         }
 
-        if let Some(ref robots_config) = site_config.robots {
-            if robots_config.enable {
-                let content =
-                    seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
-                let output_path = paths.public.join("robots.txt");
-                std::fs::write(&output_path, &content).wrap_err("Failed to write robots.txt")?;
-                seo_count += 1;
-            }
+        if let Some(ref robots_config) = site_config.robots
+            && robots_config.enable
+        {
+            let content =
+                seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
+            let output_path = paths.public.join("robots.txt");
+            std::fs::write(&output_path, &content).wrap_err("Failed to write robots.txt")?;
+            seo_count += 1;
         }
     }
     timings.seo_ms = t.elapsed().as_millis();
@@ -584,15 +584,15 @@ pub fn build(minify: bool) -> Result<()> {
     if plugin_mgr.has_hook(plugin::HOOK_POST_BUILD) {
         let config_json = serde_json::to_string(&site_config).unwrap_or_default();
         for p in plugin_mgr.plugins() {
-            if let Some(f) = p.hooks.post_build {
-                if let Err(e) = plugin_mgr.call_hook(p, f, &config_json) {
-                    error!(
-                        "{} plugin '{}': {}",
-                        "Plugin error:".red().bold(),
-                        p.name.bold(),
-                        e
-                    );
-                }
+            if let Some(f) = p.hooks.post_build
+                && let Err(e) = plugin_mgr.call_hook(p, f, &config_json)
+            {
+                error!(
+                    "{} plugin '{}': {}",
+                    "Plugin error:".red().bold(),
+                    p.name.bold(),
+                    e
+                );
             }
         }
     }

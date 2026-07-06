@@ -197,13 +197,13 @@ async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
 #[instrument(skip(path))]
 async fn ensure_directory_exists(path: &Path) -> Result<()> {
     debug!(path = %path.display(), "Ensuring directory exists");
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            debug!("Creating directory: {}", parent.display());
-            tokio::fs::create_dir_all(parent)
-                .await
-                .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.exists()
+    {
+        debug!("Creating directory: {}", parent.display());
+        tokio::fs::create_dir_all(parent)
+            .await
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
     }
     Ok(())
 }

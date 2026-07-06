@@ -109,14 +109,14 @@ pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
     let val: serde_json::Value =
         serde_json::from_str(json).map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
 
-    if let Some(status) = val.get("status").and_then(|v| v.as_str()) {
-        if status == "error" {
-            let msg = val
-                .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown error");
-            bail!("plugin error: {}", msg);
-        }
+    if let Some(status) = val.get("status").and_then(|v| v.as_str())
+        && status == "error"
+    {
+        let msg = val
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown error");
+        bail!("plugin error: {}", msg);
     }
 
     match val.get("html").and_then(|v| v.as_str()) {
@@ -130,14 +130,14 @@ pub fn parse_status_response(json: &str) -> Result<()> {
     let val: serde_json::Value =
         serde_json::from_str(json).map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
 
-    if let Some(status) = val.get("status").and_then(|v| v.as_str()) {
-        if status == "error" {
-            let msg = val
-                .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown error");
-            bail!("plugin error: {}", msg);
-        }
+    if let Some(status) = val.get("status").and_then(|v| v.as_str())
+        && status == "error"
+    {
+        let msg = val
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown error");
+        bail!("plugin error: {}", msg);
     }
     Ok(())
 }

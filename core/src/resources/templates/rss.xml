@@ -6,7 +6,7 @@
     <description>{{ config.rss.description | default(value="Latest posts")}}</description>
     <generator>Norgolith</generator>
     <language>{{ config.language }}</language>
-    <lastBuildDate>{{ now | date(format="%a, %d %b %Y %H:%M:%S %z") }}</lastBuildDate>
+    <lastBuildDate>{{ now() | date(format="%a, %d %b %Y %H:%M:%S %z") }}</lastBuildDate>
     <ttl>{{ config.rss.ttl | default(value=60) }}</ttl>
     <atom:link href="{{ config.rootUrl }}/rss.xml" rel="self" type="application/rss+xml" />
 

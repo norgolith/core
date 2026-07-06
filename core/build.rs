@@ -22,11 +22,11 @@ fn get_version() -> String {
         .args(["describe", "--exact-match", "--tags", "HEAD"])
         .output();
 
-    if let Ok(output) = output {
-        if output.status.success() {
-            let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            return tag.strip_prefix('v').unwrap_or(&tag).to_string();
-        }
+    if let Ok(output) = output
+        && output.status.success()
+    {
+        let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        return tag.strip_prefix('v').unwrap_or(&tag).to_string();
     }
 
     // Not at a tag, append commit hash

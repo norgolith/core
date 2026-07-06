@@ -2,7 +2,7 @@
   class="flex flex-col md:flex-row gap-4 justify-between md:items-center mx-auto max-w-5xl md:px-4 font-medium text-xs md:text-sm text-text-alt"
 >
   <span
-      >Copyright &copy; {{ now(format="%Y") }}
+      >Copyright &copy; {{ now() | date(format="%Y") }}
     {% if config.extra.footer_author_link %}
     <a
       href="{{ config.extra.footer_author_link }}"

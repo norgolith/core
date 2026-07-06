@@ -28,22 +28,21 @@ pub(super) fn generate_xml_feeds(
     }
 
     let mut context = shared_context.clone();
-    context.insert("now", &chrono::Utc::now());
 
     for template_name in &xml_templates {
         let rendered = tera
             .render(template_name, &context)
             .map_err(|e| eyre!("{}: {}", "Failed to render XML template".bold(), e))?;
 
-        if template_name.contains("rss") && template_name.ends_with(".xml") {
-            if let Err(e) = Channel::read_from(rendered.as_bytes()) {
-                warn!(
-                    template = %template_name,
-                    "'{}' does not validate as RSS ({}); written as-is",
-                    template_name,
-                    e
-                );
-            }
+        if (template_name.contains("rss") && template_name.ends_with(".xml"))
+            && let Err(e) = Channel::read_from(rendered.as_bytes())
+        {
+            warn!(
+                template = %template_name,
+                "'{}' does not validate as RSS ({}); written as-is",
+                template_name,
+                e
+            );
         }
 
         let output_path = public_dir.join(template_name);
