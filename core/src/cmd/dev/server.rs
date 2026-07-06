@@ -302,15 +302,15 @@ pub(super) async fn setup_server_state(
         })
         .to_string();
         for p in plugin_mgr.plugins() {
-            if let Some(f) = p.hooks.pre_build {
-                if let Err(e) = plugin_mgr.call_hook(p, f, &input) {
-                    error!(
-                        "{} plugin '{}': {}",
-                        "Plugin error:".red().bold(),
-                        p.name.bold(),
-                        e
-                    );
-                }
+            if let Some(f) = p.hooks.pre_build
+                && let Err(e) = plugin_mgr.call_hook(p, f, &input)
+            {
+                error!(
+                    "{} plugin '{}': {}",
+                    "Plugin error:".red().bold(),
+                    p.name.bold(),
+                    e
+                );
             }
         }
     }

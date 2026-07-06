@@ -150,13 +150,13 @@ impl FieldDefinition {
                 },
                 toml::Value::String(s),
             ) => {
-                if let Some(max) = max_length {
-                    if s.len() > *max {
-                        return Err(ValidationError::ConstraintViolation {
-                            field: field_name.to_string(),
-                            message: format!("Exceeds max length {}", max),
-                        });
-                    }
+                if let Some(max) = max_length
+                    && s.len() > *max
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Exceeds max length {}", max),
+                    });
                 }
                 if let Some(pattern) = pattern {
                     let re = match Regex::new(pattern) {
@@ -196,21 +196,21 @@ impl FieldDefinition {
                         }
                     }
                 }
-                if let Some(min) = min_items {
-                    if arr.len() < *min {
-                        return Err(ValidationError::ConstraintViolation {
-                            field: field_name.to_string(),
-                            message: format!("Must contain at least {} value(s)", *min),
-                        });
-                    }
+                if let Some(min) = min_items
+                    && arr.len() < *min
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Must contain at least {} value(s)", *min),
+                    });
                 }
-                if let Some(max) = max_items {
-                    if arr.len() > *max {
-                        return Err(ValidationError::ConstraintViolation {
-                            field: field_name.to_string(),
-                            message: format!("Exceeds values limit (expected {} value(s))", *max),
-                        });
-                    }
+                if let Some(max) = max_items
+                    && arr.len() > *max
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Exceeds values limit (expected {} value(s))", *max),
+                    });
                 }
                 for (i, item) in arr.iter().enumerate() {
                     items.validate(item, &format!("{}[{}]", field_name, i))?;

@@ -110,10 +110,10 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
     }
 
     // Handle asset reloads
-    if actions.reload_assets {
-        if let Err(e) = state.send_reload() {
-            error!("Asset reload error: {}", e);
-        }
+    if actions.reload_assets
+        && let Err(e) = state.send_reload()
+    {
+        error!("Asset reload error: {}", e);
     }
 
     // Handle template reloads

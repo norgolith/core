@@ -72,24 +72,24 @@ pub(super) async fn read_asset(path: &Path) -> Result<(Vec<u8>, String)> {
 pub(super) fn handle_not_found(state: &ServerState) -> Response<Body> {
     let tera = state.tera.try_read().ok();
     let config = state.config.try_read().ok();
-    if let (Some(tera), Some(config)) = (tera, config) {
-        if tera.get_template_names().any(|n| n == "404.html") {
-            let posts = state.posts.try_read().ok();
-            let collections = posts
-                .as_ref()
-                .map(|p| shared::precompute_collection_subsets(p, &config))
-                .unwrap_or_default();
-            let shared_context = posts
-                .as_ref()
-                .map(|p| shared::build_shared_context(p, &config, &collections))
-                .unwrap_or_else(|| shared::build_shared_context(&[], &config, &collections));
-            if let Ok(rendered) = tera.render("404.html", &shared_context) {
-                return Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .header(CONTENT_TYPE, "text/html; charset=utf-8")
-                    .body(Body::from(rendered))
-                    .expect("Could not build Not Found response");
-            }
+    if let (Some(tera), Some(config)) = (tera, config)
+        && tera.get_template_names().any(|n| n == "404.html")
+    {
+        let posts = state.posts.try_read().ok();
+        let collections = posts
+            .as_ref()
+            .map(|p| shared::precompute_collection_subsets(p, &config))
+            .unwrap_or_default();
+        let shared_context = posts
+            .as_ref()
+            .map(|p| shared::build_shared_context(p, &config, &collections))
+            .unwrap_or_else(|| shared::build_shared_context(&[], &config, &collections));
+        if let Ok(rendered) = tera.render("404.html", &shared_context) {
+            return Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(CONTENT_TYPE, "text/html; charset=utf-8")
+                .body(Body::from(rendered))
+                .expect("Could not build Not Found response");
         }
     }
     Response::builder()
@@ -448,7 +448,7 @@ pub(super) async fn handle_server_request(
         Err(e) => {
             error!("{}", e);
             let e_str = e.to_string().replace("\x1b[1m", "").replace("\x1b[0m", "");
-            let response = {
+            {
                 let tera = state.tera.try_read();
                 let config = state.config.try_read();
                 match (tera, config) {
@@ -499,8 +499,7 @@ pub(super) async fn handle_server_request(
                         )))
                         .unwrap(),
                 }
-            };
-            response
+            }
         }
     };
 
