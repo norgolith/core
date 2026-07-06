@@ -201,7 +201,7 @@ impl PluginManager {
                 .to_string();
                 match self.call_hook(p, f, &input) {
                     Ok(Some(new_html)) => {
-                        if let toml::Value::Table(ref mut table) = metadata {
+                        if let toml::Value::Table(table) = metadata {
                             table.insert("raw".to_string(), toml::Value::String(new_html));
                         }
                     }

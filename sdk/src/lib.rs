@@ -133,7 +133,7 @@ static PLUGIN_LOG_FN: OnceLock<extern "C" fn(u32, *const c_char)> = OnceLock::ne
 /// ```
 #[macro_export]
 macro_rules! plugin_log {
-    ($level:expr, $($arg:tt)*) => {
+    ($level:expr_2021, $($arg:tt)*) => {
         if let Some(f) = $crate::__log_fn() {
             let msg = format!($($arg)*);
             let level_num = match $level {
@@ -175,7 +175,7 @@ pub fn __log_fn() -> Option<extern "C" fn(u32, *const c_char)> {
 /// ```
 #[macro_export]
 macro_rules! register_plugin {
-    ($name:expr, $version:expr, hooks: [$($hook:ident : $handler:ident),* $(,)?]) => {
+    ($name:expr_2021, $version:expr_2021, hooks: [$($hook:ident : $handler:ident),* $(,)?]) => {
         // Generate one bridge function per hook
         $(
             #[no_mangle]

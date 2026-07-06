@@ -32,7 +32,7 @@ fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
 
 /// Converts TOML datetime values to RFC3339 strings in a metadata table.
 fn normalize_datetimes(metadata: &mut toml::Value) {
-    if let toml::Value::Table(ref mut table) = metadata {
+    if let toml::Value::Table(table) = metadata {
         for (_k, v) in table.iter_mut() {
             if let toml::Value::Datetime(dt) = v {
                 *v = toml::Value::String(dt.to_string());

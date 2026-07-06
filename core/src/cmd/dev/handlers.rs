@@ -448,7 +448,7 @@ pub(super) async fn handle_server_request(
             let response = {
                 let tera = state.tera.try_read();
                 let config = state.config.try_read();
-                if let (Ok(tera), Ok(config)) = (tera, config) {
+                match (tera, config) { (Ok(tera), Ok(config)) => {
                     if tera.get_template_names().any(|n| n == "500.html") {
                         let posts = state.posts.try_read().ok();
                         let collections = posts
@@ -463,13 +463,13 @@ pub(super) async fn handle_server_request(
                             });
                         let mut context = shared_context;
                         context.insert("error_message", &e_str);
-                        if let Ok(rendered) = tera.render("500.html", &context) {
+                        match tera.render("500.html", &context) { Ok(rendered) => {
                             Response::builder()
                                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                                 .header(CONTENT_TYPE, "text/html; charset=utf-8")
                                 .body(Body::from(rendered))
                                 .unwrap()
-                        } else {
+                        } _ => {
                             Response::builder()
                                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                                 .body(Body::from(format!(
@@ -477,7 +477,7 @@ pub(super) async fn handle_server_request(
                                     e_str
                                 )))
                                 .unwrap()
-                        }
+                        }}
                     } else {
                         Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -487,7 +487,7 @@ pub(super) async fn handle_server_request(
                             )))
                             .unwrap()
                     }
-                } else {
+                } _ => {
                     Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
                         .body(Body::from(format!(
@@ -495,7 +495,7 @@ pub(super) async fn handle_server_request(
                             e_str
                         )))
                         .unwrap()
-                }
+                }}
             };
             response
         }

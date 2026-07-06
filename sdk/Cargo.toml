@@ -1,10 +1,10 @@
 [package]
 name = "norgolith-plugin-sdk"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["NTBBloodbath <bloodbathalchemist@protonmail.com"]
 license = "GPL-2.0"
-README = "README.md"
+readme = "README.md"
 description = "SDK for building Norgolith plugins"
 repository = "https://github.com/norgolith/core"
 
