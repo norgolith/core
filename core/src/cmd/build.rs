@@ -921,7 +921,7 @@ pub fn build(minify: bool) -> Result<()> {
     // Initialize Tera
     let t = Instant::now();
     debug!("Initializing template engine");
-    let tera = shared::init_tera(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
+    let tera = crate::tera::init(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
     timings.tera_ms = t.elapsed().as_millis();
 
     // Load plugins and apply sandbox

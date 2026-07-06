@@ -207,50 +207,6 @@ pub fn get_elapsed_time(instant: Instant) -> String {
     }
 }
 
-pub fn init_tera(templates_dir: &str, theme_templates_dir: &Path) -> Result<Tera> {
-    let mut tera = Tera::default();
-
-    // Register built-in error templates as defaults; theme/user templates override via extend().
-    tera.add_raw_template("404.html", include_str!("../resources/templates/404.html"))
-        .map_err(|e| eyre!("Failed to register default 404 template: {}", e))?;
-    tera.add_raw_template("500.html", include_str!("../resources/templates/500.html"))
-        .map_err(|e| eyre!("Failed to register default 500 template: {}", e))?;
-
-    // Loading theme templates first allows the user to extend the theme templates using their own user-defined
-    // templates aka inheriting from the theme templates.
-    if theme_templates_dir.exists() {
-        let theme_glob = format!("{}/**/*.html", theme_templates_dir.display());
-        let theme_tera =
-            Tera::parse(&theme_glob).map_err(|e| eyre!("Error parsing theme templates: {}", e))?;
-        tera.extend(&theme_tera)?;
-
-        let theme_xml_glob = format!("{}/**/*.xml", theme_templates_dir.display());
-        let theme_xml_tera = Tera::parse(&theme_xml_glob)
-            .map_err(|e| eyre!("Error parsing theme XML templates: {}", e))?;
-        tera.extend(&theme_xml_tera)?;
-    }
-
-    // Load user's templates
-    let user_glob = format!("{}/**/*.html", templates_dir);
-    let user_tera =
-        Tera::parse(&user_glob).map_err(|e| eyre!("Error parsing user templates: {}", e))?;
-    tera.extend(&user_tera)?;
-
-    let xml_glob = format!("{}/**/*.xml", templates_dir);
-    let xml_tera =
-        Tera::parse(&xml_glob).map_err(|e| eyre!("Error parsing user XML templates: {}", e))?;
-    tera.extend(&xml_tera)?;
-
-    tera.build_inheritance_chains()
-        .map_err(|e| eyre!("{}: {}", "Failed to build templates inheritance".bold(), e))?;
-
-    // Register functions
-    tera.register_function("now", crate::tera_functions::NowFunction);
-    tera.register_function("generate_toc", crate::tera_functions::GenerateToc);
-
-    Ok(tera)
-}
-
 /// Computes the permalink for a content file based on its relative path.
 fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
     let mut permalink_path = rel_path.with_extension("");

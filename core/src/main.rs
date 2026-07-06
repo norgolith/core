@@ -8,7 +8,7 @@ mod net;
 mod plugin;
 mod schema;
 mod shared;
-mod tera_functions;
+mod tera;
 mod theme;
 
 use eyre::Result;

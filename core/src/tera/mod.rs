@@ -1,6 +1,11 @@
 use std::collections::HashMap;
+use std::path::Path;
 
-use tera::{Error, Function, Result, Value};
+use colored::Colorize;
+use eyre::eyre;
+use tera::{Error, Function, Tera, Value};
+
+// ─── Custom Tera functions ──────────────────────────────────────────────────
 
 fn encode_uri_component(s: &str) -> String {
     s.bytes()
@@ -15,9 +20,9 @@ fn encode_uri_component(s: &str) -> String {
 
 /// Now function
 /// Template usage: {{ now(format="%A, %B %d") }} → "Thursday, October 05"
-pub struct NowFunction;
+pub(crate) struct NowFunction;
 impl Function for NowFunction {
-    fn call(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    fn call(&self, args: &HashMap<String, Value>) -> tera::Result<Value> {
         let format = match args.get("format") {
             Some(v) => v
                 .as_str()
@@ -44,7 +49,7 @@ struct TocTree {
     root_indices: Vec<usize>,
 }
 
-fn parse_toc(value: &Value) -> Result<TocTree> {
+fn parse_toc(value: &Value) -> std::result::Result<TocTree, tera::Error> {
     let entries = value
         .as_array()
         .ok_or_else(|| Error::msg("TOC must be an array"))?;
@@ -139,9 +144,9 @@ fn generate_nested_html(tree: &TocTree, list_type: &str) -> String {
     html
 }
 
-pub struct GenerateToc;
+pub(crate) struct GenerateToc;
 impl Function for GenerateToc {
-    fn call(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    fn call(&self, args: &HashMap<String, Value>) -> tera::Result<Value> {
         let toc = args
             .get("toc")
             .ok_or_else(|| Error::msg("Missing 'toc' argument"))?;
@@ -158,4 +163,54 @@ impl Function for GenerateToc {
     fn is_safe(&self) -> bool {
         true
     }
+}
+
+// ─── Tera engine construction ───────────────────────────────────────────────
+
+/// Constructs a Tera engine with the given template directories.
+///
+/// Loads default error templates, then theme templates, then user templates,
+/// and registers the custom functions `now` and `generate_toc`.
+pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> eyre::Result<Tera> {
+    let mut tera = Tera::default();
+
+    // Register built-in error templates as defaults; theme/user templates override via extend().
+    tera.add_raw_template("404.html", include_str!("../resources/templates/404.html"))
+        .map_err(|e| eyre!("Failed to register default 404 template: {}", e))?;
+    tera.add_raw_template("500.html", include_str!("../resources/templates/500.html"))
+        .map_err(|e| eyre!("Failed to register default 500 template: {}", e))?;
+
+    // Loading theme templates first allows the user to extend the theme templates using their own user-defined
+    // templates aka inheriting from the theme templates.
+    if theme_templates_dir.exists() {
+        let theme_glob = format!("{}/**/*.html", theme_templates_dir.display());
+        let theme_tera =
+            Tera::parse(&theme_glob).map_err(|e| eyre!("Error parsing theme templates: {}", e))?;
+        tera.extend(&theme_tera)?;
+
+        let theme_xml_glob = format!("{}/**/*.xml", theme_templates_dir.display());
+        let theme_xml_tera = Tera::parse(&theme_xml_glob)
+            .map_err(|e| eyre!("Error parsing theme XML templates: {}", e))?;
+        tera.extend(&theme_xml_tera)?;
+    }
+
+    // Load user's templates
+    let user_glob = format!("{}/**/*.html", templates_dir);
+    let user_tera =
+        Tera::parse(&user_glob).map_err(|e| eyre!("Error parsing user templates: {}", e))?;
+    tera.extend(&user_tera)?;
+
+    let xml_glob = format!("{}/**/*.xml", templates_dir);
+    let xml_tera =
+        Tera::parse(&xml_glob).map_err(|e| eyre!("Error parsing user XML templates: {}", e))?;
+    tera.extend(&xml_tera)?;
+
+    tera.build_inheritance_chains()
+        .map_err(|e| eyre!("{}: {}", "Failed to build templates inheritance".bold(), e))?;
+
+    // Register functions
+    tera.register_function("now", NowFunction);
+    tera.register_function("generate_toc", GenerateToc);
+
+    Ok(tera)
 }

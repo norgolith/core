@@ -65,7 +65,7 @@ impl ServerState {
         //      create a new Tera instance to be able to actually have the content reloaded.
         //      I think this may be a little inefficient if the templates are being constantly reloaded
         //      but who cares, it does the job and I am not willing to keep debugging this any longer right now.
-        let new_tera = shared::init_tera(
+        let new_tera = crate::tera::init(
             self.paths.templates.to_str().unwrap(),
             &self.paths.theme_templates,
         )?;
@@ -1348,7 +1348,7 @@ async fn setup_server_state(
         paths.theme_templates = real;
     }
 
-    let tera = shared::init_tera(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
+    let tera = crate::tera::init(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
 
     let (reload_tx, _) = broadcast::channel(16);
 
