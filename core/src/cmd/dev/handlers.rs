@@ -22,6 +22,22 @@ const LIVE_RELOAD_PORT: u16 = 35729;
 const WS_HELLO_MESSAGE: &str = r#"{"command":"hello","protocols":["http://livereload.com/protocols/official-7"],"serverName":"norgolith"}"#;
 const WS_RELOAD_MESSAGE: &str = r#"{"command":"reload","path":"/"}"#;
 
+async fn fast_path_lookup(state: &ServerState, url_path: &str) -> Option<String> {
+    let pages = state.rendered_pages.read().await;
+    pages.get(url_path).cloned()
+}
+
+fn rewrite_urls(body: String, root_url: &str, routes_url: &str) -> String {
+    body.replace(&root_url.replace("://", ":&#x2F;&#x2F;"), routes_url)
+}
+
+fn html_response(body: String, status: StatusCode) -> Result<Response<Body>> {
+    Ok(Response::builder()
+        .header(CONTENT_TYPE, "text/html; charset=utf-8")
+        .status(status)
+        .body(Body::from(body))?)
+}
+
 #[instrument(skip(html))]
 pub(super) fn inject_livereload_script(html: &mut String) {
     debug!("Injecting LiveReload script");
@@ -151,14 +167,11 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
     debug!(template = %template_name, "Handling XML feed request");
 
     // Fast path: lookup in pre-rendered memory cache
-    {
-        let pages = state.rendered_pages.read().await;
-        if let Some(html) = pages.get(request_path) {
-            return Ok(Response::builder()
-                .header(CONTENT_TYPE, "application/xml; charset=utf-8")
-                .status(StatusCode::OK)
-                .body(Body::from(html.clone()))?);
-        }
+    if let Some(html) = fast_path_lookup(state, request_path).await {
+        return Ok(Response::builder()
+            .header(CONTENT_TYPE, "application/xml; charset=utf-8")
+            .status(StatusCode::OK)
+            .body(Body::from(html))?);
     }
 
     // Slow path: render on demand
@@ -186,19 +199,13 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
 
 async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<Response<Body>> {
     let rel_path = path.strip_prefix(&state.paths.content)?.to_path_buf();
+    let url_path = format!("/{}", rel_path.with_extension("").display());
 
     // Fast path: lookup in pre-rendered memory cache
-    {
-        let pages = state.rendered_pages.read().await;
-        let url_path = format!("/{}", rel_path.with_extension("").display());
-        if let Some(html) = pages.get(&url_path) {
-            let mut body = html.clone();
-            inject_livereload_script(&mut body);
-            return Ok(Response::builder()
-                .header(CONTENT_TYPE, "text/html; charset=utf-8")
-                .status(StatusCode::OK)
-                .body(Body::from(body))?);
-        }
+    if let Some(html) = fast_path_lookup(&state, &url_path).await {
+        let mut body = html;
+        inject_livereload_script(&mut body);
+        return html_response(body, StatusCode::OK);
     }
 
     // Slow path: not in cache (e.g. file changed since last render), render on demand
@@ -242,16 +249,10 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
     let shared_context = shared::build_shared_context(&posts, &config, &collections);
     let mut body = shared::render_norg_page(&tera, &metadata, &shared_context)?;
 
-    body = body.replace(
-        &config.root_url.replace("://", ":&#x2F;&#x2F;"),
-        &state.routes_url,
-    );
+    body = rewrite_urls(body, &config.root_url, &state.routes_url);
 
     inject_livereload_script(&mut body);
-    Ok(Response::builder()
-        .header(CONTENT_TYPE, "text/html; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(body))?)
+    html_response(body, StatusCode::OK)
 }
 
 async fn handle_content(request_path: &str, state: Arc<ServerState>) -> Result<Response<Body>> {
@@ -275,16 +276,10 @@ async fn handle_category_index(state: &Arc<ServerState>) -> Result<Response<Body
     let url_path = format!("/{}", config.categories_dir);
 
     // Fast path: lookup in pre-rendered memory cache
-    {
-        let pages = state.rendered_pages.read().await;
-        if let Some(html) = pages.get(&url_path) {
-            let mut body = html.clone();
-            inject_livereload_script(&mut body);
-            return Ok(Response::builder()
-                .header(CONTENT_TYPE, "text/html; charset=utf-8")
-                .status(StatusCode::OK)
-                .body(Body::from(body))?);
-        }
+    if let Some(html) = fast_path_lookup(state, &url_path).await {
+        let mut body = html;
+        inject_livereload_script(&mut body);
+        return html_response(body, StatusCode::OK);
     }
 
     // Slow path: render on demand
@@ -308,16 +303,10 @@ async fn handle_category_index(state: &Arc<ServerState>) -> Result<Response<Body
             eyre!("{}", "Failed to render 'categories.html' template".bold())
         }
     })?;
-    body = body.replace(
-        &config.root_url.replace("://", ":&#x2F;&#x2F;"),
-        &state.routes_url,
-    );
+    body = rewrite_urls(body, &config.root_url, &state.routes_url);
 
     inject_livereload_script(&mut body);
-    Ok(Response::builder()
-        .header(CONTENT_TYPE, "text/html; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(body))?)
+    html_response(body, StatusCode::OK)
 }
 
 async fn handle_category(path: &str, state: &Arc<ServerState>) -> Result<Response<Body>> {
@@ -326,16 +315,10 @@ async fn handle_category(path: &str, state: &Arc<ServerState>) -> Result<Respons
     let category = path.strip_prefix(&*cat_prefix).unwrap_or(path);
 
     // Fast path: lookup in pre-rendered memory cache
-    {
-        let pages = state.rendered_pages.read().await;
-        if let Some(html) = pages.get(path) {
-            let mut body = html.clone();
-            inject_livereload_script(&mut body);
-            return Ok(Response::builder()
-                .header(CONTENT_TYPE, "text/html; charset=utf-8")
-                .status(StatusCode::OK)
-                .body(Body::from(body))?);
-        }
+    if let Some(html) = fast_path_lookup(state, path).await {
+        let mut body = html;
+        inject_livereload_script(&mut body);
+        return html_response(body, StatusCode::OK);
     }
 
     // Slow path: render on demand
@@ -374,16 +357,10 @@ async fn handle_category(path: &str, state: &Arc<ServerState>) -> Result<Respons
         }
     })?;
 
-    body = body.replace(
-        &config.root_url.replace("://", ":&#x2F;&#x2F;"),
-        &state.routes_url,
-    );
+    body = rewrite_urls(body, &config.root_url, &state.routes_url);
 
     inject_livereload_script(&mut body);
-    Ok(Response::builder()
-        .header(CONTENT_TYPE, "text/html; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(body))?)
+    html_response(body, StatusCode::OK)
 }
 
 #[instrument(skip(stream, reload_tx))]
