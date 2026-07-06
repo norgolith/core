@@ -6,7 +6,7 @@ use tera::value::Key;
 use tera::{Error, Filter, Function, Kwargs, State, Tera, TeraResult, Value};
 use walkdir::WalkDir;
 
-// ponytail: RFC 3986 unreserved characters — keeps id anchors clean
+// RFC 3986 unreserved characters - keeps id anchors clean
 const UNRESERVED: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'-')
     .remove(b'_')

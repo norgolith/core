@@ -203,8 +203,123 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
      - Ensure the base template exists and is correctly referenced.
      - Verify that `{% block %}` tags are correctly placed.
 
+** Shortcodes
+   Shortcodes are reusable, parameterized components defined as Tera v2 templates.
+   They let you embed complex HTML (tweets, figures, callouts) from within your Norg content
+   without writing raw HTML each time.
+
+*** Defining a Shortcode
+    Place a Tera component definition in `templates/shortcodes/<name>.html`:
+
+    @code django
+    <!-- templates/shortcodes/youtube.html -->
+    {% component youtube(id: String, autoplay: String = "false") %}
+    <div class="video-container">
+      <iframe src="https://www.youtube.com/embed/{{ id }}?autoplay={{ autoplay }}"
+              frameborder="0"
+              allowfullscreen>
+      </iframe>
+    </div>
+    {% endcomponent youtube %}
+    @end
+
+    - Components are registered globally, no imports needed.
+    - Named arguments with types (`id: String`) are required.
+    - Default values (`autoplay = "false"`) are optional.
+    - Use `{% raw %}...{% endraw %}` to include literal `{{ }}` or `{{ }}` syntax in the body.
+
+*** Using Shortcodes in Content
+    Shortcodes are invoked inside `@embed html` blocks using Tera v2 component syntax:
+
+    @code norg
+    @embed html
+    {{ <youtube id="dQw4w9WgXcQ" /> }}
+    @end
+    @end
+
+**** With Body
+     Block shortcodes pass content via `{{ body }}`:
+
+     @code norg
+     @embed html
+     {% <callout type="warning" > %}
+     This is a **warning** callout.
+     {% </callout> %}
+     @end
+     @end
+
+     Template definition:
+
+     @code django
+     {% component callout(type: String = "info") %}
+     <aside class="callout callout-{{ type }}">
+       {{ body }}
+     </aside>
+     {% endcomponent callout %}
+     @end
+
+**** With Shorthand
+     Variable names matching argument names can be omitted:
+
+     @code norg
+     @embed html
+     {% <callout type warning > %}
+     A warning callout.
+     {% </callout> %}
+     @end
+     @end
+
+     This is equivalent to `{% <callout type={type} warning={warning} > %}`.
+
+*** Theme Override
+    Theme authors can ship shortcodes in their `templates/shortcodes/` directory.
+    Site-level shortcodes override theme shortcodes of the same name.
+
+*** Example: YouTube Embed
+    @code django
+    <!-- templates/shortcodes/youtube.html -->
+    {% component youtube(id: String, autoplay: String = "false") %}
+    <div class="video-container">
+      <iframe src="https://www.youtube.com/embed/{{ id }}?autoplay={{ autoplay }}"
+              frameborder="0"
+              allowfullscreen>
+      </iframe>
+    </div>
+    {% endcomponent youtube %}
+    @end
+
+*** Example: Tweet Embed
+    @code django
+    <!-- templates/shortcodes/tweet.html -->
+    {% component tweet(id: String) %}
+    <blockquote class="twitter-tweet">
+      <a href="https://twitter.com/i/status/{{ id }}">View tweet</a>
+    </blockquote>
+    <script async src="https://platform.twitter.com/widgets.js"></script>
+    {% endcomponent tweet %}
+    @end
+
+*** Example: Figure with Caption
+    @code django
+    <!-- templates/shortcodes/figure.html -->
+    {% component figure(src: String, alt: String = "", caption: String = "") %}
+    <figure>
+      <img src="{{ src }}" alt="{{ alt }}" />
+      {% if caption %}<figcaption>{{ caption }}</figcaption>{% endif %}
+    </figure>
+    {% endcomponent figure %}
+    @end
+
+    Usage:
+
+    @code norg
+    @embed html
+    {{ <figure src="/img/photo.jpg" alt="A landscape" caption="Mountains at sunset" /> }}
+    @end
+    @end
+
 ** Best Practices
 *** Organizing Templates
     - Keep templates modular and reusable.
     - Use template inheritance to avoid duplicating code.
-    - Organize partial templates into subdirectories (e.g. `templates/partials/`).
+    - Organize partial templates into subdirectories (e.g. `templates/partials/`).

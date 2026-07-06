@@ -8,6 +8,7 @@ mod net;
 mod plugin;
 mod schema;
 mod shared;
+mod shortcode;
 mod tera;
 mod theme;
 

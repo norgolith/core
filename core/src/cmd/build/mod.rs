@@ -16,7 +16,7 @@ use walkdir::WalkDir;
 
 use super::seo;
 use crate::shared::{BuildContext, SitePaths};
-use crate::{cache::BuildCache, config, fs, plugin, shared};
+use crate::{cache::BuildCache, config, fs, plugin, shortcode, shared};
 
 use assets::copy_assets;
 use content::{build_category_pages, build_error_pages, generate_xml_feeds};
@@ -267,6 +267,21 @@ fn build_content_entry(
 
     ctx.plugins
         .run_post_convert(ctx.site_config, &mut metadata, rel_path);
+
+    // Process shortcode component calls inside @embed html islands.
+    // Runs after plugin post_convert (which may modify raw) but before
+    // render_norg_page wraps content in the Tera layout.
+    if let Some(raw) = metadata.get("raw").and_then(|v| v.as_str())
+        && raw.contains("<!--lith:embed-->")
+    {
+        let mut shortcode_ctx = shared_context.clone();
+        shortcode_ctx.insert("metadata", &metadata);
+        if let Ok(processed) = shortcode::process(raw, ctx.tera, &shortcode_ctx)
+            && let toml::Value::Table(ref mut table) = metadata
+        {
+            table.insert("raw".to_string(), toml::Value::String(processed));
+        }
+    }
 
     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
 

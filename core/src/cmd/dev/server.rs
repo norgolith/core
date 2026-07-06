@@ -10,7 +10,7 @@ use tracing::{debug, error, info, instrument};
 use walkdir::WalkDir;
 
 use crate::shared::{BuildContext, SitePaths};
-use crate::{config, plugin, shared};
+use crate::{config, plugin, shortcode, shared};
 
 pub(super) struct ServerState {
     pub reload_tx: Arc<broadcast::Sender<()>>,
@@ -166,6 +166,19 @@ pub fn render_all_pages(
 
         ctx.plugins
             .run_post_convert(ctx.site_config, &mut metadata, rel_path);
+
+        // Process shortcode component calls inside @embed html islands.
+        if let Some(raw) = metadata.get("raw").and_then(|v| v.as_str())
+            && raw.contains("<!--lith:embed-->")
+        {
+            let mut shortcode_ctx = shared_context.clone();
+            shortcode_ctx.insert("metadata", &metadata);
+            if let Ok(processed) = shortcode::process(raw, ctx.tera, &shortcode_ctx)
+                && let toml::Value::Table(ref mut table) = metadata
+            {
+                table.insert("raw".to_string(), toml::Value::String(processed));
+            }
+        }
 
         let mut body = shared::render_norg_page(ctx.tera, &metadata, &shared_context)?;
 

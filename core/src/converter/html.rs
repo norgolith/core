@@ -505,7 +505,13 @@ impl NorgToHtml for NorgAST {
                     "embed" => {
                         // XXX: only works for embedding HTML code for now
                         if !parameters.is_empty() && parameters[0] == "html" {
-                            verbatim_tag = content.to_string()
+                            // markers let shortcode::process find and render
+                            // Tera component calls inside embed islands before minify.
+                            // Markers are consumed before minify runs. It's safe.
+                            verbatim_tag = format!(
+                                "<!--lith:embed-->{}<!--/lith:embed-->",
+                                content
+                            );
                         }
                     }
                     // TODO: support other verbatim ranged tags like '@math'
