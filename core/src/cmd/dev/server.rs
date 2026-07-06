@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::Utc;
 use colored::Colorize;
 use eyre::{Result, bail, eyre};
 use tera::{Context, Tera};
@@ -233,8 +232,7 @@ pub fn render_all_pages(
         if !template_name.ends_with(".xml") {
             continue;
         }
-        let mut context = shared_context.clone();
-        context.insert("now", &Utc::now());
+        let context = shared_context.clone();
         if let Ok(body) = ctx.tera.render(template_name, &context) {
             let url_path = format!("/{}", template_name);
             pages.insert(url_path, body);

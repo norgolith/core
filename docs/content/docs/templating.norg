@@ -100,11 +100,10 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
 ** Filters and Functions
    Tera comes with some built-in global {https://keats.github.io/tera/docs/#built-in-filters}[filters] and {https://keats.github.io/tera/docs/#built-in-functions}[functions] which you can use directly in your templates. Additionally, Norgolith also exposes custom Tera functions for use in templates:
 
-   - `now`: Returns the current datetime.
+   - `now`: Returns the current datetime (provided by tera-contrib).
    @code django
-   <!-- You can also use it without providing an argument -->
    <footer>
-     <span>Copyright &copy; {{ now(format="%Y") }}</span>
+     <span>Copyright &copy; {{ now() | date(format="%Y") }}</span>
    </footer>
    @end
 

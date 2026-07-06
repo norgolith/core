@@ -12,7 +12,7 @@
     </div>
     <div class="flex flex-col">
       <p>
-        {% if post.truncate_char is defined and post.truncate_char is matching("^nil$") %}
+        {% if post.truncate_char is defined and post.truncate_char is matching(pat="^nil$") %}
           {% set truncate_char = "" %}
         {% else %}
           {% set truncate_char = "…" %}

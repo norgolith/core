@@ -469,7 +469,9 @@ impl NorgToHtml for NorgAST {
                         // NOTE: Tera completely skips HTML code block contents while rendering our HTML content
                         // because we are forced to use the `safe` filter. This workaround aims to fix those
                         // problems, and (hopefully) also including XML rendering.
-                        let content = &tera::escape_html(content);
+                        let mut escaped = Vec::new();
+                        tera::escape_html(content, &mut escaped).expect("escape_html write never fails");
+                        let content = &String::from_utf8(escaped).expect("escape_html produces valid UTF-8");
                         code_tag.push('>');
                         code_tag.push_str("<code");
                         if !parameters.is_empty() {
