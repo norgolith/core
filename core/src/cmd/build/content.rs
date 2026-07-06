@@ -27,7 +27,7 @@ pub(super) fn generate_xml_feeds(
         return Ok((0, vec![]));
     }
 
-    let mut context = shared_context.clone();
+    let context = shared_context.clone();
 
     for template_name in &xml_templates {
         let rendered = tera

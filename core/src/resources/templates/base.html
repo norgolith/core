@@ -3,17 +3,17 @@
 <head>
     {% block head %}
     <meta charset="UTF-8" />
-    {% if metadata.description and not metadata.description == "nil" %}
-    <meta name="description" content="{{ metadata.description }}" />
+    {% if metadata?.description and not metadata?.description == "nil" %}
+    <meta name="description" content="{{ metadata?.description }}" />
     {% endif %}
-    {% if metadata.authors %}
+    {% if metadata?.authors %}
     <meta name="author" content="{{ config.author }}" />
     {% endif %}
-    {% if metadata.categories %}
-    <meta name="keywords" content="{{ metadata.categories | join(sep=", ") }}" />
+    {% if metadata?.categories %}
+    <meta name="keywords" content="{{ metadata?.categories | join(sep=", ") }}" />
     {% endif %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    {% if config.highlighter is defined and config.highlighter.enable %}
+    {% if config.highlighter?.enable %}
       {# If highlighter is enabled but the engine is not defined then fallback to prismjs #}
       {% if config.highlighter.engine is not string or config.highlighter.engine == "prism" %}
         {# PrismJS #}
@@ -21,8 +21,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
-      {% elif config.highlighter.engine is defined
-          and config.highlighter.engine == "hljs" %}
+      {% elif config.highlighter.engine == "hljs" %}
         {# Highlight.js #}
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -50,32 +49,32 @@
     <link rel="icon" href="/assets/norgolith.svg" />
 
     {# Canonical URL #}
-    {% if metadata.permalink %}
-    <link rel="canonical" href="{{ metadata.permalink }}" />
+    {% if metadata?.permalink %}
+    <link rel="canonical" href="{{ metadata?.permalink }}" />
     {% endif %}
 
     {# OpenGraph + Twitter Cards #}
-    {% if config.seo is defined and config.seo.open_graph %}
-    <meta property="og:title" content="{{ metadata.title | default(value=config.title) }}" />
-    {% if metadata.description and not metadata.description == "nil" %}
-    <meta property="og:description" content="{{ metadata.description }}" />
+    {% if config.seo?.open_graph %}
+    <meta property="og:title" content="{{ metadata?.title | default(value=config.title) }}" />
+    {% if metadata?.description and not metadata?.description == "nil" %}
+    <meta property="og:description" content="{{ metadata?.description }}" />
     {% endif %}
-    {% if metadata.permalink %}
-    <meta property="og:url" content="{{ metadata.permalink }}" />
+    {% if metadata?.permalink %}
+    <meta property="og:url" content="{{ metadata?.permalink }}" />
     {% endif %}
     <meta property="og:site_name" content="{{ config.title }}" />
     <meta property="og:locale" content="{{ config.language | replace(from="-", to="_") }}" />
-    {% if metadata.image %}
-    <meta property="og:image" content="{{ config.rootUrl }}{{ metadata.image }}" />
-    <meta name="twitter:image" content="{{ config.rootUrl }}{{ metadata.image }}" />
-    {% elif config.seo is defined and config.seo.default_image %}
+    {% if metadata?.image %}
+    <meta property="og:image" content="{{ config.rootUrl }}{{ metadata?.image }}" />
+    <meta name="twitter:image" content="{{ config.rootUrl }}{{ metadata?.image }}" />
+    {% elif config.seo?.default_image %}
     <meta property="og:image" content="{{ config.rootUrl }}{{ config.seo.default_image }}" />
     <meta name="twitter:image" content="{{ config.rootUrl }}{{ config.seo.default_image }}" />
     {% endif %}
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="{{ metadata.title | default(value=config.title) }}" />
-    {% if metadata.description and not metadata.description == "nil" %}
-    <meta name="twitter:description" content="{{ metadata.description }}" />
+    <meta name="twitter:title" content="{{ metadata?.title | default(value=config.title) }}" />
+    {% if metadata?.description and not metadata?.description == "nil" %}
+    <meta name="twitter:description" content="{{ metadata?.description }}" />
     {% endif %}
     {% endif %}
 

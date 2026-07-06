@@ -186,7 +186,7 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
     let posts = state.posts.read().await.clone();
     let collections = shared::precompute_collection_subsets(&posts, &config);
     let shared_context = shared::build_shared_context(&posts, &config, &collections);
-    let mut context = shared_context;
+    let context = shared_context;
 
     let content = tera
         .render(template_name, &context)
@@ -463,7 +463,7 @@ pub(super) async fn handle_server_request(
                                 .unwrap_or_else(|| {
                                     shared::build_shared_context(&[], &config, &collections)
                                 });
-                            let mut context = shared_context;
+    let mut context = shared_context;
                             context.insert("error_message", &e_str);
                             match tera.render("500.html", &context) {
                                 Ok(rendered) => Response::builder()

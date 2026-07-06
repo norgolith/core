@@ -232,7 +232,7 @@ pub fn render_all_pages(
         if !template_name.ends_with(".xml") {
             continue;
         }
-        let mut context = shared_context.clone();
+        let context = shared_context.clone();
         if let Ok(body) = ctx.tera.render(template_name, &context) {
             let url_path = format!("/{}", template_name);
             pages.insert(url_path, body);
