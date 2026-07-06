@@ -50,12 +50,7 @@ pub fn apply_landlock(site_dir: &Path) -> Result<()> {
         let _ = std::fs::create_dir_all(&plugins_dir);
         let _ = std::fs::create_dir_all(&cache_dir);
 
-        let allowed_paths: Vec<&Path> = vec![
-            site_dir,
-            &public_dir,
-            &plugins_dir,
-            &cache_dir,
-        ];
+        let allowed_paths: Vec<&Path> = vec![site_dir, &public_dir, &plugins_dir, &cache_dir];
 
         let access = AccessFs::from_all(ABI::V1);
 

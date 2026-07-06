@@ -12,7 +12,7 @@ mod tera;
 mod theme;
 
 use eyre::Result;
-use tracing_subscriber::{filter::EnvFilter, fmt::time::ChronoLocal, FmtSubscriber};
+use tracing_subscriber::{FmtSubscriber, filter::EnvFilter, fmt::time::ChronoLocal};
 
 #[tokio::main]
 async fn main() -> Result<()> {

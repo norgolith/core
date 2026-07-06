@@ -65,9 +65,7 @@ pub fn __bridge_json<F>(input: *const c_char, handler: F) -> *mut c_char
 where
     F: FnOnce(serde_json::Value) -> Result<Option<String>, String>,
 {
-    let input_str = unsafe { CStr::from_ptr(input) }
-        .to_str()
-        .unwrap_or("{}");
+    let input_str = unsafe { CStr::from_ptr(input) }.to_str().unwrap_or("{}");
 
     let value: serde_json::Value =
         serde_json::from_str(input_str).unwrap_or(serde_json::Value::Null);
@@ -88,12 +86,7 @@ where
 /// Set a hook function pointer and mask bit by name
 ///
 /// Hook names map to array indices: pre_build=0, post_convert=1, post_render=2, post_build=3
-pub fn __set_hook(
-    name: &str,
-    mask: &mut u32,
-    hooks: &mut [Option<PluginFn>; 4],
-    func: PluginFn,
-) {
+pub fn __set_hook(name: &str, mask: &mut u32, hooks: &mut [Option<PluginFn>; 4], func: PluginFn) {
     match name {
         "pre_build" => {
             *mask |= HOOK_PRE_BUILD;
@@ -218,7 +211,8 @@ mod tests {
 
     #[test]
     fn test_bridge_json_success() {
-        let input = CString::new(r#"{"html":"hello","metadata":{},"rel_path":"test.norg"}"#).unwrap();
+        let input =
+            CString::new(r#"{"html":"hello","metadata":{},"rel_path":"test.norg"}"#).unwrap();
 
         fn handler(json: serde_json::Value) -> Result<Option<String>, String> {
             let html = json.get("html").and_then(|v| v.as_str()).unwrap();
@@ -230,12 +224,16 @@ mod tests {
 
         let output = unsafe { CStr::from_ptr(result) }.to_str().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(output).unwrap();
-        assert_eq!(parsed.get("html").and_then(|v| v.as_str()).unwrap(), "hello world");
+        assert_eq!(
+            parsed.get("html").and_then(|v| v.as_str()).unwrap(),
+            "hello world"
+        );
     }
 
     #[test]
     fn test_bridge_json_no_change() {
-        let input = CString::new(r#"{"html":"keep","metadata":{},"rel_path":"test.norg"}"#).unwrap();
+        let input =
+            CString::new(r#"{"html":"keep","metadata":{},"rel_path":"test.norg"}"#).unwrap();
 
         fn handler(_json: serde_json::Value) -> Result<Option<String>, String> {
             Ok(None)
@@ -247,7 +245,8 @@ mod tests {
 
     #[test]
     fn test_bridge_json_error() {
-        let input = CString::new(r#"{"html":"fail","metadata":{},"rel_path":"test.norg"}"#).unwrap();
+        let input =
+            CString::new(r#"{"html":"fail","metadata":{},"rel_path":"test.norg"}"#).unwrap();
 
         fn handler(_json: serde_json::Value) -> Result<Option<String>, String> {
             Err("something went wrong".to_string())
@@ -258,7 +257,10 @@ mod tests {
 
         let output = unsafe { CStr::from_ptr(result) }.to_str().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(output).unwrap();
-        assert_eq!(parsed.get("error").and_then(|v| v.as_str()).unwrap(), "something went wrong");
+        assert_eq!(
+            parsed.get("error").and_then(|v| v.as_str()).unwrap(),
+            "something went wrong"
+        );
     }
 
     #[test]
@@ -283,7 +285,10 @@ mod tests {
         assert!(hooks[2].is_some());
 
         __set_hook("post_build", &mut mask, &mut hooks, dummy);
-        assert_eq!(mask, HOOK_PRE_BUILD | HOOK_POST_CONVERT | HOOK_POST_RENDER | HOOK_POST_BUILD);
+        assert_eq!(
+            mask,
+            HOOK_PRE_BUILD | HOOK_POST_CONVERT | HOOK_POST_RENDER | HOOK_POST_BUILD
+        );
         assert!(hooks[3].is_some());
     }
 

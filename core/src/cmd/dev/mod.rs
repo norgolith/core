@@ -6,10 +6,10 @@ use std::net::{IpAddr, Ipv4Addr, TcpListener as StdTcpListener};
 use std::sync::Arc;
 
 use colored::Colorize;
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use futures_util::StreamExt;
-use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;
+use hyper::service::{make_service_fn, service_fn};
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tracing::{debug, error, info, instrument, warn};

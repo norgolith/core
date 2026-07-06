@@ -165,7 +165,7 @@ impl FieldDefinition {
                             return Err(ValidationError::ConstraintViolation {
                                 field: field_name.to_string(),
                                 message: format!("Invalid regex pattern: {}", pattern),
-                            })
+                            });
                         }
                     };
                     if !re.is_match(s) {
@@ -348,7 +348,10 @@ mod tests {
             max_length: None,
             pattern: None,
         };
-        assert!(def.validate(&toml::Value::String("hello".into()), "title").is_ok());
+        assert!(
+            def.validate(&toml::Value::String("hello".into()), "title")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -357,7 +360,10 @@ mod tests {
             max_length: Some(10),
             pattern: None,
         };
-        assert!(def.validate(&toml::Value::String("hello".into()), "title").is_ok());
+        assert!(
+            def.validate(&toml::Value::String("hello".into()), "title")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -366,7 +372,10 @@ mod tests {
             max_length: Some(5),
             pattern: None,
         };
-        assert!(def.validate(&toml::Value::String("hello".into()), "title").is_ok());
+        assert!(
+            def.validate(&toml::Value::String("hello".into()), "title")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -387,7 +396,10 @@ mod tests {
             max_length: None,
             pattern: Some(r"^\d+$".into()),
         };
-        assert!(def.validate(&toml::Value::String("1234".into()), "title").is_ok());
+        assert!(
+            def.validate(&toml::Value::String("1234".into()), "title")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -408,7 +420,9 @@ mod tests {
             max_length: None,
             pattern: None,
         };
-        let err = def.validate(&toml::Value::Boolean(true), "title").unwrap_err();
+        let err = def
+            .validate(&toml::Value::Boolean(true), "title")
+            .unwrap_err();
         assert!(matches!(err, ValidationError::TypeMismatch { .. }));
     }
 
@@ -416,16 +430,20 @@ mod tests {
 
     #[test]
     fn boolean_true_valid() {
-        assert!(FieldDefinition::Boolean
-            .validate(&toml::Value::Boolean(true), "draft")
-            .is_ok());
+        assert!(
+            FieldDefinition::Boolean
+                .validate(&toml::Value::Boolean(true), "draft")
+                .is_ok()
+        );
     }
 
     #[test]
     fn boolean_false_valid() {
-        assert!(FieldDefinition::Boolean
-            .validate(&toml::Value::Boolean(false), "draft")
-            .is_ok());
+        assert!(
+            FieldDefinition::Boolean
+                .validate(&toml::Value::Boolean(false), "draft")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -506,7 +524,9 @@ mod tests {
             max_items: Some(2),
             must_contain: None,
         };
-        let err = def.validate(&str_array(&["a", "b", "c"]), "tags").unwrap_err();
+        let err = def
+            .validate(&str_array(&["a", "b", "c"]), "tags")
+            .unwrap_err();
         assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
     }
 
@@ -521,7 +541,10 @@ mod tests {
             max_items: None,
             must_contain: Some(vec![toml::Value::String("norgolith".into())]),
         };
-        assert!(def.validate(&str_array(&["foo", "norgolith"]), "tags").is_ok());
+        assert!(
+            def.validate(&str_array(&["foo", "norgolith"]), "tags")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -535,7 +558,9 @@ mod tests {
             max_items: None,
             must_contain: Some(vec![toml::Value::String("norgolith".into())]),
         };
-        let err = def.validate(&str_array(&["foo", "bar"]), "tags").unwrap_err();
+        let err = def
+            .validate(&str_array(&["foo", "bar"]), "tags")
+            .unwrap_err();
         assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
     }
 

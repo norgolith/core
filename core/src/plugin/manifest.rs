@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use eyre::{bail, eyre, Result};
+use eyre::{Result, bail, eyre};
 use serde::Deserialize;
 
 /// Current ABI version that this norgolith core provides
@@ -146,8 +146,13 @@ impl PluginManifest {
 
     /// Validate semver compatibility with the running norgolith version
     pub fn validate_semver(&self) -> Result<()> {
-        let req = semver::VersionReq::parse(&self.plugin.norgolith)
-            .map_err(|e| eyre!("Invalid semver requirement '{}': {}", self.plugin.norgolith, e))?;
+        let req = semver::VersionReq::parse(&self.plugin.norgolith).map_err(|e| {
+            eyre!(
+                "Invalid semver requirement '{}': {}",
+                self.plugin.norgolith,
+                e
+            )
+        })?;
         let current = semver::Version::parse(env!("CARGO_PKG_VERSION"))
             .map_err(|e| eyre!("Invalid core version: {}", e))?;
         if !req.matches(&current) {

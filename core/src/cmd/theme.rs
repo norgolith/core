@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 use colored::Colorize;
-use eyre::{bail, eyre, Context, Result};
+use eyre::{Context, Result, bail, eyre};
 use indoc::formatdoc;
-use inquire::{validator::Validation, Confirm, Select, Text};
-use spinoff::{spinners, Spinner};
+use inquire::{Confirm, Select, Text, validator::Validation};
+use spinoff::{Spinner, spinners};
 use tracing::info;
 
 use crate::{
@@ -18,8 +18,7 @@ use crate::{
 /// and its parents, then returns the theme directory path.
 async fn find_theme_dir() -> Result<PathBuf> {
     let mut current_dir = std::env::current_dir()?;
-    let found_site_root =
-        fs::find_in_previous_dirs("file", "norgolith.toml", &mut current_dir)?;
+    let found_site_root = fs::find_in_previous_dirs("file", "norgolith.toml", &mut current_dir)?;
 
     match found_site_root {
         Some(mut root) => {
@@ -91,8 +90,7 @@ async fn update_theme() -> Result<()> {
     // Check if there is a '.metadata.toml' in the theme directory before proceeding
     if theme_dir.join(".metadata.toml").exists() {
         // Load the current theme metadata
-        let metadata_content =
-            tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await?;
+        let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await?;
         let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content)?;
 
         let mut theme = ThemeManager {
@@ -306,11 +304,9 @@ async fn show_theme_info() -> Result<()> {
 
     // Check if there is a '.metadata.toml' in the theme directory before proceeding
     if theme_dir.join(".metadata.toml").exists() {
-        let metadata_content =
-            tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await?;
+        let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await?;
         let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content)?;
-        let theme_toml_content =
-            tokio::fs::read_to_string(theme_dir.join("theme.toml")).await?;
+        let theme_toml_content = tokio::fs::read_to_string(theme_dir.join("theme.toml")).await?;
         let theme_toml: ThemeMetadata = toml::from_str(&theme_toml_content)?;
 
         let mut theme_info: Vec<String> = vec![

@@ -198,10 +198,7 @@ pub fn generate_robots_txt(
         match std::fs::read_to_string(custom_path) {
             Ok(content) => buf.push_str(&content),
             Err(e) => {
-                warn!(
-                    "Failed to read custom robots file '{}': {}",
-                    custom_path, e
-                );
+                warn!("Failed to read custom robots file '{}': {}", custom_path, e);
                 // Fallback to a permissive robots.txt
                 buf.push_str(ROBOTS_ALLOW_ALL);
             }
@@ -297,9 +294,18 @@ mod tests {
     #[test]
     fn sitemap_multiple_urls() {
         let urls = vec![
-            SitemapUrl { loc: "/".into(), lastmod: None },
-            SitemapUrl { loc: "/about/".into(), lastmod: None },
-            SitemapUrl { loc: "/posts/".into(), lastmod: None },
+            SitemapUrl {
+                loc: "/".into(),
+                lastmod: None,
+            },
+            SitemapUrl {
+                loc: "/about/".into(),
+                lastmod: None,
+            },
+            SitemapUrl {
+                loc: "/posts/".into(),
+                lastmod: None,
+            },
         ];
         let xml = generate_sitemap_xml(&urls, "https://example.com");
         assert!(xml.contains("<loc>https://example.com/</loc>"));

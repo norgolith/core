@@ -12,8 +12,8 @@ use std::sync::OnceLock;
 use html_escape::encode_text_minimal_to_string;
 use regex::Regex;
 use rust_norg::{
-    parse_tree, CarryoverTag, DelimitingModifier, LinkTarget, NestableDetachedModifier, NorgAST,
-    NorgASTFlat, ParagraphSegment, ParagraphSegmentToken,
+    CarryoverTag, DelimitingModifier, LinkTarget, NestableDetachedModifier, NorgAST, NorgASTFlat,
+    ParagraphSegment, ParagraphSegmentToken, parse_tree,
 };
 use tracing::{error, info, warn};
 
@@ -271,7 +271,9 @@ fn weak_carryover_attribute(weak_carryover: CarryOverTag) -> String {
     // this behaviour?
     if namespace == "html" {
         if weak_carryover.name.len() < 2 {
-            error!("[converter] Carryover tag with namespace 'html' is expected to have an attribute name (e.g. 'html.class')");
+            error!(
+                "[converter] Carryover tag with namespace 'html' is expected to have an attribute name (e.g. 'html.class')"
+            );
         } else if weak_carryover.name.len() >= 3 {
             error!(
                 "[converter] Carryover tag with namespace 'html' is expected to have only one attribute name (e.g. 'html.class'), '{}' provided",
@@ -320,7 +322,12 @@ impl NorgToHtml for NorgAST {
                     }
                 }
                 paragraph.push('>');
-                paragraph.push_str(&paragraph_to_string(s, strong_carry, &mut weak_carry, root_url));
+                paragraph.push_str(&paragraph_to_string(
+                    s,
+                    strong_carry,
+                    &mut weak_carry,
+                    root_url,
+                ));
                 paragraph.push_str("</p>");
                 paragraph
             }
@@ -407,7 +414,13 @@ impl NorgToHtml for NorgAST {
                         list.push_str(&mod_text);
                         list.push_str("</li>");
                         if !content.is_empty() {
-                            list.push_str(&to_html(content, strong_carry, &weak_carry, root_url, toc));
+                            list.push_str(&to_html(
+                                content,
+                                strong_carry,
+                                &weak_carry,
+                                root_url,
+                                toc,
+                            ));
                         }
                         list
                     }
@@ -423,7 +436,13 @@ impl NorgToHtml for NorgAST {
                         quote.push('>');
                         quote.push_str(&mod_text);
                         if !content.is_empty() {
-                            quote.push_str(&to_html(content, strong_carry, &weak_carry, root_url, toc));
+                            quote.push_str(&to_html(
+                                content,
+                                strong_carry,
+                                &weak_carry,
+                                root_url,
+                                toc,
+                            ));
                         }
                         quote.push_str("</blockquote>");
                         quote
@@ -510,13 +529,13 @@ impl NorgToHtml for NorgAST {
                         parameters: parameters.clone(),
                     };
                     weak_carry.push_back(tag);
-                        to_html(
-                            &[*next_object.clone()],
-                            strong_carry,
-                            &weak_carry,
-                            root_url,
-                            toc,
-                        )
+                    to_html(
+                        &[*next_object.clone()],
+                        strong_carry,
+                        &weak_carry,
+                        root_url,
+                        toc,
+                    )
                 }
                 CarryoverTag::Macro => {
                     error!("[converter] Carryover tag macros are unsupported right now");

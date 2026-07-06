@@ -5,7 +5,7 @@ use colored::Colorize;
 use comfy_table::modifiers::UTF8_SOLID_INNER_BORDERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, ContentArrangement, Table};
-use eyre::{bail, eyre, Result};
+use eyre::{Result, bail, eyre};
 use indoc::formatdoc;
 use inquire::Text;
 use tokio::fs;

@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use eyre::{bail, eyre, Context, Result};
-use git2::{build::CheckoutBuilder, Repository};
+use eyre::{Context, Result, bail, eyre};
+use git2::{Repository, build::CheckoutBuilder};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use spinoff::Spinner;
@@ -193,7 +193,10 @@ fn check_min_version(theme_toml_path: &Path, sp: &mut Spinner) {
         return;
     };
     let Ok(min_ver) = Version::parse(&min_version_str) else {
-        debug!("min_version '{}' is not valid semver, skipping", min_version_str);
+        debug!(
+            "min_version '{}' is not valid semver, skipping",
+            min_version_str
+        );
         return;
     };
 
@@ -216,7 +219,10 @@ fn check_min_version(theme_toml_path: &Path, sp: &mut Spinner) {
             ),
         );
     } else {
-        debug!("min_version {} satisfied by lith {}", min_version_str, lith_clean);
+        debug!(
+            "min_version {} satisfied by lith {}",
+            min_version_str, lith_clean
+        );
     }
 }
 
@@ -252,7 +258,11 @@ impl ThemeManager {
         check_min_version(&temp_dir.path().join("theme.toml"), sp);
 
         // Backup existing theme files before installing a new one
-        let backup_dir = self.theme_dir.parent().unwrap_or(Path::new(".")).join(".theme_backup");
+        let backup_dir = self
+            .theme_dir
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(".theme_backup");
         debug!(backup_path = %backup_dir.display(), "Starting theme backup");
         backup_theme_files(&self.theme_dir, &backup_dir, sp)
             .await
@@ -310,7 +320,11 @@ impl ThemeManager {
             check_min_version(&temp_dir.path().join("theme.toml"), sp);
 
             // Backup current theme files
-            let backup_dir = self.theme_dir.parent().unwrap_or(Path::new(".")).join(".theme_backup");
+            let backup_dir = self
+                .theme_dir
+                .parent()
+                .unwrap_or(Path::new("."))
+                .join(".theme_backup");
             backup_theme_files(&self.theme_dir, &backup_dir, sp)
                 .await
                 .context("Failed to backup theme files")?;

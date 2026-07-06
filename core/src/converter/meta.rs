@@ -1,5 +1,5 @@
 use eyre::{Error, Result};
-use rust_norg::metadata::{parse_metadata, NorgMeta};
+use rust_norg::metadata::{NorgMeta, parse_metadata};
 use std::str::FromStr;
 use toml::{self, value::Datetime};
 

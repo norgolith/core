@@ -5,7 +5,7 @@ use std::{
 
 use chrono::{Local, SecondsFormat};
 use colored::Colorize;
-use eyre::{bail, eyre, Context, Result};
+use eyre::{Context, Result, bail, eyre};
 use indoc::formatdoc;
 use inquire::{Select, Text};
 use regex::Regex;

@@ -9,14 +9,14 @@ use std::{
 };
 
 use colored::{ColoredString, Colorize};
-use eyre::{bail, eyre, Result, WrapErr};
+use eyre::{Result, WrapErr, bail, eyre};
 use tera::Context;
 use tracing::{debug, error, instrument, warn};
 use walkdir::WalkDir;
 
-use crate::{cache::BuildCache, config, fs, plugin, shared};
-use crate::shared::{BuildContext, SitePaths};
 use super::seo;
+use crate::shared::{BuildContext, SitePaths};
+use crate::{cache::BuildCache, config, fs, plugin, shared};
 
 use assets::copy_assets;
 use content::{build_category_pages, build_error_pages, generate_xml_feeds};
@@ -74,12 +74,11 @@ fn prepare_build_directory(public_dir: &Path) -> Result<()> {
         }
     } else {
         debug!(path = %public_dir.display(), "Creating public directory");
-        std::fs::create_dir_all(public_dir)
-            .wrap_err(format!(
-                "{}: {}",
-                "Failed to create public directory".bold(),
-                public_dir.display()
-            ))?;
+        std::fs::create_dir_all(public_dir).wrap_err(format!(
+            "{}: {}",
+            "Failed to create public directory".bold(),
+            public_dir.display()
+        ))?;
     }
 
     debug!("Build directory prepared successfully");
@@ -130,12 +129,11 @@ fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
             return Ok(false);
         }
     }
-    std::fs::write(public_path, rendered)
-        .wrap_err(format!(
-            "{}: {}",
-            "Failed to write to public path".bold(),
-            public_path.display()
-        ))?;
+    std::fs::write(public_path, rendered).wrap_err(format!(
+        "{}: {}",
+        "Failed to write to public path".bold(),
+        public_path.display()
+    ))?;
     Ok(true)
 }
 
@@ -200,10 +198,7 @@ fn build_contents(
     Ok((built_count, permalinks, timings))
 }
 
-#[instrument(
-    level = "debug",
-    skip(path, ctx, shared_context, cache)
-)]
+#[instrument(level = "debug", skip(path, ctx, shared_context, cache))]
 fn build_content_entry(
     path: &Path,
     ctx: BuildContext<'_>,
@@ -224,12 +219,18 @@ fn build_content_entry(
         return Ok(None);
     };
 
-    let metadata = shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
+    let metadata =
+        shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
 
     if let Some(schema) = &ctx.site_config.content_schema {
         if !rel_path.starts_with(&ctx.site_config.categories_dir) {
-            let errors =
-                shared::validate_content_metadata(&ctx.paths.content, path, &metadata, schema, false)?;
+            let errors = shared::validate_content_metadata(
+                &ctx.paths.content,
+                path,
+                &metadata,
+                schema,
+                false,
+            )?;
             if !errors.is_empty() {
                 return Err(eyre!("{}", errors));
             }
@@ -249,7 +250,11 @@ fn build_content_entry(
         match serde_json::from_value::<toml::Value>(cached.clone()) {
             Ok(md) => (md, None),
             Err(_) => {
-                let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
+                let md = shared::load_metadata_from_content(
+                    &content,
+                    rel_path,
+                    &ctx.site_config.root_url,
+                );
                 let cache_val = serde_json::to_value(&md).unwrap_or_default();
                 (md, Some((cache_key, content.clone(), cache_val)))
             }
@@ -260,13 +265,16 @@ fn build_content_entry(
         (md, Some((cache_key, content.clone(), cache_val)))
     };
 
-    ctx.plugins.run_post_convert(ctx.site_config, &mut metadata, rel_path);
+    ctx.plugins
+        .run_post_convert(ctx.site_config, &mut metadata, rel_path);
 
     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
 
     let mut rendered = shared::render_norg_page(ctx.tera, &metadata, shared_context)?;
 
-    rendered = ctx.plugins.run_post_render(ctx.site_config, rendered, &metadata, rel_path);
+    rendered = ctx
+        .plugins
+        .run_post_render(ctx.site_config, rendered, &metadata, rel_path);
 
     let href_re = href_root_re();
     rendered = href_re
@@ -311,8 +319,7 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Load site configuration
     let t = Instant::now();
-    let config_content = std::fs::read_to_string(&root)
-        .wrap_err("Failed to read config file")?;
+    let config_content = std::fs::read_to_string(&root).wrap_err("Failed to read config file")?;
     let site_config: config::SiteConfig =
         toml::from_str(&config_content).wrap_err("Failed to parse site configuration")?;
     let validation_errors = site_config.validate();
@@ -352,8 +359,7 @@ pub fn build(minify: bool) -> Result<()> {
 
     // pre_build hook
     if plugin_mgr.has_hook(plugin::HOOK_PRE_BUILD) {
-        let config_json = serde_json::to_string(&site_config)
-            .unwrap_or_default();
+        let config_json = serde_json::to_string(&site_config).unwrap_or_default();
         for p in plugin_mgr.plugins() {
             if let Some(f) = p.hooks.pre_build {
                 if let Err(e) = plugin_mgr.call_hook(p, f, &config_json) {
@@ -415,8 +421,14 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Build content
     let t = Instant::now();
-    let ctx = BuildContext { tera: &tera, paths: &paths, site_config: &site_config, plugins: &plugin_mgr };
-    let (page_count, permalinks, content_timings) = build_contents(ctx, &shared_context, &mut cache, minify)?;
+    let ctx = BuildContext {
+        tera: &tera,
+        paths: &paths,
+        site_config: &site_config,
+        plugins: &plugin_mgr,
+    };
+    let (page_count, permalinks, content_timings) =
+        build_contents(ctx, &shared_context, &mut cache, minify)?;
     timings.content_ms = t.elapsed().as_millis();
     timings.page_count = page_count;
     timings.page_write_ms = content_timings.page_write_ms;
@@ -461,18 +473,14 @@ pub fn build(minify: bool) -> Result<()> {
     let mut seo_count = 0usize;
     let seo_enabled = site_config.seo.is_some() || site_config.robots.is_some();
     if seo_enabled {
-        let sitemap_enabled = site_config
-            .seo
-            .as_ref()
-            .is_none_or(|s| s.sitemap);
+        let sitemap_enabled = site_config.seo.as_ref().is_none_or(|s| s.sitemap);
         if sitemap_enabled {
             use std::collections::HashMap;
-            let date_map: HashMap<&str, &str> = posts.iter()
+            let date_map: HashMap<&str, &str> = posts
+                .iter()
                 .filter_map(|p| {
                     let permalink = p.get("permalink")?.as_str()?;
-                    let date = p.get("updated")
-                        .or_else(|| p.get("created"))?
-                        .as_str()?;
+                    let date = p.get("updated").or_else(|| p.get("created"))?.as_str()?;
                     Some((permalink, date))
                 })
                 .collect();
@@ -516,21 +524,16 @@ pub fn build(minify: bool) -> Result<()> {
 
             let xml = seo::generate_sitemap_xml(&urls, &site_config.root_url);
             let output_path = paths.public.join("sitemap.xml");
-            std::fs::write(&output_path, &xml)
-                .wrap_err("Failed to write sitemap.xml")?;
+            std::fs::write(&output_path, &xml).wrap_err("Failed to write sitemap.xml")?;
             seo_count += 1;
         }
 
         if let Some(ref robots_config) = site_config.robots {
             if robots_config.enable {
-                let content = seo::generate_robots_txt(
-                    &site_config,
-                    robots_config,
-                    sitemap_enabled,
-                );
+                let content =
+                    seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
                 let output_path = paths.public.join("robots.txt");
-                std::fs::write(&output_path, &content)
-                    .wrap_err("Failed to write robots.txt")?;
+                std::fs::write(&output_path, &content).wrap_err("Failed to write robots.txt")?;
                 seo_count += 1;
             }
         }
@@ -579,8 +582,7 @@ pub fn build(minify: bool) -> Result<()> {
 
     // post_build hook
     if plugin_mgr.has_hook(plugin::HOOK_POST_BUILD) {
-        let config_json = serde_json::to_string(&site_config)
-            .unwrap_or_default();
+        let config_json = serde_json::to_string(&site_config).unwrap_or_default();
         for p in plugin_mgr.plugins() {
             if let Some(f) = p.hooks.post_build {
                 if let Err(e) = plugin_mgr.call_hook(p, f, &config_json) {
@@ -610,11 +612,7 @@ pub fn build(minify: bool) -> Result<()> {
         let mut sorted: Vec<_> = plugin_timings.iter().collect();
         sorted.sort_by(|a, b| b.1.cmp(a.1));
         for (name, duration) in sorted {
-            println!(
-                "    {:<20} {:>6}ms",
-                name.dimmed(),
-                duration.as_millis()
-            );
+            println!("    {:<20} {:>6}ms", name.dimmed(), duration.as_millis());
         }
     }
 

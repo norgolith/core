@@ -1,6 +1,6 @@
 use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 
-use eyre::{eyre, Result};
+use eyre::{Result, eyre};
 
 /// Bind to the given address, returning the listener if successful.
 ///

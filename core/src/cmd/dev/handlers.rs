@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use colored::Colorize;
-use eyre::{eyre, Result};
+use eyre::{Result, eyre};
 use futures_util::{SinkExt, StreamExt};
-use hyper::{header::CONTENT_TYPE, Body, Request, Response, StatusCode};
 use hyper::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
+use hyper::{Body, Request, Response, StatusCode, header::CONTENT_TYPE};
 use tokio::net::TcpStream;
 use tokio::sync::broadcast;
 use tracing::{debug, error, instrument};
@@ -98,7 +98,10 @@ pub(super) fn handle_not_found(state: &ServerState) -> Response<Body> {
         .expect("Could not build Not Found response")
 }
 
-pub(super) async fn resolve_url_norg_path(content_dir: &Path, path: &Path) -> std::io::Result<PathBuf> {
+pub(super) async fn resolve_url_norg_path(
+    content_dir: &Path,
+    path: &Path,
+) -> std::io::Result<PathBuf> {
     use tokio::fs;
     let mut path = content_dir.join(path);
     debug!(?path);
@@ -448,28 +451,37 @@ pub(super) async fn handle_server_request(
             let response = {
                 let tera = state.tera.try_read();
                 let config = state.config.try_read();
-                match (tera, config) { (Ok(tera), Ok(config)) => {
-                    if tera.get_template_names().any(|n| n == "500.html") {
-                        let posts = state.posts.try_read().ok();
-                        let collections = posts
-                            .as_ref()
-                            .map(|p| shared::precompute_collection_subsets(p, &config))
-                            .unwrap_or_default();
-                        let shared_context = posts
-                            .as_ref()
-                            .map(|p| shared::build_shared_context(p, &config, &collections))
-                            .unwrap_or_else(|| {
-                                shared::build_shared_context(&[], &config, &collections)
-                            });
-                        let mut context = shared_context;
-                        context.insert("error_message", &e_str);
-                        match tera.render("500.html", &context) { Ok(rendered) => {
-                            Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(CONTENT_TYPE, "text/html; charset=utf-8")
-                                .body(Body::from(rendered))
-                                .unwrap()
-                        } _ => {
+                match (tera, config) {
+                    (Ok(tera), Ok(config)) => {
+                        if tera.get_template_names().any(|n| n == "500.html") {
+                            let posts = state.posts.try_read().ok();
+                            let collections = posts
+                                .as_ref()
+                                .map(|p| shared::precompute_collection_subsets(p, &config))
+                                .unwrap_or_default();
+                            let shared_context = posts
+                                .as_ref()
+                                .map(|p| shared::build_shared_context(p, &config, &collections))
+                                .unwrap_or_else(|| {
+                                    shared::build_shared_context(&[], &config, &collections)
+                                });
+                            let mut context = shared_context;
+                            context.insert("error_message", &e_str);
+                            match tera.render("500.html", &context) {
+                                Ok(rendered) => Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(CONTENT_TYPE, "text/html; charset=utf-8")
+                                    .body(Body::from(rendered))
+                                    .unwrap(),
+                                _ => Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .body(Body::from(format!(
+                                        "500 Internal Server Error\n\n{}",
+                                        e_str
+                                    )))
+                                    .unwrap(),
+                            }
+                        } else {
                             Response::builder()
                                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                                 .body(Body::from(format!(
@@ -477,25 +489,16 @@ pub(super) async fn handle_server_request(
                                     e_str
                                 )))
                                 .unwrap()
-                        }}
-                    } else {
-                        Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!(
-                                "500 Internal Server Error\n\n{}",
-                                e_str
-                            )))
-                            .unwrap()
+                        }
                     }
-                } _ => {
-                    Response::builder()
+                    _ => Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
                         .body(Body::from(format!(
                             "500 Internal Server Error\n\n{}",
                             e_str
                         )))
-                        .unwrap()
-                }}
+                        .unwrap(),
+                }
             };
             response
         }

@@ -14,8 +14,8 @@ use eyre::Result;
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
 pub use manifest::{
-    Capabilities, FilesystemAccess, HookConfig, PluginManifest, CORE_ABI_VERSION,
-    HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
+    CORE_ABI_VERSION, Capabilities, FilesystemAccess, HOOK_POST_BUILD, HOOK_POST_CONVERT,
+    HOOK_POST_RENDER, HOOK_PRE_BUILD, HookConfig, PluginManifest,
 };
 
 use tracing::{error, info, warn};
@@ -106,18 +106,13 @@ impl PluginManager {
             let dir = entry.path();
             match load_plugin(&dir) {
                 Ok(instance) => {
-                    info!(
-                        "Loaded plugin '{}' v{}",
-                        instance.name, instance.version
-                    );
+                    info!("Loaded plugin '{}' v{}", instance.name, instance.version);
                     manager.plugins.push(instance);
                 }
                 Err(e) => {
                     warn!(
                         "Plugin '{}' skipped: {}",
-                        dir.file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("?"),
+                        dir.file_name().and_then(|n| n.to_str()).unwrap_or("?"),
                         e
                     );
                 }
@@ -152,7 +147,12 @@ impl PluginManager {
     }
 
     /// Call a hook on a plugin with timing recorded
-    pub fn call_hook(&self, plugin: &PluginInstance, f: PluginFn, input: &str) -> Result<Option<String>> {
+    pub fn call_hook(
+        &self,
+        plugin: &PluginInstance,
+        f: PluginFn,
+        input: &str,
+    ) -> Result<Option<String>> {
         let start = Instant::now();
         let result = plugin.call_hook(f, input);
         self.record_hook_time(&plugin.name, start.elapsed());
@@ -182,8 +182,12 @@ impl PluginManager {
         metadata: &mut toml::Value,
         rel_path: &Path,
     ) {
-        if !self.has_hook(HOOK_POST_CONVERT) { return; }
-        let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) else { return; };
+        if !self.has_hook(HOOK_POST_CONVERT) {
+            return;
+        }
+        let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) else {
+            return;
+        };
         let html = html.to_string();
         for p in self.plugins() {
             if let Some(f) = p.hooks.post_convert {
@@ -229,7 +233,9 @@ impl PluginManager {
         metadata: &toml::Value,
         rel_path: &Path,
     ) -> String {
-        if !self.has_hook(HOOK_POST_RENDER) { return html; }
+        if !self.has_hook(HOOK_POST_RENDER) {
+            return html;
+        }
         let mut current = html;
         for p in self.plugins() {
             if let Some(f) = p.hooks.post_render {
@@ -272,22 +278,34 @@ impl Default for PluginManager {
 
 pub fn library_extension() -> &'static str {
     #[cfg(target_os = "linux")]
-    { "so" }
+    {
+        "so"
+    }
     #[cfg(target_os = "macos")]
-    { "dylib" }
+    {
+        "dylib"
+    }
     #[cfg(target_os = "windows")]
-    { "dll" }
+    {
+        "dll"
+    }
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-    { "so" }
+    {
+        "so"
+    }
 }
 
 pub fn library_filename(name: &str) -> String {
     // Linux/macOS convention: lib<name>.<ext>
     // Windows convention: <name>.dll
     #[cfg(target_os = "windows")]
-    { format!("{}.{}", name, library_extension()) }
+    {
+        format!("{}.{}", name, library_extension())
+    }
     #[cfg(not(target_os = "windows"))]
-    { format!("lib{}.{}", name, library_extension()) }
+    {
+        format!("lib{}.{}", name, library_extension())
+    }
 }
 
 /// Find the shared library file in a plugin directory
@@ -334,11 +352,7 @@ fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
     let lib = unsafe { libloading::Library::new(&lib_path) }
         .map_err(|e| eyre::eyre!("failed to load {}: {}", lib_path.display(), e))?;
 
-    type InitFn = unsafe extern "C" fn(
-        *mut PluginInfo,
-        *mut u32,
-        *mut [Option<PluginFn>; 4],
-    );
+    type InitFn = unsafe extern "C" fn(*mut PluginInfo, *mut u32, *mut [Option<PluginFn>; 4]);
 
     let init: libloading::Symbol<InitFn> = unsafe { lib.get(b"norgolith_plugin_init") }
         .map_err(|e| eyre::eyre!("missing symbol norgolith_plugin_init: {}", e))?;
@@ -619,11 +633,17 @@ timeout_ms = 5000
         let p = mgr.plugins().next().unwrap();
         assert_eq!(p.name, "test-sdk-plugin");
         assert_eq!(p.version, "0.1.0");
-        assert!(p.hooks.post_render.is_some(), "post_render hook should be set");
+        assert!(
+            p.hooks.post_render.is_some(),
+            "post_render hook should be set"
+        );
 
         let input = r#"{"html":"<p>hello</p>","metadata":{},"rel_path":"test.norg"}"#;
         let result = p.call_hook(p.hooks.post_render.unwrap(), input).unwrap();
         assert!(result.is_some(), "plugin should return modified HTML");
-        assert!(result.unwrap().contains("<!-- plugin-ok -->"), "should contain plugin marker");
+        assert!(
+            result.unwrap().contains("<!-- plugin-ok -->"),
+            "should contain plugin marker"
+        );
     }
 }

@@ -4,9 +4,6 @@ use eyre::Result;
 use tokio::fs::{copy, create_dir_all, read_dir};
 use tracing::{debug, instrument};
 
-#[cfg(test)]
-use tempfile::tempdir;
-
 /// Find a given file or directory in the current working directory and its parent directories recursively
 #[instrument(skip(kind, filename, current_dir))]
 pub fn find_in_previous_dirs(
@@ -122,8 +119,7 @@ mod tests {
         std::fs::create_dir(&test_directory)?;
         std::fs::File::create(&test_file)?;
 
-        let result =
-            find_in_previous_dirs("file", test_file_name, &mut test_directory.clone());
+        let result = find_in_previous_dirs("file", test_file_name, &mut test_directory.clone());
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some(test_file.clone()));
 
