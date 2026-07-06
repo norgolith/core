@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use eyre::{eyre, Result};
+use eyre::{Result, eyre};
 use tracing::{error, warn};
 use walkdir::WalkDir;
 
 use crate::config::CollectionConfig;
 use crate::converter;
-use crate::schema::{format_errors, validate_metadata, ContentSchema};
+use crate::schema::{ContentSchema, format_errors, validate_metadata};
 
 /// Computes the permalink for a content file based on its relative path.
 fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
@@ -32,7 +32,7 @@ fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
 
 /// Converts TOML datetime values to RFC3339 strings in a metadata table.
 fn normalize_datetimes(metadata: &mut toml::Value) {
-    if let toml::Value::Table(ref mut table) = metadata {
+    if let toml::Value::Table(table) = metadata {
         for (_k, v) in table.iter_mut() {
             if let toml::Value::Datetime(dt) = v {
                 *v = toml::Value::String(dt.to_string());
@@ -46,13 +46,14 @@ fn normalize_datetimes(metadata: &mut toml::Value) {
 /// This is the inner function that does the actual work. It does NOT read from disk.
 pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &str) -> toml::Value {
     let (html, toc) = converter::html::convert(content, routes_url);
-    let mut metadata = match converter::meta::convert(content, Some(converter::html::toc_to_toml(&toc))) {
-        Ok(m) => m,
-        Err(e) => {
-            warn!("Failed to parse metadata for {}: {}", rel_path.display(), e);
-            toml::Value::Table(toml::map::Map::new())
-        }
-    };
+    let mut metadata =
+        match converter::meta::convert(content, Some(converter::html::toc_to_toml(&toc))) {
+            Ok(m) => m,
+            Err(e) => {
+                warn!("Failed to parse metadata for {}: {}", rel_path.display(), e);
+                toml::Value::Table(toml::map::Map::new())
+            }
+        };
     let permalink = compute_permalink(rel_path, routes_url);
     normalize_datetimes(&mut metadata);
     if let toml::Value::Table(ref mut table) = metadata {
@@ -65,7 +66,11 @@ pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &s
 /// Lightweight metadata extraction from pre-read content (no parse_tree).
 ///
 /// This is the inner function that does the actual work. It does NOT read from disk.
-pub fn extract_metadata_from_content(content: &str, rel_path: &Path, routes_url: &str) -> toml::Value {
+pub fn extract_metadata_from_content(
+    content: &str,
+    rel_path: &Path,
+    routes_url: &str,
+) -> toml::Value {
     let mut metadata = match converter::meta::convert(content, None) {
         Ok(m) => m,
         Err(e) => {

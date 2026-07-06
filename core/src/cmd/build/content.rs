@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use colored::Colorize;
-use eyre::{eyre, Result, WrapErr};
+use eyre::{Result, WrapErr, eyre};
 use rss::Channel;
 use tera::{Context, Tera};
 use tracing::{instrument, warn};
@@ -104,7 +104,11 @@ pub(super) fn build_category_pages(
 }
 
 #[instrument(level = "debug", skip(tera, shared_context, public_dir))]
-pub(super) fn build_error_pages(tera: &Tera, shared_context: &Context, public_dir: &Path) -> Result<usize> {
+pub(super) fn build_error_pages(
+    tera: &Tera,
+    shared_context: &Context,
+    public_dir: &Path,
+) -> Result<usize> {
     let mut count = 0usize;
     for name in &["404.html", "500.html"] {
         if !tera.get_template_names().any(|n| n == *name) {

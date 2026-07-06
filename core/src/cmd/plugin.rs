@@ -2,14 +2,14 @@ use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
 use colored::Colorize;
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use flate2::read::GzDecoder;
 use git2::Repository;
 use serde::Deserialize;
 use tar::Archive;
 use tempfile::tempdir;
 
-use crate::plugin::{self, PluginManifest, CORE_ABI_VERSION};
+use crate::plugin::{self, CORE_ABI_VERSION, PluginManifest};
 
 #[derive(Subcommand, Clone)]
 pub enum PluginCommands {
@@ -45,9 +45,12 @@ pub fn handle(subcommand: &PluginCommands) -> Result<()> {
     match subcommand {
         PluginCommands::List => list_plugins(),
         PluginCommands::New { name } => new_plugin(name),
-        PluginCommands::Install { source, git, tag, branch } => {
-            install(source, *git, tag.as_deref(), branch.as_deref())
-        }
+        PluginCommands::Install {
+            source,
+            git,
+            tag,
+            branch,
+        } => install(source, *git, tag.as_deref(), branch.as_deref()),
         PluginCommands::Uninstall { name } => uninstall_plugin(name),
     }
 }
@@ -93,10 +96,7 @@ fn list_plugins() -> Result<()> {
         };
 
         println!("{}", p.name.bold());
-        println!(
-            "   version:  {:<10}  hooks:      {}",
-            p.version, hooks_str
-        );
+        println!("   version:  {:<10}  hooks:      {}", p.version, hooks_str);
         println!(
             "   status:   {:<19}  priority:   {}",
             status, p.manifest.priority
@@ -124,7 +124,11 @@ fn new_plugin(name: &str) -> Result<()> {
     let plugins_dir = cwd.join("plugins").join(name);
 
     if plugins_dir.exists() {
-        bail!("Plugin '{}' already exists at {}", name, plugins_dir.display());
+        bail!(
+            "Plugin '{}' already exists at {}",
+            name,
+            plugins_dir.display()
+        );
     }
 
     std::fs::create_dir_all(plugins_dir.join("src"))?;
@@ -288,10 +292,7 @@ fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Resul
 
     let manifest_path = clone_path.join("plugin.toml");
     if !manifest_path.is_file() {
-        bail!(
-            "No plugin.toml found in {} (not a norgolith plugin?)",
-            url
-        );
+        bail!("No plugin.toml found in {} (not a norgolith plugin?)", url);
     }
 
     let manifest = PluginManifest::load(&manifest_path)?;
@@ -321,10 +322,7 @@ fn install_from_local(source_dir: &Path) -> Result<()> {
 
     let manifest_path = source_dir.join("plugin.toml");
     if !manifest_path.is_file() {
-        bail!(
-            "No plugin.toml found in {}",
-            source_dir.display()
-        );
+        bail!("No plugin.toml found in {}", source_dir.display());
     }
 
     let manifest = PluginManifest::load(&manifest_path)?;
@@ -397,7 +395,9 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
     let tar_gz = std::fs::File::open(&dl_path)?;
     let decoder = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(decoder);
-    archive.unpack(tmp.path()).map_err(|e| eyre::eyre!("Failed to extract crate: {}", e))?;
+    archive
+        .unpack(tmp.path())
+        .map_err(|e| eyre::eyre!("Failed to extract crate: {}", e))?;
 
     // Crate tarball extracts to <name>-<version>/ directory
     let crate_dir = tmp.path().join(format!("{}-{}", name, version));
@@ -454,7 +454,10 @@ fn validate_plugin_name(name: &str) -> Result<()> {
         bail!("Plugin name cannot be empty");
     }
     if name.contains('/') || name.contains('\\') || name.contains("..") || name.contains(':') {
-        bail!("Invalid plugin name: '{}' (no path separators or '..' allowed)", name);
+        bail!(
+            "Invalid plugin name: '{}' (no path separators or '..' allowed)",
+            name
+        );
     }
     Ok(())
 }
@@ -616,7 +619,9 @@ priority = 100
         let tree_id = index.write_tree().unwrap();
         let tree = work_repo.find_tree(tree_id).unwrap();
         let sig = git2::Signature::now("test", "test@test.com").unwrap();
-        work_repo.commit(Some("HEAD"), &sig, &sig, "init plugin", &tree, &[]).unwrap();
+        work_repo
+            .commit(Some("HEAD"), &sig, &sig, "init plugin", &tree, &[])
+            .unwrap();
 
         // Push to bare (origin remote was already added by clone)
         work_repo

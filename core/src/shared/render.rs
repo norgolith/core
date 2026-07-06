@@ -1,13 +1,13 @@
 use std::error::Error;
 
 use colored::Colorize;
-use eyre::{eyre, Result};
+use eyre::{Result, eyre};
 use tera::{Context, Tera};
 
 use crate::config::SiteConfig;
 
-use super::metadata::collect_all_posts_categories;
 use super::PrecomputedCollections;
+use super::metadata::collect_all_posts_categories;
 
 /// Pre-computes collection subsets once, avoiding O(posts × collections) per page.
 pub fn precompute_collection_subsets(

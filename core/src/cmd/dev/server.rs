@@ -4,14 +4,14 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use colored::Colorize;
-use eyre::{bail, eyre, Result};
+use eyre::{Result, bail, eyre};
 use tera::{Context, Tera};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, error, info, instrument};
 use walkdir::WalkDir;
 
-use crate::{config, plugin, shared};
 use crate::shared::{BuildContext, SitePaths};
+use crate::{config, plugin, shared};
 
 pub(super) struct ServerState {
     pub reload_tx: Arc<broadcast::Sender<()>>,
@@ -79,7 +79,12 @@ impl ServerState {
         let cache = self.cache.read().await;
 
         match render_all_pages(
-            BuildContext { tera: &tera, paths: &self.paths, site_config: &config, plugins: &self.plugin_mgr },
+            BuildContext {
+                tera: &tera,
+                paths: &self.paths,
+                site_config: &config,
+                plugins: &self.plugin_mgr,
+            },
             &posts,
             &self.routes_url,
             &cache,
@@ -160,13 +165,19 @@ pub fn render_all_pages(
             shared::load_metadata_from_content(&content, rel_path, routes_url)
         };
 
-        ctx.plugins.run_post_convert(ctx.site_config, &mut metadata, rel_path);
+        ctx.plugins
+            .run_post_convert(ctx.site_config, &mut metadata, rel_path);
 
         let mut body = shared::render_norg_page(ctx.tera, &metadata, &shared_context)?;
 
-        body = ctx.plugins.run_post_render(ctx.site_config, body, &metadata, rel_path);
+        body = ctx
+            .plugins
+            .run_post_render(ctx.site_config, body, &metadata, rel_path);
 
-        body = body.replace(&ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
+        body = body.replace(
+            &ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"),
+            routes_url,
+        );
 
         let url_path = format!("/{}", rel_path.with_extension("").display());
         pages.insert(url_path, body);
@@ -174,8 +185,13 @@ pub fn render_all_pages(
 
     // Pre-render category index
     if !posts.is_empty() {
-        if let Ok(body) = shared::render_category_index(ctx.tera, posts, ctx.site_config, &collections) {
-            let body = body.replace(&ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
+        if let Ok(body) =
+            shared::render_category_index(ctx.tera, posts, ctx.site_config, &collections)
+        {
+            let body = body.replace(
+                &ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"),
+                routes_url,
+            );
             pages.insert(format!("/{}", ctx.site_config.categories_dir), body);
         }
 
@@ -202,8 +218,10 @@ pub fn render_all_pages(
             );
 
             if let Ok(body) = ctx.tera.render("category.html", &context) {
-                let body =
-                    body.replace(&ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"), routes_url);
+                let body = body.replace(
+                    &ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"),
+                    routes_url,
+                );
                 let url_path = format!("/{}/{}", ctx.site_config.categories_dir, category);
                 pages.insert(url_path, body);
             }
@@ -298,7 +316,12 @@ pub(super) async fn setup_server_state(
     }
 
     let rendered_pages = render_all_pages(
-        BuildContext { tera: &tera, paths: &paths, site_config: &site_config, plugins: &plugin_mgr },
+        BuildContext {
+            tera: &tera,
+            paths: &paths,
+            site_config: &site_config,
+            plugins: &plugin_mgr,
+        },
         &posts,
         &routes_url,
         &cache,

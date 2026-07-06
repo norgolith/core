@@ -2,12 +2,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use eyre::Result;
+use futures_util::Stream;
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 use tokio::runtime::Handle;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::{debug, error, info, instrument};
-use futures_util::Stream;
 
 use crate::fs;
 

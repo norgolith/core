@@ -4,11 +4,11 @@ use std::{
 };
 
 use colored::Colorize as _;
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use hyper::{
+    Body, Request, Response, Server, StatusCode,
     header::CONTENT_TYPE,
     service::{make_service_fn, service_fn},
-    Body, Request, Response, Server, StatusCode,
 };
 use tracing::{debug, info};
 
@@ -49,8 +49,7 @@ fn handle_not_found() -> Response<Body> {
 }
 
 fn sanitize_path(uri_path: &str) -> PathBuf {
-    let decoded = percent_encoding::percent_decode_str(uri_path)
-        .decode_utf8_lossy();
+    let decoded = percent_encoding::percent_decode_str(uri_path).decode_utf8_lossy();
     let rel_path = decoded.trim_start_matches('/');
     let mut base = PathBuf::from("./public");
     for comp in Path::new(rel_path) {

@@ -4,7 +4,7 @@ use std::panic::AssertUnwindSafe;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use tracing::{debug, error, info, trace, warn};
 
 /// Core-provided logging callback for plugins. Level: 0=trace, 1=debug, 2=info, 3=warn, 4=error.
@@ -59,20 +59,15 @@ pub type FreeStringFn = extern "C" fn(*mut c_char);
 /// compatible with libc malloc (true for the default system allocator). Plugins compiled with
 /// jemalloc or mimalloc will cause UB. This is an acceptable trade-off for MVP; a future version
 /// can add a `plugin_free` callback to let each plugin provide its own deallocator
-pub fn call_hook_safe(
-    f: PluginFn,
-    input: &str,
-    timeout: Duration,
-) -> Result<Option<String>> {
-    let c_input = CString::new(input)
-        .map_err(|e| eyre::eyre!("failed to create CString: {}", e))?;
+pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Option<String>> {
+    let c_input =
+        CString::new(input).map_err(|e| eyre::eyre!("failed to create CString: {}", e))?;
 
     let (tx, rx) = mpsc::channel();
 
     std::thread::spawn(move || {
-        let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-            HookResult(Some(f(c_input.as_ptr())))
-        }));
+        let result =
+            std::panic::catch_unwind(AssertUnwindSafe(|| HookResult(Some(f(c_input.as_ptr())))));
         let _ = tx.send(result);
     });
 
@@ -98,12 +93,10 @@ pub fn call_hook_safe(
             };
             Err(eyre::eyre!("plugin panicked: {}", msg))
         }
-        Err(_timeout) => {
-            Err(eyre::eyre!(
-                "plugin hook timed out after {}ms",
-                timeout.as_millis()
-            ))
-        }
+        Err(_timeout) => Err(eyre::eyre!(
+            "plugin hook timed out after {}ms",
+            timeout.as_millis()
+        )),
     }
 }
 
@@ -113,8 +106,8 @@ pub fn call_hook_safe(
 /// Returns `Ok(Some(html))` if html is present
 /// Returns `Err` on error status or invalid JSON
 pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
-    let val: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
+    let val: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
 
     if let Some(status) = val.get("status").and_then(|v| v.as_str()) {
         if status == "error" {
@@ -134,8 +127,8 @@ pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
 
 /// Parse a hook response for pre_build/post_build (status only)
 pub fn parse_status_response(json: &str) -> Result<()> {
-    let val: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
+    let val: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
 
     if let Some(status) = val.get("status").and_then(|v| v.as_str()) {
         if status == "error" {
@@ -181,9 +174,6 @@ mod tests {
 
     #[test]
     fn test_parse_status_response_error() {
-        assert!(parse_status_response(
-            r#"{"status": "error", "message": "init failed"}"#
-        )
-        .is_err());
+        assert!(parse_status_response(r#"{"status": "error", "message": "init failed"}"#).is_err());
     }
 }

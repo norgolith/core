@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use colored::Colorize;
-use eyre::{eyre, Result, WrapErr};
+use eyre::{Result, WrapErr, eyre};
 use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
 use tracing::{instrument, warn};
 use walkdir::WalkDir;
@@ -64,25 +64,23 @@ fn minify_css_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
         ..Default::default()
     })?;
 
-    std::fs::write(dest_path, minified.code)
-        .wrap_err_with(|| {
-            format!("Failed to write minified CSS to {}", dest_path.display()).bold()
-        })?;
+    std::fs::write(dest_path, minified.code).wrap_err_with(|| {
+        format!("Failed to write minified CSS to {}", dest_path.display()).bold()
+    })?;
     Ok(())
 }
 
 #[instrument(skip(src_path, dest_path))]
 fn copy_binary_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
     let content = std::fs::read(src_path)?;
-    std::fs::write(dest_path, content)
-        .wrap_err_with(|| {
-            format!(
-                "Failed to copy asset from {} to {}",
-                src_path.display(),
-                dest_path.display()
-            )
-            .bold()
-        })?;
+    std::fs::write(dest_path, content).wrap_err_with(|| {
+        format!(
+            "Failed to copy asset from {} to {}",
+            src_path.display(),
+            dest_path.display()
+        )
+        .bold()
+    })?;
     Ok(())
 }
 
@@ -117,7 +115,10 @@ pub(super) fn copy_assets(assets_dir: &Path, target_dir: &Path, minify: bool) ->
         })
     {
         let Some(rel_path) = entry.path().strip_prefix(assets_dir).ok() else {
-            warn!("Skipping asset outside assets directory: {}", entry.path().display());
+            warn!(
+                "Skipping asset outside assets directory: {}",
+                entry.path().display()
+            );
             continue;
         };
         let target_path = target_dir.join(rel_path);

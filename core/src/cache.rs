@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use eyre::{eyre, Result};
+use eyre::{Result, eyre};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -64,7 +64,11 @@ impl BuildCache {
             let _ = std::fs::remove_dir_all(&cache_dir);
         }
 
-        Ok(Self { cache_dir, entries, global_hash })
+        Ok(Self {
+            cache_dir,
+            entries,
+            global_hash,
+        })
     }
 
     /// Looks up cached metadata for a file.
@@ -98,16 +102,14 @@ impl BuildCache {
     /// Saves cache entries and global hash to disk.
     pub fn save(&self) -> Result<()> {
         if !self.cache_dir.exists() {
-            std::fs::create_dir_all(&self.cache_dir).map_err(|e| {
-                eyre!("{}: {}", "Failed to create cache directory".bold(), e)
-            })?;
+            std::fs::create_dir_all(&self.cache_dir)
+                .map_err(|e| eyre!("{}: {}", "Failed to create cache directory".bold(), e))?;
         }
 
         // Write global hash
         let global_path = self.cache_dir.join(".global_hash");
-        std::fs::write(&global_path, &self.global_hash).map_err(|e| {
-            eyre!("{}: {}", "Failed to write global hash".bold(), e)
-        })?;
+        std::fs::write(&global_path, &self.global_hash)
+            .map_err(|e| eyre!("{}: {}", "Failed to write global hash".bold(), e))?;
 
         // Write each entry
         for (rel_path, entry) in &self.entries {
@@ -115,9 +117,8 @@ impl BuildCache {
             if let Some(parent) = cache_path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            let json = serde_json::to_string_pretty(entry).map_err(|e| {
-                eyre!("{}: {}", "Failed to serialize cache entry".bold(), e)
-            })?;
+            let json = serde_json::to_string_pretty(entry)
+                .map_err(|e| eyre!("{}: {}", "Failed to serialize cache entry".bold(), e))?;
             std::fs::write(&cache_path, json).unwrap_or_else(|e| {
                 warn!(
                     path = %cache_path.display(),
@@ -139,7 +140,9 @@ fn blake3_hash(content: &str) -> String {
 /// Reads the stored global hash from cache.
 fn read_global_hash(cache_dir: &Path) -> Option<String> {
     let path = cache_dir.join(".global_hash");
-    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 /// Computes a global hash from templates, config, and theme directories.

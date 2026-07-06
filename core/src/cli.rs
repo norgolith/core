@@ -1,8 +1,8 @@
 use std::env::set_current_dir;
 use std::path::PathBuf;
 
-use clap::{builder::PossibleValue, Parser, Subcommand};
-use eyre::{bail, Result};
+use clap::{Parser, Subcommand, builder::PossibleValue};
+use eyre::{Result, bail};
 
 use crate::cmd;
 use crate::net;
@@ -346,11 +346,13 @@ mod tests {
 
         let result = run_dev_server(port, false, false, false).await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .root_cause()
-            .to_string()
-            .contains("Could not bind"));
+        assert!(
+            result
+                .unwrap_err()
+                .root_cause()
+                .to_string()
+                .contains("Could not bind")
+        );
 
         // Restore previous directory
         std::env::set_current_dir(origin)?;
