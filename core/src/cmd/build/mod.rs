@@ -260,84 +260,13 @@ fn build_content_entry(
         (md, Some((cache_key, content.clone(), cache_val)))
     };
 
-    // post_convert hook: modify HTML after Norg conversion, before Tera
-    if ctx.plugins.has_hook(plugin::HOOK_POST_CONVERT) {
-        if let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) {
-            let html = html.to_string();
-            for p in ctx.plugins.plugins() {
-                if let Some(f) = p.hooks.post_convert {
-                    let plugin_config = ctx.site_config
-                        .plugins
-                        .as_ref()
-                        .and_then(|m| m.get(&p.name))
-                        .cloned();
-                    let input = serde_json::json!({
-                        "html": html,
-                        "metadata": metadata,
-                        "rel_path": rel_path.to_string_lossy(),
-                        "config": plugin_config,
-                    })
-                    .to_string();
-                    match ctx.plugins.call_hook(p, f, &input) {
-                        Ok(Some(new_html)) => {
-                            if let toml::Value::Table(ref mut table) = metadata {
-                                table.insert("raw".to_string(), toml::Value::String(new_html));
-                            }
-                        }
-                        Ok(None) => {}
-                        Err(e) => {
-                            error!(
-                                "{} plugin '{}' on {}: {}",
-                                "Plugin error:".red().bold(),
-                                p.name.bold(),
-                                rel_path.display(),
-                                e
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
+    ctx.plugins.run_post_convert(ctx.site_config, &mut metadata, rel_path);
 
     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
 
     let mut rendered = shared::render_norg_page(ctx.tera, &metadata, shared_context)?;
 
-    // post_render hook: modify final HTML after Tera, before write
-    if ctx.plugins.has_hook(plugin::HOOK_POST_RENDER) {
-        for p in ctx.plugins.plugins() {
-            if let Some(f) = p.hooks.post_render {
-                let plugin_config = ctx.site_config
-                    .plugins
-                    .as_ref()
-                    .and_then(|m| m.get(&p.name))
-                    .cloned();
-                let input = serde_json::json!({
-                    "html": rendered,
-                    "metadata": metadata,
-                    "rel_path": rel_path.to_string_lossy(),
-                    "config": plugin_config,
-                })
-                .to_string();
-                match ctx.plugins.call_hook(p, f, &input) {
-                    Ok(Some(new_html)) => {
-                        rendered = new_html;
-                    }
-                    Ok(None) => {}
-                    Err(e) => {
-                        error!(
-                            "{} plugin '{}' on {}: {}",
-                            "Plugin error:".red().bold(),
-                            p.name.bold(),
-                            rel_path.display(),
-                            e
-                        );
-                    }
-                }
-            }
-        }
-    }
+    rendered = ctx.plugins.run_post_render(ctx.site_config, rendered, &metadata, rel_path);
 
     let href_re = href_root_re();
     rendered = href_re

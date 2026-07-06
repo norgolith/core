@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use colored::Colorize;
 use eyre::Result;
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
@@ -17,7 +18,7 @@ pub use manifest::{
     HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
 
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 /// Hooks a plugin can implement. Each is an optional C ABI function pointer
 pub struct PluginHooks {
@@ -171,6 +172,95 @@ impl PluginManager {
             .lock()
             .map(|guard| guard.clone())
             .unwrap_or_default()
+    }
+
+    /// Run post_convert hook against metadata, mutating the `raw` HTML field in place.
+    /// No-op if no plugin registers post_convert.
+    pub fn run_post_convert(
+        &self,
+        site_config: &crate::config::SiteConfig,
+        metadata: &mut toml::Value,
+        rel_path: &Path,
+    ) {
+        if !self.has_hook(HOOK_POST_CONVERT) { return; }
+        let Some(html) = metadata.get("raw").and_then(|v| v.as_str()) else { return; };
+        let html = html.to_string();
+        for p in self.plugins() {
+            if let Some(f) = p.hooks.post_convert {
+                let plugin_config = site_config
+                    .plugins
+                    .as_ref()
+                    .and_then(|m| m.get(&p.name))
+                    .cloned();
+                let input = serde_json::json!({
+                    "html": html,
+                    "metadata": metadata,
+                    "rel_path": rel_path.to_string_lossy(),
+                    "config": plugin_config,
+                })
+                .to_string();
+                match self.call_hook(p, f, &input) {
+                    Ok(Some(new_html)) => {
+                        if let toml::Value::Table(ref mut table) = metadata {
+                            table.insert("raw".to_string(), toml::Value::String(new_html));
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        error!(
+                            "{} plugin '{}' on {}: {}",
+                            "Plugin error:".red().bold(),
+                            p.name.bold(),
+                            rel_path.display(),
+                            e
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Run post_render hook against rendered HTML, returning the (possibly modified) HTML.
+    /// Returns input unchanged if no plugin registers post_render.
+    pub fn run_post_render(
+        &self,
+        site_config: &crate::config::SiteConfig,
+        html: String,
+        metadata: &toml::Value,
+        rel_path: &Path,
+    ) -> String {
+        if !self.has_hook(HOOK_POST_RENDER) { return html; }
+        let mut current = html;
+        for p in self.plugins() {
+            if let Some(f) = p.hooks.post_render {
+                let plugin_config = site_config
+                    .plugins
+                    .as_ref()
+                    .and_then(|m| m.get(&p.name))
+                    .cloned();
+                let input = serde_json::json!({
+                    "html": current,
+                    "metadata": metadata,
+                    "rel_path": rel_path.to_string_lossy(),
+                    "config": plugin_config,
+                })
+                .to_string();
+                match self.call_hook(p, f, &input) {
+                    Ok(Some(new_html)) => current = new_html,
+                    Ok(None) => {}
+                    Err(e) => {
+                        error!(
+                            "{} plugin '{}' on {}: {}",
+                            "Plugin error:".red().bold(),
+                            p.name.bold(),
+                            rel_path.display(),
+                            e
+                        );
+                    }
+                }
+            }
+        }
+        current
     }
 }
 
