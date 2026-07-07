@@ -186,10 +186,7 @@ pub fn render_all_pages(
             .plugins
             .run_post_render(ctx.site_config, body, &metadata, rel_path);
 
-        body = body.replace(
-            &ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"),
-            routes_url,
-        );
+        body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
 
         let url_path = format!("/{}", rel_path.with_extension("").display());
         pages.insert(url_path, body);
@@ -200,10 +197,7 @@ pub fn render_all_pages(
         if let Ok(body) =
             shared::render_category_index(ctx.tera, posts, ctx.site_config, &collections)
         {
-            let body = body.replace(
-                &ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"),
-                routes_url,
-            );
+            let body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
             pages.insert(format!("/{}", ctx.site_config.categories_dir), body);
         }
 
@@ -230,10 +224,7 @@ pub fn render_all_pages(
             );
 
             if let Ok(body) = ctx.tera.render("category.html", &context) {
-                let body = body.replace(
-                    &ctx.site_config.root_url.replace("://", ":&#x2F;&#x2F;"),
-                    routes_url,
-                );
+                let body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
                 let url_path = format!("/{}/{}", ctx.site_config.categories_dir, category);
                 pages.insert(url_path, body);
             }

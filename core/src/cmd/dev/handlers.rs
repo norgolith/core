@@ -26,7 +26,7 @@ async fn fast_path_lookup(state: &ServerState, url_path: &str) -> Option<String>
     pages.get(url_path).cloned()
 }
 
-fn rewrite_urls(body: String, root_url: &str, routes_url: &str) -> String {
+pub(super) fn rewrite_urls(body: String, root_url: &str, routes_url: &str) -> String {
     body.replace(&root_url.replace("://", ":&#x2F;&#x2F;"), routes_url)
 }
 
