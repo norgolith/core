@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use colored::Colorize;
 use eyre::{Result, eyre};
@@ -84,22 +84,6 @@ pub fn extract_metadata_from_content(
         table.insert("permalink".to_string(), toml::Value::String(permalink));
     }
     metadata
-}
-
-/// Full metadata extraction including HTML content (`raw` field).
-///
-/// Calls `load_metadata_from_content` which runs the full Norg→HTML conversion.
-/// The `raw` field is required by templates that list posts (e.g. posts.html).
-pub fn extract_metadata_only(path: PathBuf, rel_path: PathBuf, routes_url: &str) -> toml::Value {
-    let Ok(content) = std::fs::read_to_string(&path) else {
-        error!(
-            "{} {}",
-            "Norg file not found for".bold(),
-            rel_path.display()
-        );
-        return toml::Value::Table(toml::map::Map::new());
-    };
-    load_metadata_from_content(&content, &rel_path, routes_url)
 }
 
 /// Validates content metadata against a schema.
@@ -202,7 +186,17 @@ pub fn collect_all_posts_metadata(
     // Process metadata extraction
     let mut posts: Vec<toml::Value> = entries
         .into_iter()
-        .map(|(path, rel_path)| extract_metadata_only(path, rel_path, routes_url))
+        .map(|(path, rel_path)| match std::fs::read_to_string(&path) {
+            Ok(content) => load_metadata_from_content(&content, &rel_path, routes_url),
+            Err(_) => {
+                error!(
+                    "{} {}",
+                    "Norg file not found for".bold(),
+                    rel_path.display()
+                );
+                toml::Value::Table(toml::map::Map::new())
+            }
+        })
         .collect();
 
     posts.sort_by(|a, b| {

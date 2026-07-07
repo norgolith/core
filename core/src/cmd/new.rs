@@ -57,20 +57,7 @@ fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
         .collect::<Vec<_>>()
         .join(" ");
 
-    // Titlecase the first letter of each word
-    let title = titlecase(
-        &title
-            .split(' ')
-            .map(|word| {
-                let mut chars = word.chars();
-                match chars.next() {
-                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
-                    None => String::new(),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" "),
-    );
+    let title = titlecase(&title);
 
     debug!(title = %title, "Generated content title");
     title

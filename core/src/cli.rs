@@ -2,7 +2,7 @@ use std::env::set_current_dir;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, builder::PossibleValue};
-use eyre::{Result, bail};
+use eyre::{Result, eyre};
 
 use crate::cmd;
 use crate::net;
@@ -177,8 +177,8 @@ pub async fn start() -> Result<()> {
             name,
             prompt: _,
             _no_prompt,
-        } => init_site(name, !_no_prompt).await?,
-        Commands::Theme { subcommand } => theme_handle(&subcommand).await?,
+        } => cmd::init(&name, !_no_prompt).await?,
+        Commands::Theme { subcommand } => cmd::theme(&subcommand).await?,
         Commands::Dev {
             port,
             drafts: _,
@@ -189,108 +189,28 @@ pub async fn start() -> Result<()> {
         Commands::Build {
             minify: _,
             _no_minify,
-        } => build_site(!_no_minify).await?,
-        Commands::Plugin { subcommand } => plugin_handle(&subcommand)?,
+        } => cmd::build(!_no_minify)?,
+        Commands::Plugin { subcommand } => cmd::plugin(&subcommand)?,
         Commands::New {
             kind,
             name,
             open,
             collection,
-        } => new_asset(kind.as_ref(), name.as_ref(), open, collection.as_ref()).await?,
-        Commands::Preview { port, host, open } => preview(port, open, host).await?,
+        } => {
+            let kind = kind.unwrap_or_else(|| "norg".to_string());
+            let name = name.ok_or_else(|| eyre!("Unable to create site asset: missing name for the asset"))?;
+            cmd::new(&kind, &name, open, collection.as_ref()).await?
+        }
+        Commands::Preview { port, host, open } => cmd::preview(port, open, host).await?,
     }
 
     Ok(())
-}
-
-/// Initializes a new Norgolith site.
-///
-/// # Arguments:
-///   * name: An optional name for the site. If `None` is provided, an error will be returned.
-///
-/// # Returns:
-///   A `Result<()>` indicating success or error. On error, the context message will provide information on why the site could not be initialized.
-async fn init_site(name: String, prompt: bool) -> Result<()> {
-    cmd::init(&name, prompt).await?;
-    // if let Some(name) = name {
-    // } else {
-    //     bail!("Missing name for the site: could not initialize the new Norgolith site");
-    // }
-    Ok(())
-}
-
-/// Builds a Norgolith site for production.
-///
-/// # Arguments:
-///   * minify: Whether to minify the produced artifacts. Defaults to `true`.
-///
-/// # Returns:
-///   A `Result<()>` indicating success or error.
-async fn build_site(minify: bool) -> Result<()> {
-    cmd::build(minify)
-}
-
-async fn preview(port: u16, open: bool, host: bool) -> Result<()> {
-    cmd::preview(port, open, host).await
 }
 
 /// Checks port availability and starts the development server.
-///
-/// # Arguments:
-///   * port: The port number to use for the server.
-///   * drafts: Whether to serve draft content.
-///   * open: Whether to open the development server in the system web browser.
-///   * host: Whether to expose local server to LAN network.
-///
-/// # Returns:
-///   A `Result<()>` indicating success or error. On error, the context message
-///   will provide information on why the development server could not be initialized.
 async fn run_dev_server(port: u16, drafts: bool, open: bool, host: bool) -> Result<()> {
     let listener = net::bind_available(port, host)?;
     cmd::dev(listener, port, drafts, open, host).await
-}
-
-async fn theme_handle(subcommand: &cmd::ThemeCommands) -> Result<()> {
-    cmd::theme(subcommand).await
-}
-
-fn plugin_handle(subcommand: &cmd::PluginCommands) -> Result<()> {
-    cmd::plugin(subcommand)
-}
-
-/// Creates a new asset with the given kind and name.
-///
-/// # Arguments
-///
-/// * `kind`: Optional asset type. Defaults to "content". Valid values are "content", "css", and "js".
-/// * `name`: Required asset name including the extension.
-///
-/// # Errors
-///
-/// Returns an error if the asset name is missing.
-///
-/// # Example
-///
-/// ```rust
-/// use crate::new_asset;
-///
-/// async fn main() -> Result<()> {
-///     new_asset(Some(&String::from("css")), Some(&String::from("style.css"))).await?;
-/// Ok(())
-/// }
-/// ```
-async fn new_asset(
-    kind: Option<&String>,
-    name: Option<&String>,
-    open: bool,
-    collection: Option<&String>,
-) -> Result<()> {
-    let kind = kind.unwrap_or(&String::from("norg")).to_owned();
-
-    match name {
-        Some(name) => cmd::new(&kind, name, open, collection).await,
-        None => bail!("Unable to create site asset: missing name for the asset"),
-    }
 }
 
 #[cfg(test)]
@@ -310,7 +230,7 @@ mod tests {
         std::env::set_current_dir(dir.path())?;
 
         let test_name = String::from("my-site");
-        let result = init_site(test_name, false).await;
+        let result = cmd::init(&test_name, false).await;
         assert!(result.is_ok());
 
         std::env::set_current_dir(origin)?;
@@ -333,7 +253,7 @@ mod tests {
 
         // Create temporal site
         let test_site_name = String::from("my-unavailable-site");
-        init_site(test_site_name.clone(), false).await.unwrap();
+        cmd::init(&test_site_name, false).await.unwrap();
 
         // Enter the test directory
         let path = dir.path().join(&test_site_name);
