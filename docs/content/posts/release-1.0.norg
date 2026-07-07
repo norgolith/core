@@ -1,0 +1,214 @@
+@document.meta
+title: Norgolith 1.0: A New Chapter
+description: After two years of development, Norgolith reaches 1.0 with Tera v2, shortcodes, plugins, and more.
+authors: [
+  NTBBloodbath
+]
+categories: [
+  release
+  announcement
+]
+created: 2026-07-07T00:00:00+00:00
+updated: 2026-07-07T00:00:00+00:00
+draft: false
+layout: post
+version: 1.0.0
+@end
+
+Today we are thrilled to announce the 1.0 release of Norgolith. This is not just a version bump. It
+is the result of two years and three months of development, 11 releases from 0.1.0 to 1.0.0, and
+countless hours of dogfooding (this very site runs on Norgolith too!). What started as a Zig experiment in
+April 2024 grew into a Rust-powered static site generator built around the Norg markup document format.
+
+Whether you are building a personal blog, technical documentation, or a full-featured content site,
+Norgolith 1.0 gives you the tools to ship faster and with less friction. Here is what is new.
+
+** What is New in 1.0
+
+  *** Tera v2 and Shortcodes
+
+      The template engine has been upgraded from Tera v1 to Tera v2. This brings shortcodes (reusable
+      components you can embed in any template), a richer filter ecosystem via tera-contrib, and
+      optional chaining for safer template rendering.
+
+      @code django
+      {{ component(name="card", title="Hello", body="World") }}
+      @end
+
+      Shortcodes work just like functions: pass arguments, get rendered HTML. No more copy-pasting the
+      same card or alert markup across templates.
+
+      {:/docs/templating-migration:}[Tera v2 migration guide]
+
+  *** Custom Error Pages
+
+      Drop a 404.html and 500.html in your templates directory and they render automatically with the
+      full theme and layout. No more bare white pages when someone hits a broken link.
+
+  *** Plugin Sources
+
+      Building on the plugin system introduced in 0.5, 1.0 lets you install plugins from crates.io or
+      any Git repository:
+
+      @code bash
+      lith plugin install norgolith-tree-sitter-highlight
+      lith plugin install --git https://github.com/norgolith/norgolith-tree-sitter.git
+      @end
+
+  *** Per-Plugin Configuration
+
+      Plugins are configured directly in your norgolith.toml:
+
+      @code toml
+      [plugins.my-plugin]
+      option = "value"
+      @end
+
+  *** SDK Logging Bridge
+
+      Plugin developers can now log through Norgolith's tracing pipeline. Log messages from your plugin
+      appear alongside core Norgolith output with proper level filtering and formatting.
+
+  *** Theme Compatibility
+
+      Themes can declare a min_version field. When you install or update, Norgolith checks
+      compatibility and warns before applying. No more cryptic template errors from mismatched
+      features.
+
+  *** Rust 2024 Edition
+
+      The entire codebase has been updated to the Rust 2024 edition, keeping the project on the latest
+      language standards and ensuring long-term maintainability.
+
+** What Came Before
+
+  Norgolith did not appear overnight. Two earlier releases laid the groundwork that 1.0 builds on.
+
+  *** 0.5 (July 2026)
+
+      The biggest pre-1.0 release. It shipped the full plugin system (C ABI types, Landlock sandbox
+      with filesystem confinement, configurable timeout, panic isolation, and build hooks at pre-build,
+      post-convert, and post-render stages). It also added incremental builds via content-hash caching,
+      parallel builds with Rayon, SEO (sitemap.xml, robots.txt with configurable presets, OpenGraph
+      and Twitter Card meta tags), configurable content collections and categoriesDir, and a
+      dramatically faster dev server that pre-renders everything into memory and hot-reloads config
+      changes.
+
+  *** 0.4 (May 2026)
+
+      Introduced automatic XML feed discovery (RSS, Atom, or any XML template rendered as a feed),
+      styled per-step build output, colored and compact dev server request logging, graceful dev server
+      shutdown via Ctrl-D, and symlink resolution in watched directories.
+
+** Design Philosophy
+
+  Norgolith occupies a unique space in the static site generator landscape. Unlike tools built for
+  Markdown workflows, Norgolith is designed from the ground up around Norg's structured markup document
+  format.
+
+  - *vs Hugo*: Hugo uses Go templates and supports a dozen content formats (Markdown, AsciiDoc, Org
+    Mode, reStructuredText) but has no plugin system. Its asset pipeline includes bundling,
+    fingerprinting, image processing, and Sass/PostCSS compilation, making it the most self-contained
+    SSG on the market. Hugo is fast, but its Go template syntax is unique to Hugo and its
+    file-watching pipeline is single-threaded for builds.
+
+  - *vs Zola*: Zola uses Tera (v1) and is the closest kin to Norgolith in the Rust SSG space. It
+    ships with Sass compilation, image processing, built-in search, and automatic link checking. But
+    Zola is Markdown-only and has no plugin system. Its Tera is one major version behind
+    Norgolith's, missing shortcodes and optional chaining.
+
+  - *Norgolith*: Tera v2 templates (shared ecosystem with Zola), Norg-native content (not
+    Markdown), a unique C ABI plugin system with Landlock sandbox that neither Hugo nor Zola can
+    match, incremental and parallel builds, and a plugin-based path to features like search
+    (even {https://github.com/norgolith/norgolith-tree-sitter}[tree-sitter higlighting] is supported
+    through plugins!). Norgolith is the only SSG that lets you extend the build pipeline at runtime
+    without forking the generator.
+
+** Quick Start
+
+  Getting started with Norgolith takes seconds:
+
+  @code bash
+  # Create a new site
+  $ lith new my-site \
+      && cd my-site
+  # Create a hello world post
+  $ lith new -k post hello-world
+  # Start dev server and open it in your browser
+  $ lith dev --open
+  # Build for production
+  $ lith build
+  @end
+
+  No configuration required for a basic site except for your metadata. Add a theme, define content schemas, install
+  plugins, all from norgolith.toml as your site grows. The {:/docs:}[full documentation] covers every
+  option.
+
+** Showcase
+
+  These sites are built with Norgolith:
+
+  - {https://docs.norgolith.dev}[Norgolith Documentation] (this site)
+  - {https://amartin.beer}[NTBBloodbath's Blog] (maintainer's blog)
+  - {https://blog.ladas552.me}[Ladas552's Blog]
+  - {https://darkkronicle.com}[DarkKronicle's Blog]
+  - {https://boltless.me}[BoltlessEngineer's Blog] (runs on an older Norgolith fork)
+
+  Building your own site with Norgolith? {https://github.com/norgolith/core/issues/new}[Let us know]
+  and we will add you to the list.
+
+** By the Numbers
+
+  - 469 commits across 11 releases (0.1.0 through 1.0.0)
+  - 2 years 3 months of active development (April 2024 to July 2026)
+  - 5 contributors
+  - 53 commits and 66 files changed in this release alone!
+
+** Breaking Changes (Migration Guide)
+
+  Upgrading from 0.x requires a few template changes given upstream Tera v2 changes:
+
+  - Replace `\{% if var is defined %\}` with `\{% if var?. %\}`
+  - Replace `\{\{ now(format="%Y") \}\}` with `\{\{ now() | date(format="%Y") \}\}`
+  - Replace `is matching("pattern")` with `is matching(pat="pattern")`
+  - Renamed filters: `escape` to `escape_html`, `as_str` to `str`,
+    `linebreaksbr` to `newlines_to_br, `divisibleby to `divisible_by`
+
+  These changes are mechanical and searchable. The {:/docs/templating-migration:}[full migration guide]
+  covers every change with before/after examples.
+
+** Community
+
+  Norgolith would not be where it is today without its contributors. Thank you to:
+
+  - BoltlessEngineer
+  - Ben Lubas
+  - Ladas552 (also the nixpkgs and AUR package maintainer)
+  - Sascha Buehrle
+
+  Want to help shape the future of Norgolith? Check out the
+  {https://github.com/norgolith/core/blob/main/CONTRIBUTING.md}[contributing guide] or join us
+  on {https://discord.gg/T6EgTAX7ht}[Discord] in `#norgolith` under the 3rd-party category!
+
+** What is Next
+
+  1.0 is a foundation, not a finish line. The focus now shifts to:
+
+  - *Content quality*: richer content schemas, cross-file validation, link checking, and built-in image
+    optimization
+  - *DX tooling*: interactive lith init with project templates, better error suggestions, and
+    smoother onboarding
+  - *Asset bundling and cache fingerprinting*: combine JS and CSS files; add content hashes to
+    filenames for aggressive cache busting (minification is already in place!)
+  - *Built-in search via plugin*: full-text search backed by ripgrep in WASM or a similarly
+    performant approach, distributed through the existing plugin system
+
+  Have ideas? {https://github.com/norgolith/core/issues/new}[Open an issue] or
+  {https://discord.gg/T6EgTAX7ht}[join us on Discord].
+
+** Full Changelog
+
+  The complete changelog is available on GitHub:
+  {https://github.com/norgolith/core/releases/tag/norgolith-v1.0.0}[v1.0.0 Release]
+
+  It includes 53 commits across 66 files, with 6650 lines added and 4533 removed.

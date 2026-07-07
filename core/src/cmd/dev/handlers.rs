@@ -103,13 +103,13 @@ pub(super) async fn resolve_url_norg_path(
 ) -> std::io::Result<PathBuf> {
     use tokio::fs;
     let mut path = content_dir.join(path);
-    debug!(?path);
     // try "{path}.norg"
     if path.file_name().is_some() {
-        let path = path.with_extension("norg");
-        debug!(?path);
-        if fs::metadata(&path).await.is_ok_and(|m| m.is_file()) {
-            return Ok(path);
+        let mut norg_path = path.to_string_lossy().into_owned();
+        norg_path.push_str(".norg");
+        let norg_path = PathBuf::from(norg_path);
+        if fs::metadata(&norg_path).await.is_ok_and(|m| m.is_file()) {
+            return Ok(norg_path);
         }
     }
     // try {path}/index.norg
@@ -257,7 +257,8 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
 }
 
 async fn handle_content(request_path: &str, state: Arc<ServerState>) -> Result<Response<Body>> {
-    let req_path = PathBuf::from(request_path.trim_start_matches('/'));
+    let trimmed = request_path.trim_end_matches('/');
+    let req_path = PathBuf::from(trimmed.trim_start_matches('/'));
     debug!(?req_path);
     match resolve_url_norg_path(&state.paths.content, &req_path).await {
         Ok(path) => handle_norg_content(path, state).await,
