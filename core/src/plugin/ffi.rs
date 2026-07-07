@@ -151,14 +151,4 @@ mod tests {
         let json = r#"{"status": "error", "message": "something broke"}"#;
         assert!(parse_hook_response(json).is_err());
     }
-
-    #[test]
-    fn test_parse_status_response_ok() {
-        assert!(parse_status_response(r#"{"status": "ok"}"#).is_ok());
-    }
-
-    #[test]
-    fn test_parse_status_response_error() {
-        assert!(parse_status_response(r#"{"status": "error", "message": "init failed"}"#).is_err());
-    }
 }

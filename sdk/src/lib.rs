@@ -28,14 +28,6 @@ pub struct PluginInfo {
 /// Function pointer type for plugin hooks
 pub type PluginFn = extern "C" fn(*const c_char) -> *mut c_char;
 
-/// Context for the pre_build hook
-#[derive(serde::Deserialize)]
-pub struct PreBuildContext {
-    pub site_config: serde_json::Value,
-    pub pages_dir: String,
-    pub output_dir: String,
-}
-
 /// Context for post_convert and post_render hooks
 #[derive(serde::Deserialize)]
 pub struct TransformContext {
@@ -44,14 +36,6 @@ pub struct TransformContext {
     pub rel_path: String,
     #[serde(default)]
     pub config: Option<serde_json::Value>,
-}
-
-/// Context for the post_build hook
-#[derive(serde::Deserialize)]
-pub struct PostBuildContext {
-    pub site_config: serde_json::Value,
-    pub pages_dir: String,
-    pub output_dir: String,
 }
 
 /// Universal bridge function: reads C input → calls handler → returns JSON/NULL/error
