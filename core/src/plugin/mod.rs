@@ -13,9 +13,9 @@ use colored::Colorize;
 use eyre::Result;
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
-pub use manifest::{
-    CORE_ABI_VERSION, Capabilities, FilesystemAccess, HOOK_POST_BUILD, HOOK_POST_CONVERT,
-    HOOK_POST_RENDER, HOOK_PRE_BUILD, HookConfig, PluginManifest,
+pub use manifest::{Capabilities, FilesystemAccess, HookConfig, PluginManifest};
+pub use norgolith_plugin_sdk::{
+    CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
 
 use tracing::{error, info, warn};

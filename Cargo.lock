@@ -2053,6 +2053,7 @@ dependencies = [
  "mime_guess",
  "minify-html",
  "minify-js",
+ "norgolith-plugin-sdk",
  "notify",
  "notify-debouncer-full",
  "open",

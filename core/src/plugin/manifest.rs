@@ -1,10 +1,10 @@
 use std::path::Path;
 
 use eyre::{Result, bail, eyre};
+use norgolith_plugin_sdk::{
+    CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
+};
 use serde::Deserialize;
-
-/// Current ABI version that this norgolith core provides
-pub const CORE_ABI_VERSION: u32 = 1;
 
 /// Default hook timeout in milliseconds
 const DEFAULT_TIMEOUT_MS: u64 = 10_000;
@@ -111,15 +111,6 @@ impl HookConfig {
         hooks
     }
 }
-
-/// Plugin needs to configure itself before any file processing
-pub const HOOK_PRE_BUILD: u32 = 1;
-/// Plugin needs to modify HTML after Norg->HTML conversion but before Tera templating
-pub const HOOK_POST_CONVERT: u32 = 2;
-/// Plugin needs to modify final HTML after Tera layout is applied
-pub const HOOK_POST_RENDER: u32 = 4;
-/// Plugin needs to generate additional output files after all pages are rendered
-pub const HOOK_POST_BUILD: u32 = 8;
 
 impl PluginManifest {
     /// Parse a `plugin.toml` file at the given path

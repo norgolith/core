@@ -63,6 +63,7 @@ libc = "0.2"
 ureq = { version = "3.3.0", features = ["json"] }
 tar = "0.4.46"
 flate2 = "1.1.9"
+norgolith-plugin-sdk = { path = "../sdk" }
 
 [dev-dependencies]
 serial_test = "3.2.0"

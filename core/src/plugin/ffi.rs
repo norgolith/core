@@ -28,22 +28,7 @@ struct HookResult(Option<*mut c_char>);
 // SAFETY: we only send the pointer across threads, actual deref happens on the receiving side
 unsafe impl Send for HookResult {}
 
-/// C ABI PluginInfo struct returned by `norgolith_plugin_init`
-#[repr(C)]
-pub struct PluginInfo {
-    /// Which version of plugin.h this .so was compiled against
-    pub abi_version: u32,
-    /// Human-readable plugin name for error messages
-    pub name: *const c_char,
-    /// Semantic version for debugging (not validation)
-    pub version: *const c_char,
-    /// Core-provided logging callback. Level: 0=trace, 1=debug, 2=info, 3=warn, 4=error.
-    /// Set by core before calling `norgolith_plugin_init`. Plugins may use it or leave it null.
-    pub log_fn: Option<extern "C" fn(u32, *const c_char)>,
-}
-
-/// Function pointer type for plugin hooks
-pub type PluginFn = extern "C" fn(*const c_char) -> *mut c_char;
+pub use norgolith_plugin_sdk::{PluginFn, PluginInfo};
 
 /// Function pointer type for freeing plugin-allocated strings
 pub type FreeStringFn = extern "C" fn(*mut c_char);
