@@ -45,7 +45,13 @@ fn normalize_datetimes(metadata: &mut toml::Value) {
 ///
 /// This is the inner function that does the actual work. It does NOT read from disk.
 pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &str) -> toml::Value {
-    let (html, toc) = converter::html::convert(content, routes_url);
+    let (html, toc) = match converter::html::convert(content, routes_url) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!("Failed to convert {}: {}", rel_path.display(), e);
+            return toml::Value::Table(toml::map::Map::new());
+        }
+    };
     let mut metadata =
         match converter::meta::convert(content, Some(converter::html::toc_to_toml(&toc))) {
             Ok(m) => m,

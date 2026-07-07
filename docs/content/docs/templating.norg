@@ -231,22 +231,22 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
 *** Using Shortcodes in Content
     Shortcodes are invoked inside `@embed html` blocks using Tera v2 component syntax:
 
-    @code norg
-    @embed html
-    {{ <youtube id="dQw4w9WgXcQ" /> }}
-    @end
-    @end
+     @embed html
+     <pre><code class="language-norg">&#64;embed html
+{{ &lt;youtube id="dQw4w9WgXcQ" /&gt; }}
+&#64;end</code></pre>
+     @end
 
 **** With Body
      Block shortcodes pass content via `{{ body }}`:
 
-     @code norg
-     @embed html
-     {% <callout type="warning" > %}
-     This is a **warning** callout.
-     {% </callout> %}
-     @end
-     @end
+      @embed html
+      <pre><code class="language-norg">&#64;embed html
+{% &lt;callout type="warning" &gt; %}
+This is a **warning** callout.
+{% &lt;/callout&gt; %}
+&#64;end</code></pre>
+      @end
 
      Template definition:
 
@@ -261,13 +261,13 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
 **** With Shorthand
      Variable names matching argument names can be omitted:
 
-     @code norg
-     @embed html
-     {% <callout type warning > %}
-     A warning callout.
-     {% </callout> %}
-     @end
-     @end
+      @embed html
+      <pre><code class="language-norg">&#64;embed html
+{% &lt;callout type warning &gt; %}
+A warning callout.
+{% &lt;/callout&gt; %}
+&#64;end</code></pre>
+      @end
 
      This is equivalent to `{% <callout type={type} warning={warning} > %}`.
 
@@ -312,10 +312,10 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
 
     Usage:
 
-    @code norg
     @embed html
-    {{ <figure src="/img/photo.jpg" alt="A landscape" caption="Mountains at sunset" /> }}
-    @end
+    <pre><code class="language-norg">&#64;embed html
+{{ &lt;figure src="/img/photo.jpg" alt="A landscape" caption="Mountains at sunset" /&gt; }}
+&#64;end</code></pre>
     @end
 
 ** Best Practices

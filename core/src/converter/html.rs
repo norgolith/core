@@ -649,11 +649,18 @@ pub fn toc_to_toml(toc: &[TocEntry]) -> toml::Value {
     toml::Value::Array(items)
 }
 
-pub fn convert(document: &str, root_url: &str) -> (String, Vec<TocEntry>) {
-    let ast = parse_tree(document).unwrap();
+pub fn convert(document: &str, root_url: &str) -> eyre::Result<(String, Vec<TocEntry>)> {
+    // Strip the @document.meta block before parsing - rust-norg's Stage 3
+    // doesn't handle RangedTagEnd('@') (only '=' and '|').
+    let doc_body = document
+        .strip_prefix("@document.meta")
+        .and_then(|rest| rest.find("\n@end").map(|i| &rest[i + "\n@end".len()..]))
+        .map(|s| s.strip_prefix('\n').unwrap_or(s))
+        .unwrap_or(document);
+    let ast = parse_tree(doc_body).map_err(|e| eyre::eyre!("Failed to parse Norg document: {:?}", e))?;
     let mut toc = Vec::<TocEntry>::new();
     // We do not have any carryover tag when starting to convert the document
     let html = to_html(&ast, &[], &VecDeque::new(), root_url, &mut toc);
 
-    (html, toc)
+    Ok((html, toc))
 }
