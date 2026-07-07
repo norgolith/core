@@ -38,7 +38,6 @@ tokio-tungstenite = "0.26.1"
 futures-util = { version = "0.3.31", features = ["sink"] }
 walkdir = "2.5.0"
 minify-html = "0.18.1"
-num_cpus = "1.16.0"
 minify-js = "0.6.0"
 regex = "1.11.1"
 semver = { version = "1.0.25", features = ["serde"] }
@@ -66,7 +65,6 @@ tar = "0.4.46"
 flate2 = "1.1.9"
 
 [dev-dependencies]
-mockall = "0.15.0"
 serial_test = "3.2.0"
 tempfile = "3.17.1"
 
