@@ -1,5 +1,76 @@
 # Changelog
 
+## [1.0.0](https://github.com/norgolith/core/compare/norgolith-v0.5.0...norgolith-v1.0.0) (2026-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **templating:** Custom Tera functions will use v2 Kwargs API. Template `is defined` tests will be replaced with optional chaining `?.` Deprecated filters will be removed. See templating-migration.norg docs
+* **templating:** Template syntax changed from {{ now(format="%Y") }} to {{ now() | date(format="%Y") }}
+* bump to 2024 edition
+* **templating:** Custom Tera functions will use v2 Kwargs API. Template `is defined` tests will be replaced with optional chaining `?.` Deprecated filters will be removed. See templating-migration.norg docs
+
+### Features
+
+* add templated 404 and 500 error pages ([6604bb7](https://github.com/norgolith/core/commit/6604bb786d915c5ddbe5e18971a9872bd54cae2b)), closes [#94](https://github.com/norgolith/core/issues/94)
+* bump to 2024 edition ([f9dc92d](https://github.com/norgolith/core/commit/f9dc92de8bebd8bf5ff5c65598c1c33f56e6931e))
+* **flake:** add norgolith-plugin-sdk build ([a3ad5d1](https://github.com/norgolith/core/commit/a3ad5d1b63fbfb57ff1ff620e42a1bc5844b702c))
+* **plugin:** add CLI flags for git and crates.io sources ([bbb66f6](https://github.com/norgolith/core/commit/bbb66f6d24270c89ab7feedf038460a91b01c9f7))
+* **plugin:** add crates.io source for plugin install ([f129d47](https://github.com/norgolith/core/commit/f129d4700b78c005657ef512ace4f1e7bd0f9ef2))
+* **plugin:** add git source for plugin install ([f2204e0](https://github.com/norgolith/core/commit/f2204e03d2d7e87f8c677f59507a7ef6b0620c39))
+* **plugin:** per-plugin config from norgolith.toml ([b1c0a42](https://github.com/norgolith/core/commit/b1c0a42f43be0f85cf733cf0baaaf6856be9f5e3))
+* **plugin:** SDK logging bridge ([ee7e92a](https://github.com/norgolith/core/commit/ee7e92afdadf88904bfd7715e5d93b8b4bb8552a))
+* **templating:** add shortcode support via Tera v2 components ([4cb8b08](https://github.com/norgolith/core/commit/4cb8b08b7bbf8db84f97f3c3d864098ee132a8a6)), closes [#63](https://github.com/norgolith/core/issues/63)
+* **templating:** migrate Tera v1 to v2 ([18bb527](https://github.com/norgolith/core/commit/18bb52745b28b9db38f4196973880cd53b9245fc))
+* **templating:** migrate Tera v1 to v2 ([#182](https://github.com/norgolith/core/issues/182)) ([06f3484](https://github.com/norgolith/core/commit/06f348431959f2542853c82718d604ae053cc33d))
+* **templating:** remove NowFunction, use tera-contrib now() + date filter ([395b270](https://github.com/norgolith/core/commit/395b270ff55d8122fa111799bdb4da040a33268b))
+* **theme:** add min_version field, init prompt, info display ([ad996b9](https://github.com/norgolith/core/commit/ad996b9d54d4a7ce49e9c5a82dbced43809457ec))
+* **theme:** check min_version on pull ([1ec5c31](https://github.com/norgolith/core/commit/1ec5c318ea2ee5978820f98fd2fb548cb77f8a46))
+* **theme:** check min-version on update ([57e034c](https://github.com/norgolith/core/commit/57e034c9f899989684b804be2a29e59d3f99d78b))
+
+
+### Bug Fixes
+
+* **docs:** handle nested @-delimited blocks in rust-norg parser ([fa66ed7](https://github.com/norgolith/core/commit/fa66ed78deff3f6ad9b1250704548c6ae1e3d7f7))
+* **templating:** Tera v2 compat - template loading, shims, syntax ([6484d46](https://github.com/norgolith/core/commit/6484d464c4cc7063fab55c114316ff1a018e1f91))
+
+
+### Refactoring
+
+* **build:** split cmd/build.rs into assets, content, timings modules ([4f6d134](https://github.com/norgolith/core/commit/4f6d13431f7af772dacd7585c57298d27ed8e1e2))
+* **cli:** remove redundant extension validation in new_asset ([670f912](https://github.com/norgolith/core/commit/670f9125f082c3c9a3e1836ea54d25a7d7083172))
+* **config:** demote config/ directory to single config.rs ([2468ff2](https://github.com/norgolith/core/commit/2468ff24c510a78e51776fda9f612abe29f044e4))
+* deduplicate plugin ABI constants between core and SDK ([ae1fb01](https://github.com/norgolith/core/commit/ae1fb01c3edecdaddee536c615d11a48b178002b))
+* **dev:** deduplicate rewrite_urls logic ([198eaf3](https://github.com/norgolith/core/commit/198eaf368fb9027cf7983b016da36c60c2e0b8e5))
+* **dev:** extract fast_path_lookup, rewrite_urls, html_response helpers ([9b634b2](https://github.com/norgolith/core/commit/9b634b25a2929af72aebc0d6e377a42d1b63a862))
+* **dev:** split cmd/dev.rs into server, handlers, watcher modules ([6865741](https://github.com/norgolith/core/commit/6865741ba85eafb018574fb7e3707bafd433f8e2))
+* **new:** replace AssetType enum with inline match ([670f912](https://github.com/norgolith/core/commit/670f9125f082c3c9a3e1836ea54d25a7d7083172))
+* **plugin:** extract run_post_convert and run_post_render methods ([59641a0](https://github.com/norgolith/core/commit/59641a0016a079d7c4b6ec22d070b42d2890facf))
+* **plugin:** extract shared build+install helpers ([6d7e43e](https://github.com/norgolith/core/commit/6d7e43ecc293eed49b10c16f3849e2fddb12797b))
+* **plugin:** remove unused parse_status_response ([e21d91f](https://github.com/norgolith/core/commit/e21d91fc8b4e7c810ed8390b56d791089eff99d8))
+* remove redundant titlecasing, inline metadata wrapper, drop cli delegates ([f11797b](https://github.com/norgolith/core/commit/f11797bafa97e59e2091eada5b63e5ae0f7da337))
+* **sdk:** remove unused PreBuildContext and PostBuildContext ([e21d91f](https://github.com/norgolith/core/commit/e21d91fc8b4e7c810ed8390b56d791089eff99d8))
+* **shared:** split shared/mod.rs into metadata and render submodules ([d6bfe7a](https://github.com/norgolith/core/commit/d6bfe7a75746f48e4d34d6fd535eb23e7fbe8a10))
+* **tera:** merge tera_functions.rs and init_tera into tera module ([48d440b](https://github.com/norgolith/core/commit/48d440b3112fec6930a965d183f1f5f67d00817b))
+* unify SitePaths, introduce BuildContext to kill too_many_arguments ([377097a](https://github.com/norgolith/core/commit/377097a3feb4e026b8935f7086e438649a56479e))
+
+
+### Miscellaneous
+
+* **deps:** bump hyper from 0.14.28 to 0.14.32 in /core ([#174](https://github.com/norgolith/core/issues/174)) ([60722c3](https://github.com/norgolith/core/commit/60722c33257e68dfbda9237decb4bb7f5295dce1))
+* **deps:** bump minify-html from 0.15.0 to 0.18.1 in /core ([#173](https://github.com/norgolith/core/issues/173)) ([669b8ec](https://github.com/norgolith/core/commit/669b8ec8dd9f3d299268ec2a4342b4611055b061))
+* **deps:** bump mockall from 0.13.1 to 0.15.0 in /core ([#175](https://github.com/norgolith/core/issues/175)) ([f4fb5b7](https://github.com/norgolith/core/commit/f4fb5b7e188e87b958cfb723cc4efa4734c7ce06))
+* **deps:** bump tokio from 1.52.2 to 1.52.3 in /core ([#176](https://github.com/norgolith/core/issues/176)) ([ed550e3](https://github.com/norgolith/core/commit/ed550e35cd884ad2dea7e03f23e7db26a38feaa8))
+* **deps:** bump tracing-subscriber from 0.3.19 to 0.3.23 in /core ([f46ec86](https://github.com/norgolith/core/commit/f46ec868247fa4b3f5fa621cf65a444aa6088c5f))
+* format source code ([ea514a8](https://github.com/norgolith/core/commit/ea514a836f5c3965f9a6714b92bc37709e2c85fc))
+* remove unused num_cpus and mockall dependencies ([001a58a](https://github.com/norgolith/core/commit/001a58ad896c0a10bcf067ad4f202689289407e3))
+
+
+### Tests
+
+* **plugin:** add unit tests for install sources ([6e1622a](https://github.com/norgolith/core/commit/6e1622ad90a46881ea7d949c1621e65724dfb004))
+* **plugin:** fix CI git fixture by using explicit signature ([e2c2ad1](https://github.com/norgolith/core/commit/e2c2ad16c5ac80b81182ce7abede314241d2fe43))
+
 ## [0.5.0](https://github.com/norgolith/core/compare/norgolith-v0.4.0...norgolith-v0.5.0) (2026-07-01)
 
 

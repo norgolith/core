@@ -1,6 +1,6 @@
 [package]
 name = "norgolith-plugin-sdk"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 authors = ["NTBBloodbath <bloodbathalchemist@protonmail.com"]
 license = "GPL-2.0"
