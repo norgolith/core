@@ -15,54 +15,6 @@ use whoami::username;
 
 use crate::{config, fs};
 
-/// Supported asset types for creation
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum AssetType {
-    Js,
-    Css,
-    Content,
-}
-
-impl AssetType {
-    /// Determine asset type from file extension
-    #[instrument]
-    fn from_extension(ext: &str) -> Result<Self> {
-        debug!(extension = %ext, "Determining asset type");
-        let asset_type = match ext.to_lowercase().as_str() {
-            "js" => Ok(Self::Js),
-            "css" => Ok(Self::Css),
-            "norg" => Ok(Self::Content),
-            _ => bail!("Unsupported file extension: {}", ext),
-        };
-
-        debug!(asset_type = ?asset_type, "Determined asset type");
-        asset_type
-    }
-
-    /// Get directory name for asset type
-    #[instrument]
-    fn directory(&self) -> &'static str {
-        let dir = match self {
-            Self::Js | Self::Css => "assets",
-            Self::Content => "content",
-        };
-        debug!(directory = dir, "Resolved asset directory");
-        dir
-    }
-
-    /// Get subdirectory for asset type
-    #[instrument]
-    fn subdirectory(&self) -> Option<&'static str> {
-        let subdir = match self {
-            Self::Js => Some("js"),
-            Self::Css => Some("css"),
-            Self::Content => None,
-        };
-        debug!(subdirectory = ?subdir, "Resolved asset subdirectory");
-        subdir
-    }
-}
-
 /// Generate content title from file path
 #[instrument(skip(base_path, full_path))]
 fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
@@ -274,14 +226,16 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
         resolved_name = name.to_string();
     }
 
-    let asset_type = AssetType::from_extension(&resolved_kind)?;
+    let (dir, subdir, is_content) = match resolved_kind.to_lowercase().as_str() {
+        "js" => ("assets", Some("js"), false),
+        "css" => ("assets", Some("css"), false),
+        "norg" => ("content", None, true),
+        _ => bail!("Unsupported file extension: {}", resolved_kind),
+    };
     let mut input_path = PathBuf::from(&resolved_name);
 
-    // Validate file extension
-    if let AssetType::Content = asset_type {
-        // Add norg file extension to content name if it is missing an extension
+    if is_content {
         if input_path.extension().is_none() {
-            debug!("Content file is missing norg extension, adding it from inference");
             input_path = input_path.with_extension("norg");
         }
         if input_path.extension().map(|e| e != "norg").unwrap_or(true) {
@@ -289,31 +243,24 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
         }
     }
 
-    // Build target path
-    let mut target_path = site_root.join(asset_type.directory());
-
-    if let Some(subdir) = asset_type.subdirectory() {
+    let mut target_path = site_root.join(dir);
+    if let Some(subdir) = subdir {
         target_path.push(subdir);
     }
-
     target_path.push(&input_path);
     debug!(target_path = %target_path.display(), "Resolved target path");
 
-    // Create directories and file
     ensure_directory_exists(&target_path).await?;
 
-    match asset_type {
-        AssetType::Content => {
-            let title = generate_content_title(&site_root, &target_path);
-            create_norg_document(&target_path, &title).await?;
-        }
-        AssetType::Js | AssetType::Css => {
-            debug!("Creating empty asset file: {}", target_path.display());
-            tokio::fs::File::create(&target_path)
-                .await
-                .with_context(|| format!("Failed to create file: {}", target_path.display()))?;
-            info!("Created asset file: {}", target_path.display());
-        }
+    if is_content {
+        let title = generate_content_title(&site_root, &target_path);
+        create_norg_document(&target_path, &title).await?;
+    } else {
+        debug!("Creating empty asset file: {}", target_path.display());
+        tokio::fs::File::create(&target_path)
+            .await
+            .with_context(|| format!("Failed to create file: {}", target_path.display()))?;
+        info!("Created asset file: {}", target_path.display());
     }
 
     // Open file if requested

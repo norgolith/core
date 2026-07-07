@@ -285,14 +285,10 @@ async fn new_asset(
     open: bool,
     collection: Option<&String>,
 ) -> Result<()> {
-    let asset_type = kind.unwrap_or(&String::from("norg")).to_owned();
-
-    if !["js", "css", "norg", "post"].contains(&asset_type.as_str()) {
-        bail!("Unable to create site asset: unknown asset type provided");
-    }
+    let kind = kind.unwrap_or(&String::from("norg")).to_owned();
 
     match name {
-        Some(name) => cmd::new(&asset_type, name, open, collection).await,
+        Some(name) => cmd::new(&kind, name, open, collection).await,
         None => bail!("Unable to create site asset: missing name for the asset"),
     }
 }
