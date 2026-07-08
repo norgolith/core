@@ -7,6 +7,9 @@ on:
       - "norgolith-plugin-sdk-v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Release - ${{ matrix.platform.os_name }}
@@ -38,6 +41,7 @@ jobs:
         uses: houseabsolute/actions-rust-release@v0
         with:
           executable-name: lith
+          release-tag-prefix: norgolith-v
           changes-file: ""
           extra-files: |
             README.md
