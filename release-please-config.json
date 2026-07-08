@@ -16,9 +16,7 @@
       "bump-patch-for-minor-pre-major": false
     }
   },
-  "plugins": [
-    "cargo-workspace"
-  ],
+  "plugins": [],
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },
