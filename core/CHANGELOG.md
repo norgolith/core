@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.1](https://github.com/norgolith/core/compare/norgolith-v1.0.0...norgolith-v1.0.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* categories render with Tera v2 compat ([60d7d65](https://github.com/norgolith/core/commit/60d7d652a7bc83ca01071d786d908c0238fa1b83))
+* **dev:** fix server path resolution ([3a248b8](https://github.com/norgolith/core/commit/3a248b8b35b288670dbade72a5a85ea4c9e635c7))
+
+
+### Documentation
+
+* add 1.0 release blog post ([3a248b8](https://github.com/norgolith/core/commit/3a248b8b35b288670dbade72a5a85ea4c9e635c7))
+
+
+### Miscellaneous
+
+* pass clippy ([113b65a](https://github.com/norgolith/core/commit/113b65abe747421ceeae30f8c062a537f1e17771))
+
 ## [1.0.0](https://github.com/norgolith/core/compare/norgolith-v0.5.0...norgolith-v1.0.0) (2026-07-07)
 
 
