@@ -155,14 +155,14 @@ macro_rules! register_plugin {
     ($name:expr_2021, $version:expr_2021, hooks: [$($hook:ident : $handler:ident),* $(,)?]) => {
         // Generate one bridge function per hook
         $(
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn $hook(input: *const ::std::os::raw::c_char) -> *mut ::std::os::raw::c_char {
                 $crate::__bridge_json(input, $handler)
             }
         )*
 
         // Generate the init function
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub extern "C" fn norgolith_plugin_init(
             info: &mut $crate::PluginInfo,
             mask: &mut u32,
