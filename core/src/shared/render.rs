@@ -95,6 +95,10 @@ pub fn render_category_index(
         let mut ctx = Context::new();
         ctx.insert("config", config);
         ctx.insert("posts", posts);
+        ctx.insert(
+            "lith_version",
+            option_env!("LITH_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
+        );
         for (name, subset) in collections {
             ctx.insert(name.clone(), subset);
         }
@@ -103,12 +107,7 @@ pub fn render_category_index(
     };
 
     tera.render("categories.html", &context).map_err(|e| {
-        let msg = "Failed to render categories index".bold();
-        if let Some(source) = e.source() {
-            eyre!("{msg}: {source}")
-        } else {
-            eyre!(msg)
-        }
+        eyre!("Failed to render categories index: {e}")
     })
 }
 
@@ -123,14 +122,13 @@ pub fn render_category_page(
         ctx.insert("config", config);
         ctx.insert("category", name);
         ctx.insert("posts", cat_posts);
+        ctx.insert(
+            "lith_version",
+            option_env!("LITH_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
+        );
         ctx
     };
     tera.render("category.html", &context).map_err(|e| {
-        let msg = "Failed to render category page".bold();
-        if let Some(source) = e.source() {
-            eyre!("{msg}: {source}")
-        } else {
-            eyre!(msg)
-        }
+        eyre!("Failed to render category page: {e}")
     })
 }
