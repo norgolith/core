@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/norgolith/core/compare/norgolith-plugin-sdk-v1.0.0...norgolith-plugin-sdk-v1.0.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **sdk:** fix Rust 2024 edition unsafe attribute in register_plugin macro ([407f9ec](https://github.com/norgolith/core/commit/407f9eca41295ec7073de3b7d77219e70112ec06))
+
 ## [1.0.0](https://github.com/norgolith/core/compare/norgolith-plugin-sdk-v0.1.0...norgolith-plugin-sdk-v1.0.0) (2026-07-07)
 
 
