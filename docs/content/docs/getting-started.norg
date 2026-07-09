@@ -65,7 +65,14 @@ This guide assumes that you’ve already {:/docs/installation:}[installed Norgol
          <strong class="text-xl">Tip</strong>
        </span>
      @end
-     You might want to add `.norgolith/cache/` directory to your `gitignore`.
+     If you use plugins, add this to your `.gitignore` to avoid committing compiled binaries:
+
+     @code gitignore
+     # Plugin binaries (reinstall with `lith plugin install`)
+     plugins/
+     @end
+
+     After cloning, reinstall plugins with `lith plugin install <source>`.
      @embed html
      </blockquote>
      @end
