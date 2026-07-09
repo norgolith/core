@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::{io, path::{Path, PathBuf}};
 
 use clap::Subcommand;
 use colored::Colorize;
@@ -215,7 +215,14 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
         .arg("build")
         .arg("--release")
         .current_dir(source_dir)
-        .status()?;
+        .status()
+        .map_err(|e| {
+            if e.kind() == io::ErrorKind::NotFound {
+                eyre::eyre!("cargo not found in PATH. Install Rust from https://rustup.rs")
+            } else {
+                eyre::eyre!("Failed to run cargo: {e}")
+            }
+        })?;
     if !status.success() {
         bail!("cargo build failed");
     }
