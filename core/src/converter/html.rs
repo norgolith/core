@@ -657,7 +657,11 @@ pub fn convert(document: &str, root_url: &str) -> eyre::Result<(String, Vec<TocE
         .and_then(|rest| rest.find("\n@end").map(|i| &rest[i + "\n@end".len()..]))
         .map(|s| s.strip_prefix('\n').unwrap_or(s))
         .unwrap_or(document);
-    let ast = parse_tree(doc_body).map_err(|e| eyre::eyre!("Failed to parse Norg document: {:?}", e))?;
+    let ast = match parse_tree(doc_body) {
+        Ok(ast) => ast,
+        Err(_) if doc_body.trim().is_empty() => return Ok((String::new(), Vec::new())),
+        Err(e) => return Err(eyre::eyre!("Failed to parse Norg document: {:?}", e)),
+    };
     let mut toc = Vec::<TocEntry>::new();
     // We do not have any carryover tag when starting to convert the document
     let html = to_html(&ast, &[], &VecDeque::new(), root_url, &mut toc);
