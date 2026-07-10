@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/norgolith/core/compare/norgolith-plugin-sdk-v1.0.0...norgolith-plugin-sdk-v1.1.0) (2026-07-10)
+
+
+### Bug Fixes
+
+* **sdk:** fix Rust 2024 edition unsafe attribute in register_plugin macro ([407f9ec](https://github.com/norgolith/core/commit/407f9eca41295ec7073de3b7d77219e70112ec06))
+
+
+### Refactoring
+
+* nuke plugin.toml version field ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+
+
+### Documentation
+
+* add FFI plugin version guidance ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+* remove plugin.toml version field from documentation ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+
 ## [1.0.0](https://github.com/norgolith/core/compare/norgolith-plugin-sdk-v0.1.0...norgolith-plugin-sdk-v1.0.0) (2026-07-07)
 
 
