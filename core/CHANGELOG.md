@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.0](https://github.com/norgolith/core/compare/norgolith-v1.0.1...norgolith-v1.1.0) (2026-07-10)
+
+
+### Bug Fixes
+
+* **converter:** handle empty Norg documents after metadata strip ([853a943](https://github.com/norgolith/core/commit/853a943758a238acdce1e2898925222cce0b1bbd))
+* **plugin:** improve error messages when cargo was not found in PATH ([9b5add2](https://github.com/norgolith/core/commit/9b5add2e89a6a71ba70cefe7f56415c967ace1ff))
+* prefix collection names in render_category_index to avoid variable collision ([92e7c68](https://github.com/norgolith/core/commit/92e7c6813e4ad2a016a56821cd18b7cfa5203af9))
+
+
+### Refactoring
+
+* nuke plugin.toml version field ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+
+
+### Documentation
+
+* add FFI plugin version guidance ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+* remove plugin.toml version field from documentation ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+
 ## [1.0.1](https://github.com/norgolith/core/compare/norgolith-v1.0.0...norgolith-v1.0.1) (2026-07-08)
 
 
