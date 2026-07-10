@@ -41,6 +41,18 @@ fn normalize_datetimes(metadata: &mut toml::Value) {
     }
 }
 
+fn normalize_categories(metadata: &mut toml::Value) {
+    if let toml::Value::Table(table) = metadata {
+        if let Some(toml::Value::Array(cats)) = table.get_mut("categories") {
+            for cat in cats.iter_mut() {
+                if let toml::Value::String(s) = cat {
+                    *cat = toml::Value::String(s.trim().to_string());
+                }
+            }
+        }
+    }
+}
+
 /// Full metadata + HTML conversion from pre-read content.
 ///
 /// This is the inner function that does the actual work. It does NOT read from disk.
@@ -62,6 +74,7 @@ pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &s
         };
     let permalink = compute_permalink(rel_path, routes_url);
     normalize_datetimes(&mut metadata);
+    normalize_categories(&mut metadata);
     if let toml::Value::Table(ref mut table) = metadata {
         table.insert("raw".to_string(), toml::Value::String(html.to_string()));
         table.insert("permalink".to_string(), toml::Value::String(permalink));
@@ -148,7 +161,7 @@ pub fn collect_all_posts_categories(posts: &[toml::Value]) -> HashSet<String> {
         if let Some(cats) = post.get("categories").and_then(|v| v.as_array()) {
             for cat in cats {
                 if let Some(cat_str) = cat.as_str() {
-                    categories.insert(cat_str.to_lowercase());
+                    categories.insert(cat_str.trim().to_lowercase());
                 }
             }
         }

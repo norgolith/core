@@ -100,7 +100,7 @@ pub fn render_category_index(
             option_env!("LITH_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
         );
         for (name, subset) in collections {
-            ctx.insert(name.clone(), subset);
+            ctx.insert(format!("collection_{name}"), subset);
         }
         ctx.insert("categories", &categories.iter().collect::<Vec<_>>());
         ctx

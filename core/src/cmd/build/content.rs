@@ -85,7 +85,10 @@ pub(super) fn build_category_pages(
             .filter(|post| {
                 post.get("categories")
                     .and_then(|c| c.as_array())
-                    .map(|cats| cats.iter().any(|c| c.as_str() == Some(category.as_str())))
+                    .map(|cats| {
+                        cats.iter()
+                            .any(|c| c.as_str().map(|s| s.trim()) == Some(category.as_str()))
+                    })
                     .unwrap_or(false)
             })
             .collect();
