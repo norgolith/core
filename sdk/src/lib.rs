@@ -132,8 +132,9 @@ pub fn __log_fn() -> Option<extern "C" fn(u32, *const c_char)> {
     PLUGIN_LOG_FN.get().copied()
 }
 
-/// Register a plugin with the given name and version.
+/// Register a plugin with the given name.
 ///
+/// Version is automatically derived from the crate's `Cargo.toml` via `env!("CARGO_PKG_VERSION")`.
 /// Generates the `norgolith_plugin_init` function and bridge functions for each hook.
 ///
 /// # Example
@@ -146,13 +147,13 @@ pub fn __log_fn() -> Option<extern "C" fn(u32, *const c_char)> {
 ///     Ok(Some(ctx.html))
 /// }
 ///
-/// register_plugin!("my-plugin", "0.1.0",
+/// register_plugin!("my-plugin",
 ///     hooks: [post_render: highlight]
 /// );
 /// ```
 #[macro_export]
 macro_rules! register_plugin {
-    ($name:expr_2021, $version:expr_2021, hooks: [$($hook:ident : $handler:ident),* $(,)?]) => {
+    ($name:expr_2021, hooks: [$($hook:ident : $handler:ident),* $(,)?]) => {
         // Generate one bridge function per hook
         $(
             #[unsafe(no_mangle)]
@@ -176,7 +177,7 @@ macro_rules! register_plugin {
             *info = $crate::PluginInfo {
                 abi_version: $crate::CORE_ABI_VERSION,
                 name: concat!($name, "\0").as_ptr() as *const ::std::os::raw::c_char,
-                version: concat!($version, "\0").as_ptr() as *const ::std::os::raw::c_char,
+                version: concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const ::std::os::raw::c_char,
                 log_fn: None,
             };
             *mask = 0;

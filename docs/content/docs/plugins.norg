@@ -64,7 +64,7 @@ Open `plugins/watermark/src/lib.rs` and replace its contents with:
 @code rust
 use norgolith_plugin_sdk::*;
 
-register_plugin!("watermark", "0.1.0",
+register_plugin!("watermark",
     hooks: [post_render: add_watermark]
 );
 
@@ -99,7 +99,6 @@ Every plugin needs a `plugin.toml` file next to its shared library. Here is the 
 @code toml
 [plugin]
 name = "my-plugin"
-version = "0.1.0"
 norgolith = ">=0.4.0"
 abi = 1
 
@@ -120,7 +119,6 @@ priority = 100
 *** \[plugin\] section
 
 - `name`: must match the name you pass to `register_plugin!` in your Rust code
-- `version`: semantic version for your plugin
 - `norgolith`: semver requirement for the Norgolith version this plugin supports (e.g. `>=0.4.0`)
 - `abi`: must be `1`. This is the plugin ABI version and must match the core
 
@@ -282,10 +280,23 @@ typedef void (*LogFn)(unsigned int level, const char* msg);
 struct PluginInfo {
     unsigned int abi_version;
     const char* name;
-    const char* version;
+    const char* version;  // set by plugin in init
     LogFn log_fn;  // set by core before init, NULL if unavailable
 };
 @end
+
+For FFI plugins, you must set `info->version` in your init function. This is the only source of truth
+for the plugin's version -- there is no plugin.toml version field.
+
+@code c
+void norgolith_plugin_init(struct PluginInfo* info, unsigned int* mask,
+                           void* hooks[4]) {
+    info->version = "1.0.0";  // required for FFI plugins
+    // ...
+}
+@end
+
+Rust SDK plugins using `register_plugin!` get this automatically from `Cargo.toml`.
 
 Level mapping: `0`=trace, `1`=debug, `2`=info, `3`=warn, `4`=error.
 

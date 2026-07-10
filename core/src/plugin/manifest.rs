@@ -31,8 +31,6 @@ fn default_priority() -> u32 {
 pub struct PluginMetadata {
     /// Name of the plugin (e.g. "my-plugin")
     pub name: String,
-    /// Version of the plugin (e.g. "0.1.0")
-    pub version: String,
     /// Semver requirement for norgolith compatibility (e.g. ">=0.4.0")
     pub norgolith: String,
     /// ABI version this plugin was compiled against

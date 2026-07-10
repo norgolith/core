@@ -39,7 +39,7 @@ The generated `src/lib.rs` looks like this:
 ```rust
 use norgolith_plugin_sdk::*;
 
-register_plugin!("my-plugin", "0.1.0",
+register_plugin!("my-plugin",
     hooks: [post_render: my_hook]
 );
 
@@ -66,13 +66,12 @@ Now `lith build` runs your plugin on every page.
 The macro generates two things: the shared library entry point and bridge functions for each hook.
 
 ```rust
-register_plugin!("plugin-name", "0.1.0",
+register_plugin!("plugin-name",
     hooks: [hook_name: handler_function, ...]
 );
 ```
 
 - First argument: plugin name (must match `plugin.toml`)
-- Second argument: version string
 - `hooks:` list: maps hook names to your handler functions
 
 Valid hook names are `pre_build`, `post_convert`, `post_render`, and `post_build`.
@@ -221,7 +220,7 @@ Here is a complete plugin that wraps every `<h1>` heading in a styled div:
 ```rust
 use norgolith_plugin_sdk::*;
 
-register_plugin!("heading-wrapper", "0.1.0",
+register_plugin!("heading-wrapper",
     hooks: [post_render: wrap_headings]
 );
 

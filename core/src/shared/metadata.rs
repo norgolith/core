@@ -42,12 +42,12 @@ fn normalize_datetimes(metadata: &mut toml::Value) {
 }
 
 fn normalize_categories(metadata: &mut toml::Value) {
-    if let toml::Value::Table(table) = metadata {
-        if let Some(toml::Value::Array(cats)) = table.get_mut("categories") {
-            for cat in cats.iter_mut() {
-                if let toml::Value::String(s) = cat {
-                    *cat = toml::Value::String(s.trim().to_string());
-                }
+    if let toml::Value::Table(table) = metadata
+        && let Some(toml::Value::Array(cats)) = table.get_mut("categories")
+    {
+        for cat in cats.iter_mut() {
+            if let toml::Value::String(s) = cat {
+                *cat = toml::Value::String(s.trim().to_string());
             }
         }
     }

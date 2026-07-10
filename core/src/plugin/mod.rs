@@ -410,7 +410,10 @@ fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
 
     Ok(PluginInstance {
         name: manifest.plugin.name.clone(),
-        version: manifest.plugin.version.clone(),
+        version: unsafe { std::ffi::CStr::from_ptr(info.version) }
+            .to_str()
+            .unwrap_or("unknown")
+            .to_string(),
         _lib: lib,
         hooks: plugin_hooks,
         manifest,
@@ -431,7 +434,6 @@ mod tests {
         let manifest = format!(
             r#"[plugin]
 name = "{name}"
-version = "0.1.0"
 norgolith = ">=0.4.0"
 abi = 1
 
@@ -596,7 +598,6 @@ timeout_ms = 5000
         // Write manifest for the SDK plugin
         let manifest = r#"[plugin]
 name = "test-sdk-plugin"
-version = "0.1.0"
 norgolith = ">=0.4.0"
 abi = 1
 

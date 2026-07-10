@@ -142,7 +142,6 @@ fn new_plugin(name: &str) -> Result<()> {
     let manifest = format!(
         r#"[plugin]
 name = "{name}"
-version = "0.1.0"
 norgolith = ">={NORGOLITH_VERSION}"
 abi = {CORE_ABI_VERSION}
 
@@ -182,7 +181,7 @@ norgolith-plugin-sdk = "0.1"
     let lib_rs = format!(
         r#"use norgolith_plugin_sdk::*;
 
-register_plugin!("{name}", "0.1.0")
+register_plugin!("{name}")
     .on_post_render(|ctx| {{
         // Access per-plugin config from norgolith.toml
         // if let Some(theme) = ctx.config.as_ref().and_then(|c| c.get("theme")) {{
@@ -315,9 +314,8 @@ fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Resul
     tmp.close().ok();
 
     println!(
-        "Plugin '{}' v{} installed",
-        manifest.plugin.name.bold(),
-        manifest.plugin.version
+        "Plugin '{}' installed from source",
+        manifest.plugin.name.bold()
     );
     Ok(())
 }
@@ -342,9 +340,8 @@ fn install_from_local(source_dir: &Path) -> Result<()> {
     install_to_plugins(&lib_path, &manifest_path, &manifest.plugin.name)?;
 
     println!(
-        "Plugin '{}' v{} installed",
-        manifest.plugin.name.bold(),
-        manifest.plugin.version
+        "Plugin '{}' installed from source",
+        manifest.plugin.name.bold()
     );
     Ok(())
 }
@@ -451,7 +448,7 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
     println!(
         "Plugin '{}' v{} installed",
         manifest.plugin.name.bold(),
-        manifest.plugin.version
+        version
     );
     Ok(())
 }
@@ -597,7 +594,6 @@ mod tests {
         let manifest = format!(
             r#"[plugin]
 name = "test-local-git-plugin"
-version = "0.1.0"
 norgolith = ">={}"
 abi = {}
 
