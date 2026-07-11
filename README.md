@@ -55,11 +55,14 @@ The monolithic Norg static site generator
 Usage: lith [OPTIONS] <COMMAND>
 
 Commands:
-  init   Initialize a new Norgolith site
-  serve  Build a site for development
-  new    Create a new asset in the site and optionally open it using your preferred          system editor. e.g. 'new -k content post1.norg' -> 'content/post1.norg'
-  build  Build a site for production
-  help   Print this message or the help of the given subcommand(s)
+  init     Initialize a new Norgolith site
+  theme    Theme management
+  dev      Run a site in development mode
+  new      Create a new asset in the site and optionally open it using your preferred system editor. e.g. 'new -k norg post1.norg' -> 'content/post1.norg'
+  build    Build a site for production
+  plugin   Plugin management
+  preview  Preview from build result
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
   -v, --version            Print version
