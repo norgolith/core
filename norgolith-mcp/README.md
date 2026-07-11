@@ -59,6 +59,9 @@ Source code resources (MIME type `text/x-rust`):
 | `norgolith://src/core/plugin/ffi.rs` | C ABI bridge |
 | `norgolith://src/core/plugin/manifest.rs` | Plugin manifest parsing |
 | `norgolith://src/core/plugin/sandbox.rs` | Landlock sandboxing |
+| `norgolith://src/core/shared/render.rs` | Tera context variables |
+| `norgolith://src/core/shared/metadata.rs` | Page metadata structure |
+| `norgolith://src/core/tera/mod.rs` | Tera functions, filters, and tests |
 
 ## Tools
 
@@ -66,6 +69,30 @@ Source code resources (MIME type `text/x-rust`):
 |------|-------------|
 | `search_docs(query)` | Search all documentation for a query string |
 | `read_source(path)` | Read a source file from the repo (monorepo only) |
+
+## Prompts
+
+Examples you can ask the AI with this MCP server enabled:
+
+**Plugin development:**
+- "How do I write a Norgolith plugin?"
+- "How does the plugin manifest work?"
+- "What hooks are available and when do they run?"
+- "Show me the plugin SDK source code"
+- "How does the FFI bridge work?"
+
+**Theme development:**
+- "How do I create a Norgolith theme?"
+- "What Tera variables are available in templates?"
+- "Show me all registered Tera filters and functions"
+- "How does `generate_toc` work?"
+- "What page metadata fields can I use in my theme?"
+
+**General:**
+- "What commands does lith have?"
+- "How do I configure content schemas?"
+- "Search docs for draft handling"
+- "How does the build pipeline work?"
 
 ## See Also
 
