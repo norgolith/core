@@ -24,7 +24,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
     - `index.html`: The homepage template.
 
 *** Example: Basic Template
-    @code django
+    @code tera
     <!-- templates/post.html -->
     <!DOCTYPE html>
     <html lang="en">
@@ -68,7 +68,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
    @end
 
 *** Example
-    @code django
+    @code tera
     <!-- templates/post.html -->
     <h1>{{ metadata.title }}</h1>
     <div class="content">{{ content }}</div>
@@ -77,7 +77,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
 ** Template Inheritance
    Use template inheritance to avoid duplicating code. For example:
 
-   @code django
+   @code tera
    <!-- templates/base.html -->
    <html>
      <head>
@@ -101,14 +101,14 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
    Tera comes with some built-in global {https://keats.github.io/tera/docs/#built-in-filters}[filters] and {https://keats.github.io/tera/docs/#built-in-functions}[functions] which you can use directly in your templates. Additionally, Norgolith also exposes custom Tera functions for use in templates:
 
    - `now`: Returns the current datetime (provided by tera-contrib).
-   @code django
+   @code tera
    <footer>
      <span>Copyright &copy; {{ now() | date(format="%Y") }}</span>
    </footer>
    @end
 
    - `generate_toc`: Generates a ToC for the current page content.
-   @code django
+   @code tera
    <!-- Usage example -->
    {% if metadata.toc %}
      <div>
@@ -128,7 +128,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
     Tera supports loops and conditionals for dynamic content.
 
 **** Example: Looping Over Categories
-     @code django
+     @code tera
      <ul>
        {% for category in metadata.categories %}
          <li>{{ category }}</li>
@@ -137,7 +137,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
      @end
 
 **** Example: Conditional Rendering
-     @code django
+     @code tera
      {% if metadata.draft %}
        <div class="draft-notice">This post is a draft.</div>
      {% endif %}
@@ -147,13 +147,13 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
     You can include other templates within a template.
 
 **** Example: Including a Header
-     @code django
+     @code tera
      {% include "header.html" %}
      @end
 
 ** Practical Examples
 *** Example 1: Blog Post Template
-    @code django
+    @code tera
     <!-- templates/post.html -->
     {% extends "base.html" %}
 
@@ -172,7 +172,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
     @end
 
 *** Example 2: Homepage Template
-    @code django
+    @code tera
     <!-- templates/index.html -->
     {% extends "base.html" %}
 
@@ -211,7 +211,7 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
 *** Defining a Shortcode
     Place a Tera component definition in `templates/shortcodes/<name>.html`:
 
-    @code django
+    @code tera
     <!-- templates/shortcodes/youtube.html -->
     {% component youtube(id: String, autoplay: String = "false") %}
     <div class="video-container">
@@ -250,7 +250,7 @@ This is a **warning** callout.
 
      Template definition:
 
-     @code django
+     @code tera
      {% component callout(type: String = "info") %}
      <aside class="callout callout-{{ type }}">
        {{ body }}
@@ -276,7 +276,7 @@ A warning callout.
     Site-level shortcodes override theme shortcodes of the same name.
 
 *** Example: YouTube Embed
-    @code django
+    @code tera
     <!-- templates/shortcodes/youtube.html -->
     {% component youtube(id: String, autoplay: String = "false") %}
     <div class="video-container">
@@ -289,7 +289,7 @@ A warning callout.
     @end
 
 *** Example: Tweet Embed
-    @code django
+    @code tera
     <!-- templates/shortcodes/tweet.html -->
     {% component tweet(id: String) %}
     <blockquote class="twitter-tweet">
@@ -300,7 +300,7 @@ A warning callout.
     @end
 
 *** Example: Figure with Caption
-    @code django
+    @code tera
     <!-- templates/shortcodes/figure.html -->
     {% component figure(src: String, alt: String = "", caption: String = "") %}
     <figure>

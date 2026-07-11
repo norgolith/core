@@ -26,12 +26,12 @@ operator. Undefined fields in root position cause errors. The ?.? operator
 returns undefined (falsy) instead of erroring.
 
 Before:
-@code django
+@code tera
 {% if config.highlighter is defined and config.highlighter.enable %}
 @end
 
 After:
-@code django
+@code tera
 {% if config.highlighter?.enable %}
 @end
 
@@ -42,12 +42,12 @@ The ?.? operator works anywhere a field might be undefined for safe access.
 Built-in now() was removed. Use tera-contrib date functions instead.
 
 Before:
-@code django
+@code tera
 {{ now(format="%Y") }}
 @end
 
 After:
-@code django
+@code tera
 {{ now() | date(format="%Y") }}
 @end
 
@@ -56,12 +56,12 @@ After:
 The matching test now requires a keyword argument named pat.
 
 Before:
-@code django
+@code tera
 {% if value is matching("^nil$") %}
 @end
 
 After:
-@code django
+@code tera
 {% if value is matching(pat="^nil$") %}
 @end
 

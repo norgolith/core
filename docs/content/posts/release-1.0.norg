@@ -31,7 +31,7 @@ Norgolith 1.0 gives you the tools to ship faster and with less friction. Here is
       components you can embed in any template), a richer filter ecosystem via tera-contrib, and
       optional chaining for safer template rendering.
 
-      @code django
+      @code tera
       {{ component(name="card", title="Hello", body="World") }}
       @end
 
