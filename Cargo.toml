@@ -1,3 +1,3 @@
 [workspace]
-members = ["core", "sdk"]
+members = ["core", "sdk", "norgolith-mcp"]
 resolver = "2"

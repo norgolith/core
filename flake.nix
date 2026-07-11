@@ -18,6 +18,7 @@
         toolchain = pkgs.rustPlatform;
         corePackage = (pkgs.lib.importTOML "${self}/core/Cargo.toml").package;
         sdkPackage = (pkgs.lib.importTOML "${self}/sdk/Cargo.toml").package;
+        mcpPackage = (pkgs.lib.importTOML "${self}/norgolith-mcp/Cargo.toml").package;
       in rec {
         # nix build
         packages.default = toolchain.buildRustPackage {
@@ -85,6 +86,24 @@
             homepage = sdkPackage.repository;
             license = pkgs.lib.licenses.gpl2Only;
             maintainers = sdkPackage.authors;
+          };
+        };
+
+        packages.norgolith-mcp = toolchain.buildRustPackage {
+          pname = mcpPackage.name;
+          version = mcpPackage.version;
+          src = pkgs.lib.cleanSource "${self}";
+          cargoLock = {
+            lockFile = "${self}/Cargo.lock";
+            allowBuiltinFetchGit = true;
+          };
+          cargoBuildFlags = ["-p" "norgolith-mcp"];
+
+          meta = {
+            description = mcpPackage.description;
+            homepage = mcpPackage.repository;
+            license = pkgs.lib.licenses.gpl2Only;
+            maintainers = mcpPackage.authors;
           };
         };
 
