@@ -94,7 +94,7 @@ For git version you can add Norgolith to NixOS configuration with flakes.
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    norgolith.url = "github:NTBBloodbath/norgolith";
+    norgolith.url = "github:norgolith/core";
   };
   outputs =
     { nixpkgs, norgolith, ... }:
