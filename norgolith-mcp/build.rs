@@ -28,10 +28,12 @@ fn main() {
         }
     }
 
-    // Source resources for plugin development
+    // Source resources for plugin and theme development
     let source_dirs = [
         ("sdk", repo_root.join("sdk/src")),
         ("core/plugin", repo_root.join("core/src/plugin")),
+        ("core/shared", repo_root.join("core/src/shared")),
+        ("core/tera", repo_root.join("core/src/tera")),
     ];
     for (prefix, dir) in &source_dirs {
         if dir.exists() {
