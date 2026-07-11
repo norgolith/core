@@ -1,5 +1,6 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
+use std::path::Path;
 
 include!(concat!(env!("OUT_DIR"), "/docs.rs"));
 
@@ -80,10 +81,15 @@ fn handle_resources_list() -> Value {
     let resources: Vec<Value> = DOC_ENTRIES
         .iter()
         .map(|e| {
+            let mime = if e.uri.starts_with("norgolith://src/") {
+                "text/x-rust"
+            } else {
+                "text/x-norg"
+            };
             json!({
                 "uri": e.uri,
                 "name": e.name,
-                "mimeType": "text/x-norg"
+                "mimeType": mime,
             })
         })
         .collect();
@@ -96,10 +102,15 @@ fn handle_resources_read(req: &Value) -> Value {
 
     for entry in DOC_ENTRIES {
         if entry.uri == uri {
+            let mime = if uri.starts_with("norgolith://src/") {
+                "text/x-rust"
+            } else {
+                "text/x-norg"
+            };
             return json!({
                 "contents": [{
                     "uri": entry.uri,
-                    "mimeType": "text/x-norg",
+                    "mimeType": mime,
                     "text": entry.content
                 }]
             });
@@ -111,20 +122,36 @@ fn handle_resources_read(req: &Value) -> Value {
 
 fn handle_tools_list() -> Value {
     json!({
-        "tools": [{
-            "name": "search_docs",
-            "description": "Search Norgolith documentation content",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query to find in documentation"
-                    }
-                },
-                "required": ["query"]
+        "tools": [
+            {
+                "name": "search_docs",
+                "description": "Search Norgolith documentation content",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query to find in documentation"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "read_source",
+                "description": "Read a source file from the norgolith repository",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Relative path from repo root (e.g., core/src/plugin/mod.rs)"
+                        }
+                    },
+                    "required": ["path"]
+                }
             }
-        }]
+        ]
     })
 }
 
@@ -132,10 +159,14 @@ fn handle_tools_call(req: &Value) -> Value {
     let name = req["params"]["name"].as_str().unwrap_or("");
     let args = &req["params"]["arguments"];
 
-    if name != "search_docs" {
-        return json!({"error": {"code": -32602, "message": format!("Unknown tool: {}", name)}});
+    match name {
+        "search_docs" => call_search_docs(args),
+        "read_source" => call_read_source(args),
+        _ => json!({"error": {"code": -32602, "message": format!("Unknown tool: {}", name)}}),
     }
+}
 
+fn call_search_docs(args: &Value) -> Value {
     let query = args["query"].as_str().unwrap_or("").to_lowercase();
     if query.is_empty() {
         return json!({
@@ -178,4 +209,32 @@ fn handle_tools_call(req: &Value) -> Value {
     json!({
         "content": [{"type": "text", "text": text}]
     })
+}
+
+fn call_read_source(args: &Value) -> Value {
+    let path = args["path"].as_str().unwrap_or("");
+    if path.is_empty() {
+        return json!({
+            "content": [{"type": "text", "text": "No path provided."}]
+        });
+    }
+
+    let root = match option_env!("NORGOLITH_ROOT") {
+        Some(r) => r,
+        None => return json!({
+            "content": [{"type": "text", "text": "Repository root not embedded. This tool only works in the norgolith repository."}]
+        }),
+    };
+
+    let full_path = Path::new(root).join(path);
+
+    // XXX: no path traversal protection. Only runs in trusted monorepo context.
+    match std::fs::read_to_string(&full_path) {
+        Ok(content) => json!({
+            "content": [{"type": "text", "text": content}]
+        }),
+        Err(e) => json!({
+            "content": [{"type": "text", "text": format!("Could not read {}: {}", path, e)}]
+        }),
+    }
 }
