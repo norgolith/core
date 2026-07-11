@@ -1,0 +1,12 @@
+[package]
+name = "norgolith-mcp"
+version = "1.0.0"
+edition = "2024"
+authors = ["NTBBloodbath <bloodbathalchemist@protonmail.com"]
+license = "GPL-2.0"
+description = "MCP server for Norgolith documentation"
+repository = "https://github.com/norgolith/core"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

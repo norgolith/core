@@ -114,6 +114,30 @@ For git version you can add Norgolith to NixOS configuration with flakes.
 ```
 </details>
 
+### 🤖 MCP Server
+
+Norgolith ships an MCP (Model Context Protocol) server for AI assistants to browse, read, and search documentation. Build it from source:
+
+```bash
+cargo build --release -p norgolith-mcp
+```
+
+The binary is at `target/release/norgolith-mcp`. Configure it in your MCP client (opencode example):
+
+```json
+{
+  "mcp": {
+    "norgolith": {
+      "type": "local",
+      "command": "norgolith-mcp",
+      "enable": true
+    }
+  }
+}
+```
+
+See [norgolith-mcp/README.md](./norgolith-mcp/README.md) for details.
+
 ## ❄️ Developing and testing with Nix
 
 The Norgolith repository includes a Nix flake for development and testing purposes in the root directory. This section outlines how to
