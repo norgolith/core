@@ -429,6 +429,6 @@ update it if needed, or install a compatible version of the plugin.
 ** Learn More
 
 - {/sdk/}[Plugin SDK on crates.io] - API reference for plugin developers
-- {https://github.com/NTBBloodbath/norgolith}[Norgolith repository] - source code and issue tracker
+- {https://github.com/norgolith/core}[Norgolith repository] - source code and issue tracker
 
 {:/docs/contributing:}[Next: Contributing ->]

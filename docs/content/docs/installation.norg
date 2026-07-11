@@ -31,7 +31,7 @@ The Norgolith binary is called `lith` and not `norgolith`, this is for ergonomic
 ** Binary Installation
 *** via Releases
     For stable releases, statically compiled binaries with musl are provided in the
-    {https://github.com/NTBBloodbath/norgolith/releases}[releases] section. There are binaries
+    {https://github.com/norgolith/core/releases}[releases] section. There are binaries
     for Linux and macOS (`x86_64` and `arm64`). Windows is currently unsupported by Norgolith.
 
     The release tarballs contains the following files:
@@ -49,7 +49,7 @@ The Norgolith binary is called `lith` and not `norgolith`, this is for ergonomic
 
     @code sh
     # Install from the repository
-    cargo install --git https://github.com/NTBBloodbath/norgolith --locked
+    cargo install --git https://github.com/norgolith/core --locked
 
     # Verify the installation
     lith --version
@@ -80,7 +80,7 @@ The Norgolith binary is called `lith` and not `norgolith`, this is for ergonomic
      inputs = {
        nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-       norgolith.url = "github:NTBBloodbath/norgolith";
+       norgolith.url = "github:norgolith/core";
      };
 
      outputs = { nixpkgs, norgolith, ... }: {

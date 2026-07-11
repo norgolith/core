@@ -77,7 +77,7 @@ Thank you for considering contributing to Norgolith, as the only maintainer of t
 
 **** Clone the Repository
      @code bash
-     git clone https://github.com/NTBBloodbath/norgolith.git \
+     git clone https://github.com/norgolith/core.git \
      && cd norgolith
      @end
 
@@ -225,6 +225,6 @@ Thank you for considering contributing to Norgolith, as the only maintainer of t
     @end
 
 ** Do you want to start contributing?
-   Check out the {https://github.com/NTBBloodbath/norgolith/issues}[issue tracker] for open tasks. I try to assign priorities, scopes and milestones to the issues so that they are easier to identify.
+   Check out the {https://github.com/norgolith/core/issues}[issue tracker] for open tasks. I try to assign priorities, scopes and milestones to the issues so that they are easier to identify.
 
    Any contribution is welcome, and thanks again for your interest in helping with the project! 💜

@@ -130,7 +130,7 @@ Norgolith uses a `norgolith.toml` file to manage site-wide settings, content sch
 *** Example: Setting up a repository URL
     @code toml
     [extra]
-    repo_url = "https://github.com/NTBBloodbath/norgolith"
+    repo_url = "https://github.com/norgolith/core"
     @end
 
 ** Practical Examples
