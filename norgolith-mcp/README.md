@@ -50,11 +50,22 @@ Each documentation page is available as a resource with URI `norgolith://{path}`
 | `norgolith://docs/theming` | Theming guide |
 | `norgolith://index` | Site landing page |
 
+Source code resources (MIME type `text/x-rust`):
+
+| URI | Description |
+| --- | ----------- |
+| `norgolith://src/sdk/lib.rs` | Plugin SDK API |
+| `norgolith://src/core/plugin/mod.rs` | Plugin loader core |
+| `norgolith://src/core/plugin/ffi.rs` | C ABI bridge |
+| `norgolith://src/core/plugin/manifest.rs` | Plugin manifest parsing |
+| `norgolith://src/core/plugin/sandbox.rs` | Landlock sandboxing |
+
 ## Tools
 
 | Tool | Description |
 |------|-------------|
 | `search_docs(query)` | Search all documentation for a query string |
+| `read_source(path)` | Read a source file from the repo (monorepo only) |
 
 ## See Also
 
