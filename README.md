@@ -2,53 +2,269 @@
 
 <img src="./res/norgolith_text.png" alt="Norgolith logo"/>
 
+[![CI](https://github.com/norgolith/core/actions/workflows/release.yml/badge.svg)](https://github.com/norgolith/core/actions)
+[![norgolith-plugin-sdk](https://img.shields.io/crates/v/norgolith-plugin-sdk?label=crates.io%20plugin-sdk)](https://crates.io/crates/norgolith-plugin-sdk)
+[![norgolith-mcp](https://img.shields.io/crates/v/norgolith-mcp?label=crates.io%20mcp)](https://crates.io/crates/norgolith-mcp)
+[![License: GPL v2](https://img.shields.io/badge/license-GPLv2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+
 </div>
 
 ---
 
-The monolithic Norg static site generator built with Rust. Leverage the precision of [rust-norg]
-syntax validation with the power of our in-house Norg-to-HTML conversion library to create stunning
-static sites from your Norg content with an unparalleled performance.
+The monolithic Norg static site generator built with Rust. Leverage [rust-norg] syntax
+validation with Norg-to-HTML conversion to build static sites from Norg content.
 
-## 🌟 Features / Why use Norgolith?
+## 🌟 Features
 
-Norgolith caters to both developers and content creators seeking a powerful and user-friendly
-solution for crafting static websites from Norg content. Here's what makes Norgolith stand out:
+- **Norg-native content** with validation via [rust-norg]
+- **Tera v2 templates** with shortcodes, optional chaining, and rich filters
+- **C ABI plugin system** with Landlock sandboxing (filesystem confinement, timeout, panic isolation)
+- **Incremental builds** via content-hash caching
+- **Parallel builds** powered by Rayon
+- **SEO** out of the box: sitemap.xml, robots.txt, OpenGraph, Twitter Cards
+- **Custom error pages** (404.html, 500.html)
+- **Live preview** dev server with hot reload and config hot-reloading
+- **Plugin sources**: install from crates.io, Git repositories, or local paths
 
-### ✍️ For content creators seeking an easy-to-use conversion tool
+<details>
+<summary>⚖️ Comparison with Hugo and Zola</summary>
 
-- **Effortless Norg workflow**: write your content in Norg and let Norgolith handle the technical
-  complexities. Seamlessly convert your Norg documents to clean and validated HTML.
-- **Focus on content, not code**: leave the website maintenance and complexities to Norgolith. You
-  can safely concentrate on creating compelling content for your audience without worrying about
-  weird bugs or unexpected invalid syntax from reaching your production site.
-- **Live preview**: See your Norg content rendered as HTML in real-time as you edit it, allowing for
-  a smooth writing experience and easy iteration on your website's design.
+| Dimension            | Hugo                              | Zola                | Norgolith                     |
+| -------------------- | --------------------------------- | ------------------- | ----------------------------- |
+| Language             | Go                                | Rust                | Rust                          |
+| Templates            | Go templates                      | Tera v1             | Tera v2 + shortcodes          |
+| Content format       | Markdown + 5 others               | Markdown only       | Norg only                     |
+| Plugin system        | None                              | None                | C ABI + Landlock sandbox      |
+| Content validation   | None                              | Link checking       | rust-norg parser + schemas    |
+| Syntax highlighting  | Built-in (Chroma)                 | Built-in            | Via plugin (tree-sitter)      |
+| Image processing     | Yes                               | Yes                 | Planned                       |
+| Asset bundling       | Yes                               | No                  | Planned                       |
+| Asset fingerprinting | Yes                               | No                  | Planned                       |
+| Configuration        | TOML / YAML / JSON                | TOML                | TOML                          |
+| Multilingual         | Yes                               | Yes                 | No                            |
+| Shortcodes           | Built-in                          | No                  | Tera v2 `component()`         |
+| Custom output        | JSON, RSS, etc                    | RSS, Atom           | RSS, Atom                     |
+| Theme system         | Yes                               | Yes                 | Yes                           |
+| Built-in search      | No                                | Yes                 | Via plugin                    |
+| Build                | Parallel (pages)                  | Parallel            | Parallel + incremental        |
 
-### ⚙️ For developers who value validation and control
-
-- **Robust syntax validation**: leverage the power of the [rust-norg] parser to catch errors in your Norg
-  documents before conversion. This ensures clean, well-structured HTML output and avoids surprises
-  later during the development process.
-- **Modern Rust codebase**: contribute with ease! Norgolith boasts a clean, well-structured codebase.
-  This allows you to easily understand the inner workings of Norgolith, contribute to its
-  development and extend its functionality through plugins.
-- **Active community engagement**: Norgolith fosters discussions, encourages bug reporting,
-  welcomes feature requests and code contributions. Help us shape the future of Norgolith!
+</details>
 
 ## 📝 Requirements
 
-| Component | Requirement  |
-|-----------|--------------|
-| Build     | Rust >= 1.77 |
+| Component | Requirement                      |
+| --------- | -------------------------------- |
+| Build     | Rust >= 1.85 (Rust 2024 edition) |
 
-## 📚 Usage
+## ⚡ Install
 
-Compile the project using the `release` Cargo profile (recommended). Note that the produced binary
-is called `lith` and not `norgolith`, this is for ergonomic reasons.
+Run `cargo install --release --path .` to compile and install Norgolith in your `~/.cargo/bin` directory.
+
+<details>
+<summary>🔨 AUR</summary>
+
+Use Arch User Repository helper to install `norgolith-git`.
+
+`paru -S norgolith-git`
+
+</details>
+
+<details>
+<summary>📦 Nix Package</summary>
+
+For latest release version: `nix-shell -p norgolith`.
+
+For git version you can add Norgolith to NixOS configuration with flakes.
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    norgolith.url = "github:norgolith/core";
+  };
+  outputs =
+    { nixpkgs, norgolith, ... }:
+    {
+      nixosConfigurations.mysystem = nixpkgs.lib.nixosSystem {
+        modules = [
+          {
+            environment.systemPackages = [
+              norgolith.packages.x86_64-linux.default
+            ];
+          }
+        ];
+      };
+    };
+}
+```
+
+</details>
+
+<details>
+<summary>📦 Plugin SDK</summary>
+
+Install from crates.io into your plugin project:
+
+```bash
+cargo add norgolith-plugin-sdk
+```
+
+Or build from the flake:
+
+```bash
+nix build .#norgolith-plugin-sdk
+```
+
+Add it to your NixOS configuration:
+
+```nix
+environment.systemPackages = [
+  norgolith.packages.x86_64-linux.norgolith-plugin-sdk
+];
+```
+
+Scaffold a new plugin with `lith plugin new my-plugin`, which generates `plugin.toml`, `Cargo.toml`, and `src/lib.rs`.
+
+**Hooks**: `pre_build`, `post_convert`, `post_render`, `post_build`.
+**Sandboxing**: Landlock filesystem confinement, configurable timeout per hook, panic isolation.
+**Logging**: `plugin_log!` macro bridges to Norgolith's tracing pipeline.
+
+The canonical plugin is written in Rust using the SDK:
+
+```rust
+use norgolith_plugin_sdk::*;
+
+register_plugin!("my-plugin",
+    hooks: [post_render: my_hook]
+);
+
+fn my_hook(json: serde_json::Value) -> Result<Option<String>, String> {
+    let ctx: TransformContext = serde_json::from_value(json)
+        .map_err(|e| e.to_string())?;
+    Ok(Some(ctx.html))
+}
+```
+
+Plugins use Norgolith's C ABI, so any language that exports C functions can participate. A C plugin looks like:
+
+```c
+#include <stdint.h>
+#include <string.h>
+
+#define HOOK_POST_RENDER 4
+
+typedef char* (*plugin_fn)(const char*);
+
+typedef struct {
+    uint32_t abi_version;
+    const char* name;
+    const char* version;
+    void (*log_fn)(uint32_t, const char*);
+} plugin_info;
+
+char* post_render(const char* input) {
+    /* parse input JSON, return modified HTML or NULL */
+    return NULL;
+}
+
+void norgolith_plugin_init(plugin_info* info, uint32_t* mask, plugin_fn hooks[4]) {
+    info->abi_version = 1;
+    info->name = "my-c-plugin";
+    info->version = "0.1.0";
+    *mask = HOOK_POST_RENDER;
+    hooks[2] = post_render;
+}
+```
+
+For Lua, write a small C shim that embeds Lua and dispatches hook calls to a `.lua` script:
+
+```c
+// c-shim.c — compiles to a .so that Norgolith loads
+#include <lua5.4/lua.h>
+#include <lua5.4/lauxlib.h>
+
+static lua_State *L;
+
+void norgolith_plugin_init(plugin_info* info, uint32_t* mask, plugin_fn hooks[4]) {
+    L = luaL_newstate();
+    luaL_dofile(L, "my-plugin.lua");
+    *mask = HOOK_POST_RENDER;
+    hooks[2] = &bridge;
+}
+
+char* bridge(const char* input) {
+    /* push input, call my-plugin.lua's post_render, return result */
+}
+```
+
+See [sdk/README.md](./sdk/README.md) and [norgolith.dev/docs/plugins](https://norgolith.dev/docs/plugins) for full documentation.
+
+</details>
+
+<details>
+<summary>🤖 MCP Server</summary>
+
+Install from crates.io:
+
+```bash
+cargo install norgolith-mcp
+```
+
+Or build from source:
+
+```bash
+cargo build --release -p norgolith-mcp
+```
+
+Or build from the flake:
+
+```bash
+nix build .#norgolith-mcp
+```
+
+Add it to your NixOS configuration:
+
+```nix
+environment.systemPackages = [
+  norgolith.packages.x86_64-linux.norgolith-mcp
+];
+```
+
+Configure in your MCP client:
+
+```json
+{
+  "mcp": {
+    "norgolith": {
+      "type": "local",
+      "command": "norgolith-mcp",
+      "enable": true
+    }
+  }
+}
+```
+
+**Capabilities**: resources (`norgolith://docs/*`), tools (`search_docs`, `read_source`).
+See [norgolith-mcp/README.md](./norgolith-mcp/README.md) for details.
+
+</details>
+
+## 🚀 Quick Start
+
+```bash
+lith init my-site
+cd my-site
+lith new -k post hello-world
+lith dev --open
+lith build
+```
+
+## 📖 Usage
+
+The produced binary is called `lith` for short.
 
 ```
-$ cargo build --release && ./target/release/lith --help
+$ lith --help
 
 The monolithic Norg static site generator
 
@@ -70,124 +286,43 @@ Options:
   -h, --help               Print help
 ```
 
-## ⚡ Install
-
-Run `cargo install --release --path .` to compile and install Norgolith in your `~/.cargo/bin` directory.
-
-### 🔨 AUR
-
-Use Arch User Repository helper to install `norgolith-git`.
-
-`paru -S norgolith-git`
-
-### 📦 Nix Package
-
-For latest release version: `nix-shell -p norgolith`.
-
-For git version you can add Norgolith to NixOS configuration with flakes.
-
 <details>
-<summary>Minimal flake.nix for a NixOS configuration:</summary>
+<summary>🔌 Plugin Development</summary>
 
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+Norgolith ships a C ABI plugin system. Plugins are shared libraries (`.so`, `.dylib`, `.dll`) loaded at runtime and sandboxed with Landlock.
 
-    norgolith.url = "github:norgolith/core";
-  };
-  outputs =
-    { nixpkgs, norgolith, ... }:
-    {
-      nixosConfigurations.mysystem = nixpkgs.lib.nixosSystem {
-        modules = [
-          {
-          # add norgolith as a package
-            environment.systemPackages = [
-              norgolith.packages.x86_64-linux.default
-            ];
-          }
-        ];
-      };
-    };
-}
+**Hook pipeline**:
+
 ```
-</details>
+Content --> pre_build --> post_convert --> Tera render --> post_render --> post_write --> post_build
+```
 
-### 🤖 MCP Server
-
-Norgolith ships an MCP (Model Context Protocol) server for AI assistants to browse, read, and search documentation. Build it from source:
+**Plugin install**:
 
 ```bash
-cargo build --release -p norgolith-mcp
+lith plugin install ./my-plugin            # from local path
+lith plugin install norgolith-tree-sitter  # from crates.io
+lith plugin install --git https://github.com/norgolith/norgolith-tree-sitter.git
 ```
 
-The binary is at `target/release/norgolith-mcp`. Configure it in your MCP client (opencode example):
+**Sandboxing**: each plugin gets filesystem confinement (configurable: none / read / write / read-write), a per-hook timeout (default 10s), and panic isolation.
 
-```json
-{
-  "mcp": {
-    "norgolith": {
-      "type": "local",
-      "command": "norgolith-mcp",
-      "enable": true
-    }
-  }
-}
-```
+See [sdk/README.md](./sdk/README.md) for the full plugin guide.
 
-See [norgolith-mcp/README.md](./norgolith-mcp/README.md) for details.
-
-## ❄️ Developing and testing with Nix
-
-The Norgolith repository includes a Nix flake for development and testing purposes in the root directory. This section outlines how to
-use the Nix flake for these workflows.
-
-<!--
-> [!IMPORTANT]
->
-> I've set up a Cachix cache, which has `x86_64-linux` binaries for the Norgolith releases, so it
-> should be faster to get it working on Nix systems. Make sure to accept the flake `nixConfig` inputs.
--->
+</details>
 
 <details>
-<summary>Usage</summary>
+<summary>❄️ Developing with Nix</summary>
 
-### Building Norgolith
-
-```sh
-# For extra verbosity add '--show-trace -Lv'
-nix build .
-```
-
-This command builds Norgolith using Nix and places the executable in the `result` directory.
-
-### Build and run Norgolith:
+The repository includes a Nix flake for development and testing.
 
 ```sh
-# For extra verbosity add '--show-trace -Lv'
-nix run .
-```
-This command builds Norgolith the same way the `nix build` command would (including the `result`
-directory symlink), and then proceeds to run the project.
-
-### Development shell
-
-```sh
-# For extra verbosity add '--show-trace -Lv'
-nix develop .
+nix build .          # build, output in result/
+nix run .            # build and run
+nix develop .        # dev shell with all dependencies
 ```
 
-This command creates a development shell pre-configured with all the dependencies required to build
-and test Norgolith. Inside the development shell, you can directly work on the source code and test
-changes.
-
-### Nix-direnv integration (optional)
-
-For a more convenient development experience, consider using
-[nix-direnv](https://github.com/nix-community/nix-direnv). With the `nix-direnv` integration,
-entering the project directory will automatically activate the development shell defined in the
-flake.
+For Nix-direnv integration, entering the directory activates the dev shell automatically.
 
 </details>
 
@@ -196,7 +331,7 @@ flake.
 The documentation site source lives in the `docs/` directory. To work on it:
 
 ```sh
-# From repo root — enter dev shell (includes tailwindcss, mprocs)
+# From repo root, enter dev shell (includes tailwindcss, mprocs).
 nix develop
 
 # Build lith
@@ -234,10 +369,10 @@ Huge thanks to the project sponsors for supporting my work!
 
 [![Ladas552](https://images.weserv.nl/?url=github.com/Ladas552.png&h=60&w=60&fit=cover&mask=circle&maxage=7d)](https://github.com/Ladas552)
 
+
 ## 📖 License
 
 This project is licensed under the GNU General Public License v2 (GPLv2).
 You can find the license details in the [LICENSE](./LICENSE) file.
-
 
 [rust-norg]: https://github.com/nvim-neorg/rust-norg
