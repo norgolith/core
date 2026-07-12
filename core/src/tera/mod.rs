@@ -242,6 +242,13 @@ pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> Result<Te
     tera.register_filter("filter", FilterByAttribute);
     tera.register_filter("slice", SliceFilter);
 
+    tera.register_filter("slug", tera_contrib::slug::slug);
+    tera.register_filter("filesize_format", tera_contrib::filesize_format::filesize_format);
+    tera.register_filter("format", tera_contrib::format::format);
+    tera.register_filter("json_encode", tera_contrib::json::json_encode);
+    tera.register_filter("urlencode", tera_contrib::urlencode::urlencode);
+    tera.register_filter("urlencode_strict", tera_contrib::urlencode::urlencode_strict);
+
     // Collect all template files from theme + user dirs into one batch.
     // load_from_glob replaces previous glob results, so we use
     // add_template_files instead which accumulates correctly.
