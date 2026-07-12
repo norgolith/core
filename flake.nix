@@ -64,22 +64,11 @@
           version = sdkPackage.version;
           src = pkgs.lib.cleanSource "${self}";
           cargoLock = {
-            lockFile = "${self}/Cargo.lock";
+            lockFile = "${self}/sdk/Cargo.lock";
             allowBuiltinFetchGit = true;
           };
-          buildNoDefaultFeatures = true;
-          cargoBuildFlags = ["-p" "norgolith-plugin-sdk"];
-
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-          buildInputs = with pkgs; [
-            openssl
-          ];
-
-          env = {
-            OPENSSL_NO_VENDOR = true;
-          };
+          cargoRoot = "sdk";
+          buildAndTestSubdir = "sdk";
 
           meta = {
             description = sdkPackage.description;
@@ -94,10 +83,11 @@
           version = mcpPackage.version;
           src = pkgs.lib.cleanSource "${self}";
           cargoLock = {
-            lockFile = "${self}/Cargo.lock";
+            lockFile = "${self}/norgolith-mcp/Cargo.lock";
             allowBuiltinFetchGit = true;
           };
-          cargoBuildFlags = ["-p" "norgolith-mcp"];
+          cargoRoot = "norgolith-mcp";
+          buildAndTestSubdir = "norgolith-mcp";
 
           meta = {
             description = mcpPackage.description;

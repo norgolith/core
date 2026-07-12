@@ -7,7 +7,7 @@ MCP (Model Context Protocol) server for Norgolith documentation. Lets AI assista
 Build from source:
 
 ```bash
-cargo build --release -p norgolith-mcp
+cargo build --release --manifest-path norgolith-mcp/Cargo.toml
 ```
 
 The binary is at `target/release/norgolith-mcp`.

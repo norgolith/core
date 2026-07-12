@@ -60,7 +60,7 @@ jobs:
       - name: Publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p norgolith-plugin-sdk
+        run: cargo publish --manifest-path sdk/Cargo.toml
 
   publish-mcp:
     name: Publish MCP server to crates.io
@@ -73,4 +73,4 @@ jobs:
       - name: Publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p norgolith-mcp
+        run: cargo publish --manifest-path norgolith-mcp/Cargo.toml

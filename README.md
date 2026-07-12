@@ -213,7 +213,7 @@ cargo install norgolith-mcp
 Or build from source:
 
 ```bash
-cargo build --release -p norgolith-mcp
+cargo build --release --manifest-path norgolith-mcp/Cargo.toml
 ```
 
 Or build from the flake:

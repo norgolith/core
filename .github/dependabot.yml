@@ -4,5 +4,6 @@ updates:
     directories:
       - "/core"
       - "/sdk"
+      - "/norgolith-mcp"
     schedule:
       interval: "weekly"

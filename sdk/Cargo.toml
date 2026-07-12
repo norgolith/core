@@ -8,6 +8,8 @@ readme = "README.md"
 description = "SDK for building Norgolith plugins"
 repository = "https://github.com/norgolith/core"
 
+[workspace]
+
 [lib]
 crate-type = ["rlib"]
 
