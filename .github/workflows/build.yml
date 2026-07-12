@@ -4,14 +4,18 @@ on:
   push:
     branches: [master]
     paths:
-      - "src/**/*.rs"
+      - "core/src/**/*.rs"
+      - "sdk/src/**/*.rs"
+      - "norgolith-mcp/**/*.rs"
       - "Cargo.*"
       - "flake.*"
   pull_request:
     branches: [master]
     paths:
       - ".github/workflows/*.yml"
-      - "src/**/*.rs"
+      - "core/src/**/*.rs"
+      - "sdk/src/**/*.rs"
+      - "norgolith-mcp/**/*.rs"
       - "Cargo.*"
       - "flake.*"
 
@@ -43,7 +47,7 @@ jobs:
           name: ntbbloodbath
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - uses: Swatinem/rust-cache@v2
-      - name: Build
+      - name: Build all crates
         run: nix develop . -c cargo build --release
 
   macos:
@@ -70,5 +74,5 @@ jobs:
           name: ntbbloodbath
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - uses: Swatinem/rust-cache@v2
-      - name: Build
+      - name: Build all crates
         run: nix develop . -c cargo build --release
