@@ -1,0 +1,223 @@
+@document.meta
+title: MCP Server
+description: Model Context Protocol server for AI-assisted documentation browsing
+authors: [
+  NTBBloodbath
+]
+categories: [
+  docs
+]
+created: 2026-07-12T00:00:00-04:00
+updated: 2026-07-12T00:00:00-04:00
+draft: false
+layout: docs
+version: 1.0.0
+@end
+
+Norgolith ships an {https://modelcontextprotocol.io}[MCP (Model Context Protocol)] server that lets AI
+assistants browse, read, and search the documentation directly. This means you can ask your AI
+editor about Norgolith features, plugin development, or templating without switching context.
+
+The server exposes documentation pages as resources and provides tools for searching and reading
+source code.
+
+** Quick Start
+
+Install and configure the MCP server, then connect from your AI editor.
+
+*** Installation
+
+**** From crates.io
+
+@code bash
+cargo install norgolith-mcp
+@end
+
+**** From source
+
+@code bash
+git clone https://github.com/norgolith/core
+cd norgolith
+cargo build --release --manifest-path norgolith-mcp/Cargo.toml
+@end
+
+**** With Nix
+
+@code bash
+nix build .#norgolith-mcp
+@end
+
+The binary is at `target/release/norgolith-mcp`.
+
+*** Configuration
+
+Add the server to your MCP client configuration.
+
+**** opencode.json
+
+@code json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "norgolith": {
+      "type": "local",
+      "command": "norgolith-mcp",
+      "enabled": true
+    }
+  }
+}
+@end
+
+**** Claude Desktop
+
+@code json
+{
+  "mcpServers": {
+    "norgolith": {
+      "command": ["norgolith-mcp"]
+    }
+  }
+}
+@end
+
+**** Generic MCP client
+
+@code json
+{
+  "mcp": {
+    "norgolith": {
+      "type": "local",
+      "command": ["norgolith-mcp"],
+      "enable": true
+    }
+  }
+}
+@end
+
+**** Generic MCP client
+
+Check the documentation for your LLM client.
+
++html.class note
+> Make sure `norgolith-mcp` is in your `PATH`, or provide the full path to the binary.
+
+** Resources
+
+Each documentation page is available as a resource with URI `norgolith://{path}` and MIME type
+`text/x-norg`.
+
+@embed html
+<table>
+<thead><tr><th>URI</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>norgolith://docs/commands</td><td>CLI commands reference</td></tr>
+<tr><td>norgolith://docs/configuration</td><td>Site configuration reference</td></tr>
+<tr><td>norgolith://docs/content-schemas</td><td>Content schema validation</td></tr>
+<tr><td>norgolith://docs/contributing</td><td>Contributing guide</td></tr>
+<tr><td>norgolith://docs/getting-started</td><td>Quick start guide</td></tr>
+<tr><td>norgolith://docs/index</td><td>Documentation index</td></tr>
+<tr><td>norgolith://docs/installation</td><td>Installation guide</td></tr>
+<tr><td>norgolith://docs/plugins</td><td>Plugin development guide</td></tr>
+<tr><td>norgolith://docs/templating</td><td>Templating reference</td></tr>
+<tr><td>norgolith://docs/templating-migration</td><td>Tera v2 migration guide</td></tr>
+<tr><td>norgolith://docs/theming</td><td>Theming guide</td></tr>
+<tr><td>norgolith://index</td><td>Site landing page</td></tr>
+</tbody>
+</table>
+@end
+
+Source code resources (MIME type `text/x-rust`):
+
+@embed html
+<table>
+<thead><tr><th>URI</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>norgolith://src/sdk/lib.rs</td><td>Plugin SDK API</td></tr>
+<tr><td>norgolith://src/core/plugin/mod.rs</td><td>Plugin loader core</td></tr>
+<tr><td>norgolith://src/core/plugin/ffi.rs</td><td>C ABI bridge</td></tr>
+<tr><td>norgolith://src/core/plugin/manifest.rs</td><td>Plugin manifest parsing</td></tr>
+<tr><td>norgolith://src/core/plugin/sandbox.rs</td><td>Landlock sandboxing</td></tr>
+<tr><td>norgolith://src/core/shared/render.rs</td><td>Tera context variables</td></tr>
+<tr><td>norgolith://src/core/shared/metadata.rs</td><td>Page metadata structure</td></tr>
+<tr><td>norgolith://src/core/tera/mod.rs</td><td>Tera functions, filters, and tests</td></tr>
+</tbody>
+</table>
+@end
+
+** Tools
+
+@embed html
+<table>
+<thead><tr><th>Tool</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>search_docs(query)</code></td><td>Search all documentation for a query string</td></tr>
+<tr><td><code>read_source(path)</code></td><td>Read a source file from the repo</td></tr>
+</tbody>
+</table>
+@end
+
+*** search_docs
+
+Perform a full-text search across all documentation pages. Returns matching entries with their
+norgolith:// URIs and relevance snippets.
+
+@code json
+{
+  "query": "plugin manifest",
+  "results": [
+    { "name": "docs-plugins", "uri": "norgolith://docs/plugins", "snippet": "..." }
+  ]
+}
+@end
+
+*** read_source
+
+Read a source file from the repository. Accepts a file path relative to the repo root.
+
+@code json
+{
+  "path": "sdk/src/lib.rs",
+  "content": "use serde::{Serialize, Deserialize};..."
+}
+@end
+
+** Usage Examples
+
+*** Plugin development
+
+Ask your AI editor questions like:
+
+- "How do I write a Norgolith plugin?"
+- "How does the plugin manifest work?"
+- "What hooks are available and when do they run?"
+- "Show me the plugin SDK source code"
+- "How does the FFI bridge work?"
+
+*** Theme development
+
+- "How do I create a Norgolith theme?"
+- "What Tera variables are available in templates?"
+- "Show me all registered Tera filters and functions"
+- "How does `generate_toc` work?"
+- "What page metadata fields can I use in my theme?"
+
+*** General
+
+- "What commands does lith have?"
+- "How do I configure content schemas?"
+- "Search docs for draft handling"
+- "How does the build pipeline work?"
+
+** Development
+
+The MCP server source lives at `norgolith-mcp/src/main.rs` in the repository. The build script
+embeds documentation pages and source files at compile time using `include_str!`, so the server
+runs without filesystem access to the docs directory — everything is baked into the binary.
+
+To rebuild the embedded content after changing docs:
+
+@code bash
+cargo build --release --manifest-path norgolith-mcp/Cargo.toml
+@end
+
+{:/docs/contributing:}[Next: Contributing ->]

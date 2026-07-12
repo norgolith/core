@@ -45,3 +45,4 @@ Transform your Norg content into high-performance websites with /opt-in/ validat
    - {:/docs/templating:}[Templating]
    - {:/docs/templating-migration:}[Tera v2 Migration Guide]
    - {:/docs/content-schemas:}[Content Schemas]
+   - {:/docs/mcp:}[MCP Server]

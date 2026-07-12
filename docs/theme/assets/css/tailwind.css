@@ -208,6 +208,22 @@ main ul {
   @apply pl-4;
 }
 
+table {
+    @apply min-w-full table-auto text-left border border-dark-grey;
+}
+
+thead {
+    @apply text-base-alt uppercase bg-blue!;
+}
+
+thead tr th {
+    @apply px-2 py-2 border border-dark-grey;
+}
+
+tbody tr td {
+    @apply bg-base-alt text-sm p-2 border border-dark-grey;
+}
+
 /* Margins */
 main h2, article h2, section h2 {
   @apply mt-10;
