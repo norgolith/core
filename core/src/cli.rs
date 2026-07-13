@@ -249,7 +249,7 @@ mod tests {
 
         // Bind port
         let temp_listener = std::net::TcpListener::bind("127.0.0.1:0").into_diagnostic()?;
-        let port = temp_listener.local_addr()?.port();
+        let port = temp_listener.local_addr().into_diagnostic()?.port();
 
         // Create temporal site
         let test_site_name = String::from("my-unavailable-site");
