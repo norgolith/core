@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use eyre::{Result, bail, eyre};
+use miette::{Result, bail, miette};
 use norgolith_plugin_sdk::{
     CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
@@ -114,9 +114,9 @@ impl PluginManifest {
     /// Parse a `plugin.toml` file at the given path
     pub fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
-            .map_err(|e| eyre!("Failed to read {}: {}", path.display(), e))?;
+            .map_err(|e| miette!("Failed to read {}: {}", path.display(), e))?;
         let manifest: PluginManifest = toml::from_str(&content)
-            .map_err(|e| eyre!("Failed to parse {}: {}", path.display(), e))?;
+            .map_err(|e| miette!("Failed to parse {}: {}", path.display(), e))?;
         Ok(manifest)
     }
 
@@ -136,14 +136,14 @@ impl PluginManifest {
     /// Validate semver compatibility with the running norgolith version
     pub fn validate_semver(&self) -> Result<()> {
         let req = semver::VersionReq::parse(&self.plugin.norgolith).map_err(|e| {
-            eyre!(
+            miette!(
                 "Invalid semver requirement '{}': {}",
                 self.plugin.norgolith,
                 e
             )
         })?;
         let current = semver::Version::parse(env!("CARGO_PKG_VERSION"))
-            .map_err(|e| eyre!("Invalid core version: {}", e))?;
+            .map_err(|e| miette!("Invalid core version: {}", e))?;
         if !req.matches(&current) {
             bail!(
                 "Version mismatch: plugin '{}' requires norgolith {}, installed is {}",

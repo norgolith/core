@@ -4,7 +4,7 @@ use std::{
 };
 
 use colored::Colorize as _;
-use eyre::{Result, bail};
+use miette::{Result, bail};
 use hyper::{
     Body, Request, Response, Server, StatusCode,
     header::CONTENT_TYPE,

@@ -1,7 +1,7 @@
 
 
 use colored::Colorize;
-use eyre::{Result, eyre};
+use miette::{Result, miette};
 use tera::{Context, Tera};
 
 use crate::config::SiteConfig;
@@ -80,7 +80,7 @@ pub fn render_norg_page(
     tera.render(&format!("{}.html", layout), &context)
         .map_err(|e| {
             let msg = format!("Failed to render template for '{}': {}", layout, e).bold();
-            eyre!(msg)
+            miette!(msg)
         })
 }
 
@@ -107,7 +107,7 @@ pub fn render_category_index(
     };
 
     tera.render("categories.html", &context).map_err(|e| {
-        eyre!("Failed to render categories index: {e}")
+        miette!("Failed to render categories index: {e}")
     })
 }
 
@@ -129,6 +129,6 @@ pub fn render_category_page(
         ctx
     };
     tera.render("category.html", &context).map_err(|e| {
-        eyre!("Failed to render category page: {e}")
+        miette!("Failed to render category page: {e}")
     })
 }

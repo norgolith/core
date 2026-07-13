@@ -2,7 +2,7 @@ use std::env::set_current_dir;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, builder::PossibleValue};
-use eyre::{Result, eyre};
+use miette::{IntoDiagnostic, Result, miette};
 
 use crate::cmd;
 use crate::net;
@@ -169,7 +169,7 @@ pub async fn start() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(dir) = cli.project_dir {
-        set_current_dir(dir)?;
+        set_current_dir(dir).into_diagnostic()?;
     }
 
     match cli.command {
@@ -198,7 +198,7 @@ pub async fn start() -> Result<()> {
             collection,
         } => {
             let kind = kind.unwrap_or_else(|| "norg".to_string());
-            let name = name.ok_or_else(|| eyre!("Unable to create site asset: missing name for the asset"))?;
+            let name = name.ok_or_else(|| miette!("Unable to create site asset: missing name for the asset"))?;
             cmd::new(&kind, &name, open, collection.as_ref()).await?
         }
         Commands::Preview { port, host, open } => cmd::preview(port, open, host).await?,
@@ -224,16 +224,16 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_init_site_with_name() -> Result<()> {
-        let dir = tempdir()?;
+        let dir = tempdir().into_diagnostic()?;
 
-        let origin = std::env::current_dir()?;
-        std::env::set_current_dir(dir.path())?;
+        let origin = std::env::current_dir().into_diagnostic()?;
+        std::env::set_current_dir(dir.path()).into_diagnostic()?;
 
         let test_name = String::from("my-site");
         let result = cmd::init(&test_name, false).await;
         assert!(result.is_ok());
 
-        std::env::set_current_dir(origin)?;
+        std::env::set_current_dir(origin).into_diagnostic()?;
 
         Ok(())
     }
@@ -242,13 +242,13 @@ mod tests {
     #[cfg_attr(feature = "ci", ignore)]
     #[serial]
     async fn test_check_and_serve() -> Result<()> {
-        let dir = tempdir()?;
+        let dir = tempdir().into_diagnostic()?;
 
-        let origin = std::env::current_dir()?;
-        std::env::set_current_dir(dir.path())?;
+        let origin = std::env::current_dir().into_diagnostic()?;
+        std::env::set_current_dir(dir.path()).into_diagnostic()?;
 
         // Bind port
-        let temp_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        let temp_listener = std::net::TcpListener::bind("127.0.0.1:0").into_diagnostic()?;
         let port = temp_listener.local_addr()?.port();
 
         // Create temporal site
@@ -258,7 +258,7 @@ mod tests {
         // Enter the test directory
         let path = dir.path().join(&test_site_name);
 
-        std::env::set_current_dir(path)?;
+        std::env::set_current_dir(path).into_diagnostic()?;
 
         let result = run_dev_server(port, false, false, false).await;
         assert!(result.is_err());
@@ -271,7 +271,7 @@ mod tests {
         );
 
         // Restore previous directory
-        std::env::set_current_dir(origin)?;
+        std::env::set_current_dir(origin).into_diagnostic()?;
 
         Ok(())
     }

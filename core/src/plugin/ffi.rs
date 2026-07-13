@@ -4,7 +4,7 @@ use std::panic::AssertUnwindSafe;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use eyre::{Result, bail};
+use miette::{Result, bail};
 use tracing::{debug, error, info, trace, warn};
 
 /// Core-provided logging callback for plugins. Level: 0=trace, 1=debug, 2=info, 3=warn, 4=error.
@@ -46,7 +46,7 @@ pub type FreeStringFn = extern "C" fn(*mut c_char);
 /// can add a `plugin_free` callback to let each plugin provide its own deallocator
 pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Option<String>> {
     let c_input =
-        CString::new(input).map_err(|e| eyre::eyre!("failed to create CString: {}", e))?;
+        CString::new(input).map_err(|e| miette::miette!("failed to create CString: {}", e))?;
 
     let (tx, rx) = mpsc::channel();
 
@@ -76,9 +76,9 @@ pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Opt
                     None => "unknown panic".to_string(),
                 },
             };
-            Err(eyre::eyre!("plugin panicked: {}", msg))
+            Err(miette::miette!("plugin panicked: {}", msg))
         }
-        Err(_timeout) => Err(eyre::eyre!(
+        Err(_timeout) => Err(miette::miette!(
             "plugin hook timed out after {}ms",
             timeout.as_millis()
         )),
@@ -92,7 +92,7 @@ pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Opt
 /// Returns `Err` on error status or invalid JSON
 pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
     let val: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
+        serde_json::from_str(json).map_err(|e| miette::miette!("invalid JSON from plugin: {}", e))?;
 
     if let Some(status) = val.get("status").and_then(|v| v.as_str())
         && status == "error"
@@ -113,7 +113,7 @@ pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
 /// Parse a hook response for pre_build/post_build (status only)
 pub fn parse_status_response(json: &str) -> Result<()> {
     let val: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| eyre::eyre!("invalid JSON from plugin: {}", e))?;
+        serde_json::from_str(json).map_err(|e| miette::miette!("invalid JSON from plugin: {}", e))?;
 
     if let Some(status) = val.get("status").and_then(|v| v.as_str())
         && status == "error"

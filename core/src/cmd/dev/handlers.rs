@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use colored::Colorize;
-use eyre::{Result, eyre};
+use miette::{IntoDiagnostic, Result, miette};
 use futures_util::{SinkExt, StreamExt};
 use hyper::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use hyper::{Body, Request, Response, StatusCode, header::CONTENT_TYPE};
@@ -34,7 +34,7 @@ fn html_response(body: String, status: StatusCode) -> Result<Response<Body>> {
     Ok(Response::builder()
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .status(status)
-        .body(Body::from(body))?)
+        .body(Body::from(body)).into_diagnostic()?)
 }
 
 #[instrument(skip(html))]
@@ -58,7 +58,7 @@ pub(super) async fn read_asset(path: &Path) -> Result<(Vec<u8>, String)> {
 
     let content = tokio::fs::read(path)
         .await
-        .map_err(|e| eyre!("Failed to read asset: {}", e))?;
+        .map_err(|e| miette!("Failed to read asset: {}", e))?;
     let mime_type = mime_guess::from_path(path)
         .first_or_octet_stream()
         .as_ref()
@@ -161,7 +161,7 @@ pub(super) async fn handle_asset(
         )
         .header(PRAGMA, "no-cache")
         .header(EXPIRES, 0)
-        .body(Body::from(content))?)
+        .body(Body::from(content)).into_diagnostic()?)
 }
 
 async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result<Response<Body>> {
@@ -173,7 +173,7 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
         return Ok(Response::builder()
             .header(CONTENT_TYPE, "application/xml; charset=utf-8")
             .status(StatusCode::OK)
-            .body(Body::from(html))?);
+            .body(Body::from(html)).into_diagnostic()?);
     }
 
     // Slow path: render on demand
@@ -190,16 +190,16 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
 
     let content = tera
         .render(template_name, &context)
-        .map_err(|e| eyre!("{}: {}", "Failed to render XML feed template".bold(), e))?;
+        .map_err(|e| miette!("{}: {}", "Failed to render XML feed template".bold(), e))?;
 
     Ok(Response::builder()
         .header(CONTENT_TYPE, "application/xml; charset=utf-8")
         .status(StatusCode::OK)
-        .body(Body::from(content))?)
+        .body(Body::from(content)).into_diagnostic()?)
 }
 
 async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<Response<Body>> {
-    let rel_path = path.strip_prefix(&state.paths.content)?.to_path_buf();
+    let rel_path = path.strip_prefix(&state.paths.content).into_diagnostic()?.to_path_buf();
     let url_path = format!("/{}", rel_path.with_extension("").display());
 
     // Fast path: lookup in pre-rendered memory cache
@@ -268,7 +268,7 @@ async fn handle_content(request_path: &str, state: Arc<ServerState>) -> Result<R
                 .status(StatusCode::FORBIDDEN)
                 .body(Body::empty())
                 .unwrap()),
-            _ => Err(eyre!("Error reading '{}': {}", req_path.display(), io_err)),
+            _ => Err(miette!("Error reading '{}': {}", req_path.display(), io_err)),
         },
     }
 }
@@ -296,13 +296,13 @@ async fn handle_category_index(state: &Arc<ServerState>) -> Result<Response<Body
     let mut body = tera.render("categories.html", &context).map_err(|e| {
         if e.source().is_some() {
             let internal_err = e.source().unwrap();
-            eyre!(
+            miette!(
                 "{}: {}",
                 "Failed to render 'categories.html' template".bold(),
                 internal_err
             )
         } else {
-            eyre!("{}", "Failed to render 'categories.html' template".bold())
+            miette!("{}", "Failed to render 'categories.html' template".bold())
         }
     })?;
     body = rewrite_urls(body, &config.root_url, &state.routes_url);
@@ -349,13 +349,13 @@ async fn handle_category(path: &str, state: &Arc<ServerState>) -> Result<Respons
     let mut body = tera.render("category.html", &context).map_err(|e| {
         if e.source().is_some() {
             let internal_err = e.source().unwrap();
-            eyre!(
+            miette!(
                 "{}: {}",
                 "Failed to render 'category.html' template".bold(),
                 internal_err
             )
         } else {
-            eyre!("{}", "Failed to render 'category.html' template".bold())
+            miette!("{}", "Failed to render 'category.html' template".bold())
         }
     })?;
 
@@ -422,7 +422,7 @@ async fn handle_request(req: Request<Body>, state: Arc<ServerState>) -> Result<R
     match request_path {
         "/livereload.js" => Ok(Response::builder()
             .header(CONTENT_TYPE, "text/javascript")
-            .body(LIVE_RELOAD_SCRIPT.into())?),
+            .body(LIVE_RELOAD_SCRIPT.into()).into_diagnostic()?),
         path if path == format!("/{}", categories_dir) => handle_category_index(&state).await,
         path if path.starts_with(&format!("/{}/", categories_dir)) => {
             handle_category(path, &state).await

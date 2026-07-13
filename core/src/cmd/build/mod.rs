@@ -9,7 +9,7 @@ use std::{
 };
 
 use colored::{ColoredString, Colorize};
-use eyre::{Result, WrapErr, bail, eyre};
+use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use tera::Context;
 use tracing::{debug, error, instrument, warn};
 use walkdir::WalkDir;
@@ -34,12 +34,12 @@ fn href_root_re() -> &'static regex::Regex {
 fn prepare_build_directory(public_dir: &Path) -> Result<()> {
     debug!(path = %public_dir.display(), "Preparing build directory");
     if public_dir.exists() {
-        for entry in std::fs::read_dir(public_dir).wrap_err(format!(
+        for entry in std::fs::read_dir(public_dir).into_diagnostic().wrap_err(format!(
             "{}: {}",
             "Failed to read existing public directory".bold(),
             public_dir.display()
         ))? {
-            let entry = entry.wrap_err(format!(
+            let entry = entry.into_diagnostic().wrap_err(format!(
                 "{}: {}",
                 "Failed to iterate existing public directory".bold(),
                 public_dir.display()
@@ -52,20 +52,20 @@ fn prepare_build_directory(public_dir: &Path) -> Result<()> {
                 continue;
             }
 
-            let metadata = entry.metadata().wrap_err(format!(
+            let metadata = entry.metadata().into_diagnostic().wrap_err(format!(
                 "{}: {}",
                 "Failed to stat existing public entry".bold(),
                 path.display()
             ))?;
 
             if metadata.is_dir() {
-                std::fs::remove_dir_all(&path).wrap_err(format!(
+                std::fs::remove_dir_all(&path).into_diagnostic().wrap_err(format!(
                     "{}: {}",
                     "Failed to remove existing public directory entry".bold(),
                     path.display()
                 ))?;
             } else {
-                std::fs::remove_file(&path).wrap_err(format!(
+                std::fs::remove_file(&path).into_diagnostic().wrap_err(format!(
                     "{}: {}",
                     "Failed to remove existing public file entry".bold(),
                     path.display()
@@ -74,7 +74,7 @@ fn prepare_build_directory(public_dir: &Path) -> Result<()> {
         }
     } else {
         debug!(path = %public_dir.display(), "Creating public directory");
-        std::fs::create_dir_all(public_dir).wrap_err(format!(
+        std::fs::create_dir_all(public_dir).into_diagnostic().wrap_err(format!(
             "{}: {}",
             "Failed to create public directory".bold(),
             public_dir.display()
@@ -90,7 +90,7 @@ fn determine_public_path(public_dir: &Path, rel_path: &Path) -> Result<PathBuf> 
     let stem = rel_path
         .file_stem()
         .and_then(|s| s.to_str())
-        .ok_or_else(|| eyre!("Invalid file stem for path: {}", rel_path.display()))?;
+        .ok_or_else(|| miette!("Invalid file stem for path: {}", rel_path.display()))?;
     if stem == "index" {
         Ok(public_dir.join(rel_path).with_extension("html"))
     } else {
@@ -109,7 +109,7 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
 
     let mut dirs = std::collections::HashSet::new();
     for entry in entries {
-        let rel_path = entry.path().strip_prefix(&paths.content)?;
+        let rel_path = entry.path().strip_prefix(&paths.content).into_diagnostic()?;
         if let Ok(public_path) = determine_public_path(&paths.public, rel_path)
             && let Some(parent) = public_path.parent()
         {
@@ -117,7 +117,7 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
         }
     }
     for dir in &dirs {
-        std::fs::create_dir_all(dir)?;
+        std::fs::create_dir_all(dir).into_diagnostic()?;
     }
     Ok(())
 }
@@ -129,7 +129,7 @@ fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
     {
         return Ok(false);
     }
-    std::fs::write(public_path, rendered).wrap_err(format!(
+    std::fs::write(public_path, rendered).into_diagnostic().wrap_err(format!(
         "{}: {}",
         "Failed to write to public path".bold(),
         public_path.display()
@@ -208,7 +208,7 @@ fn build_content_entry(
 ) -> BuildResult {
     let rel_path = path
         .strip_prefix(&ctx.paths.content)
-        .wrap_err("Failed to strip prefix")?;
+        .into_diagnostic().wrap_err("Failed to strip prefix")?;
 
     let Ok(content) = std::fs::read_to_string(path) else {
         error!(
@@ -233,7 +233,7 @@ fn build_content_entry(
             false,
         )?;
         if !errors.is_empty() {
-            return Err(eyre!("{}", errors));
+            return Err(miette!("{}", errors));
         }
     }
 
@@ -334,9 +334,9 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Load site configuration
     let t = Instant::now();
-    let config_content = std::fs::read_to_string(&root).wrap_err("Failed to read config file")?;
+    let config_content = std::fs::read_to_string(&root).into_diagnostic().wrap_err("Failed to read config file")?;
     let site_config: config::SiteConfig =
-        toml::from_str(&config_content).wrap_err("Failed to parse site configuration")?;
+        toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
         for error in &validation_errors {
@@ -539,7 +539,7 @@ pub fn build(minify: bool) -> Result<()> {
 
             let xml = seo::generate_sitemap_xml(&urls, &site_config.root_url);
             let output_path = paths.public.join("sitemap.xml");
-            std::fs::write(&output_path, &xml).wrap_err("Failed to write sitemap.xml")?;
+            std::fs::write(&output_path, &xml).into_diagnostic().wrap_err("Failed to write sitemap.xml")?;
             seo_count += 1;
         }
 
@@ -549,7 +549,7 @@ pub fn build(minify: bool) -> Result<()> {
             let content =
                 seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
             let output_path = paths.public.join("robots.txt");
-            std::fs::write(&output_path, &content).wrap_err("Failed to write robots.txt")?;
+            std::fs::write(&output_path, &content).into_diagnostic().wrap_err("Failed to write robots.txt")?;
             seo_count += 1;
         }
     }

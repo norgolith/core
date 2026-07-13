@@ -6,7 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, TcpListener as StdTcpListener};
 use std::sync::Arc;
 
 use colored::Colorize;
-use eyre::{Result, bail};
+use miette::{IntoDiagnostic, Result, bail};
 use futures_util::StreamExt;
 use hyper::Server;
 use hyper::service::{make_service_fn, service_fn};
@@ -93,7 +93,7 @@ pub async fn dev(
             }))
         }
     });
-    listener.set_nonblocking(true)?;
+    listener.set_nonblocking(true).into_diagnostic()?;
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
     tokio::spawn(async move {
         use tokio::io::AsyncReadExt;
@@ -110,7 +110,7 @@ pub async fn dev(
         }
     });
 
-    let server = Server::from_tcp(listener)?
+    let server = Server::from_tcp(listener).into_diagnostic()?
         .serve(make_svc)
         .with_graceful_shutdown(async {
             let _ = shutdown_rx.await;

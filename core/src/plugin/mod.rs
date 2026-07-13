@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use colored::Colorize;
-use eyre::Result;
+use miette::Result;
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
 pub use manifest::{Capabilities, FilesystemAccess, HookConfig, PluginManifest};
@@ -335,10 +335,10 @@ extern "C" fn default_free(ptr: *mut std::os::raw::c_char) {
 }
 
 /// Load a single plugin from a directory containing `plugin.toml` + shared library
-fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
+fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
     let manifest_path = dir.join("plugin.toml");
     if !manifest_path.is_file() {
-        eyre::bail!("no plugin.toml found");
+        miette::bail!("no plugin.toml found");
     }
 
     let manifest = PluginManifest::load(&manifest_path)?;
@@ -346,16 +346,16 @@ fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
     manifest.validate_semver()?;
 
     let lib_path = find_library(dir, &manifest.plugin.name)
-        .ok_or_else(|| eyre::eyre!("shared library not found"))?;
+        .ok_or_else(|| miette::miette!("shared library not found"))?;
 
     // SAFETY: we validate ABI before loading, and the init function is the only symbol we look up
     let lib = unsafe { libloading::Library::new(&lib_path) }
-        .map_err(|e| eyre::eyre!("failed to load {}: {}", lib_path.display(), e))?;
+        .map_err(|e| miette::miette!("failed to load {}: {}", lib_path.display(), e))?;
 
     type InitFn = unsafe extern "C" fn(*mut PluginInfo, *mut u32, *mut [Option<PluginFn>; 4]);
 
     let init: libloading::Symbol<InitFn> = unsafe { lib.get(b"norgolith_plugin_init") }
-        .map_err(|e| eyre::eyre!("missing symbol norgolith_plugin_init: {}", e))?;
+        .map_err(|e| miette::miette!("missing symbol norgolith_plugin_init: {}", e))?;
 
     let mut info = PluginInfo {
         abi_version: 0,

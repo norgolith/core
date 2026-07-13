@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use eyre::Result;
+use miette::{IntoDiagnostic, Result};
 use futures_util::Stream;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
@@ -243,17 +243,17 @@ pub(super) async fn setup_file_watcher(
                 }
             });
         },
-    )?;
+    ).into_diagnostic()?;
 
-    debouncer.watch(&state.paths.config_file, RecursiveMode::NonRecursive)?;
-    debouncer.watch(&state.paths.templates, RecursiveMode::Recursive)?;
-    debouncer.watch(&state.paths.content, RecursiveMode::Recursive)?;
-    debouncer.watch(&state.paths.assets, RecursiveMode::Recursive)?;
+    debouncer.watch(&state.paths.config_file, RecursiveMode::NonRecursive).into_diagnostic()?;
+    debouncer.watch(&state.paths.templates, RecursiveMode::Recursive).into_diagnostic()?;
+    debouncer.watch(&state.paths.content, RecursiveMode::Recursive).into_diagnostic()?;
+    debouncer.watch(&state.paths.assets, RecursiveMode::Recursive).into_diagnostic()?;
     if state.paths.theme_assets.exists() {
-        debouncer.watch(&state.paths.theme_assets, RecursiveMode::Recursive)?;
+        debouncer.watch(&state.paths.theme_assets, RecursiveMode::Recursive).into_diagnostic()?;
     }
     if state.paths.theme_templates.exists() {
-        debouncer.watch(&state.paths.theme_templates, RecursiveMode::Recursive)?;
+        debouncer.watch(&state.paths.theme_templates, RecursiveMode::Recursive).into_diagnostic()?;
     }
 
     Ok((debouncer, ReceiverStream::new(debouncer_rx)))

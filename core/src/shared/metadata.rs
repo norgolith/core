@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use colored::Colorize;
-use eyre::{Result, eyre};
+use miette::{Result, miette};
 use tracing::{error, warn};
 use walkdir::WalkDir;
 
@@ -128,18 +128,18 @@ pub fn validate_content_metadata(
 ) -> Result<String> {
     let relative_path = path
         .strip_prefix(content_dir)
-        .map_err(|e| eyre!("Path {} is not under content_dir: {}", path.display(), e))?;
+        .map_err(|e| miette!("Path {} is not under content_dir: {}", path.display(), e))?;
     // We do not need to do anything with the metadata permalink here so we pass an empty string to it
     let metadata_map = metadata
         .as_table()
-        .ok_or_else(|| eyre!("Metadata for {} is not a table", path.display()))?
+        .ok_or_else(|| miette!("Metadata for {} is not a table", path.display()))?
         .iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
 
     let content_path = relative_path
         .to_str()
-        .ok_or_else(|| eyre!("Non-UTF-8 path: {}", path.display()))?
+        .ok_or_else(|| miette!("Non-UTF-8 path: {}", path.display()))?
         .replace('\\', "/")
         .trim_end_matches(".norg")
         .to_string();

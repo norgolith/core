@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use colored::Colorize;
-use eyre::{Result, WrapErr, eyre};
+use miette::{IntoDiagnostic, Result, WrapErr, miette};
 use rss::Channel;
 use tera::{Context, Tera};
 use tracing::{instrument, warn};
@@ -32,7 +32,7 @@ pub(super) fn generate_xml_feeds(
     for template_name in &xml_templates {
         let rendered = tera
             .render(template_name, &context)
-            .map_err(|e| eyre!("{}: {}", "Failed to render XML template".bold(), e))?;
+            .map_err(|e| miette!("{}: {}", "Failed to render XML template".bold(), e))?;
 
         if (template_name.contains("rss") && template_name.ends_with(".xml"))
             && let Err(e) = Channel::read_from(rendered.as_bytes())
@@ -47,13 +47,13 @@ pub(super) fn generate_xml_feeds(
 
         let output_path = public_dir.join(template_name);
         if let Some(parent) = output_path.parent() {
-            std::fs::create_dir_all(parent).wrap_err(format!(
+            std::fs::create_dir_all(parent).into_diagnostic().wrap_err(format!(
                 "Failed to create output directory for '{}'",
                 template_name
             ))?;
         }
         std::fs::write(&output_path, &rendered)
-            .wrap_err(format!("Failed to write '{}'", output_path.display()))?;
+            .into_diagnostic().wrap_err(format!("Failed to write '{}'", output_path.display()))?;
     }
 
     Ok((count, xml_templates))
@@ -75,8 +75,8 @@ pub(super) fn build_category_pages(
 
     let content = shared::render_category_index(tera, posts, config, collections)?;
 
-    std::fs::create_dir_all(&categories_dir)?;
-    std::fs::write(categories_dir.join("index.html"), content)?;
+    std::fs::create_dir_all(&categories_dir).into_diagnostic()?;
+    std::fs::write(categories_dir.join("index.html"), content).into_diagnostic()?;
     let mut page_count = 1usize;
 
     for category in categories {
@@ -96,9 +96,9 @@ pub(super) fn build_category_pages(
         let content = shared::render_category_page(tera, &category, &cat_posts, config)?;
 
         let cat_dir = categories_dir.join(&category);
-        std::fs::create_dir_all(&cat_dir)?;
+        std::fs::create_dir_all(&cat_dir).into_diagnostic()?;
 
-        std::fs::write(cat_dir.join("index.html"), content)?;
+        std::fs::write(cat_dir.join("index.html"), content).into_diagnostic()?;
         page_count += 1;
     }
 
@@ -118,9 +118,9 @@ pub(super) fn build_error_pages(
         }
         let rendered = tera
             .render(name, shared_context)
-            .map_err(|e| eyre!("Failed to render {}: {}", name, e))?;
+            .map_err(|e| miette!("Failed to render {}: {}", name, e))?;
         std::fs::write(public_dir.join(name), &rendered)
-            .wrap_err(format!("Failed to write {}", name))?;
+            .into_diagnostic().wrap_err(format!("Failed to write {}", name))?;
         count += 1;
     }
     Ok(count)

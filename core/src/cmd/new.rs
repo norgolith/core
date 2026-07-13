@@ -5,7 +5,7 @@ use std::{
 
 use chrono::{Local, SecondsFormat};
 use colored::Colorize;
-use eyre::{Context, Result, bail, eyre};
+use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use indoc::formatdoc;
 use inquire::{Select, Text};
 use regex::Regex;
@@ -67,7 +67,7 @@ fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
 #[instrument(level = "debug", skip(path, title))]
 async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
     debug!("Creating new norg document: {}", path.display());
-    let re = Regex::new(r"[,\s+?]+")?;
+    let re = Regex::new(r"[,\s+?]+").into_diagnostic()?;
     let creation_date = Local::now().to_rfc3339_opts(SecondsFormat::Secs, false);
 
     // Prompt norg file metadata
@@ -75,30 +75,30 @@ async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
         .with_default(title)
         .with_help_message("Document title")
         .prompt()
-        .map_err(|e| eyre!("Failed to get document title: {}", e))?;
+        .map_err(|e| miette!("Failed to get document title: {}", e))?;
     let description = Text::new("Description:")
         .with_default("")
         .with_help_message("Document description")
         .prompt()
-        .map_err(|e| eyre!("Failed to get document description: {}", e))?;
+        .map_err(|e| miette!("Failed to get document description: {}", e))?;
     let authors = Text::new("Author(s):")
         .with_default(username().as_str())
         .with_help_message("Document authors separated by comma")
         .with_placeholder("e.g. NTBBloodbath, Vhyrro")
         .prompt()
-        .map_err(|e| eyre!("Failed to get document author: {}", e))?;
+        .map_err(|e| miette!("Failed to get document author: {}", e))?;
     let categories = Text::new("Categories:")
         .with_default("")
         .with_help_message("Document categories separated by comma")
         .with_placeholder("e.g. Neovim, Neorg")
         .prompt()
-        .map_err(|e| eyre!("Failed to get document categories: {}", e))?;
+        .map_err(|e| miette!("Failed to get document categories: {}", e))?;
     let layout = Text::new("Layout:")
         .with_default("default")
         .with_help_message("Template to be used for this file")
         .with_placeholder("e.g. post")
         .prompt()
-        .map_err(|e| eyre!("Failed to get document layout: {}", e))?;
+        .map_err(|e| miette!("Failed to get document layout: {}", e))?;
 
     let content = formatdoc!(
         r#"
@@ -126,7 +126,7 @@ async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
     );
     tokio::fs::write(path, content)
         .await
-        .map_err(|e| eyre!("Failed to write norg document: {}", e))?;
+        .map_err(|e| miette!("Failed to write norg document: {}", e))?;
 
     info!("Created norg document: {}", path.display());
     Ok(())
@@ -142,14 +142,14 @@ async fn ensure_directory_exists(path: &Path) -> Result<()> {
         debug!("Creating directory: {}", parent.display());
         tokio::fs::create_dir_all(parent)
             .await
-            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+            .into_diagnostic().wrap_err_with(|| format!("Failed to create directory: {}", parent.display()))?;
     }
     Ok(())
 }
 
 /// Handle file opening with system editor
 async fn open_file_editor(path: &Path) -> Result<()> {
-    open::that(path).with_context(|| format!("Failed to open file: {}", path.display()))?;
+    open::that(path).into_diagnostic().wrap_err_with(|| format!("Failed to open file: {}", path.display()))?;
     info!("Opened file in editor: {}", path.display());
     Ok(())
 }
@@ -168,7 +168,7 @@ fn resolve_collection<'a>(
                 .map(|c| c.name.as_str())
                 .collect::<Vec<_>>()
                 .join(", ");
-            eyre!("Unknown collection '{}'. Available: {}", name, available)
+            miette!("Unknown collection '{}'. Available: {}", name, available)
         })
     } else if collections.len() == 1 {
         Ok(&collections[0])
@@ -176,7 +176,7 @@ fn resolve_collection<'a>(
         let names: Vec<&str> = collections.iter().map(|c| c.name.as_str()).collect();
         let selected_name = Select::new("Select a collection:", names)
             .prompt()
-            .map_err(|e| eyre!("Failed to select collection: {}", e))?;
+            .map_err(|e| miette!("Failed to select collection: {}", e))?;
         Ok(collections
             .iter()
             .find(|c| c.name == selected_name)
@@ -190,7 +190,7 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
 
     // Find site root early, needed for "post" collection resolution
     let config_file = fs::find_config_file()?.ok_or_else(|| {
-        eyre!(
+        miette!(
             "{}: not in a Norgolith site directory",
             "Unable to create site asset".bold()
         )
@@ -202,9 +202,9 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
     if kind == "post" {
         let config_content = tokio::fs::read_to_string(&config_file)
             .await
-            .map_err(|e| eyre!("Failed to read config: {}", e))?;
+            .map_err(|e| miette!("Failed to read config: {}", e))?;
         let site_config: config::SiteConfig =
-            toml::from_str(&config_content).map_err(|e| eyre!("Failed to parse config: {}", e))?;
+            toml::from_str(&config_content).map_err(|e| miette!("Failed to parse config: {}", e))?;
         let col = resolve_collection(&site_config.collections, collection)?;
         resolved_kind = "norg".to_string();
         resolved_name = format!("{}/{}", col.dir, name);
@@ -246,7 +246,7 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
         debug!("Creating empty asset file: {}", target_path.display());
         tokio::fs::File::create(&target_path)
             .await
-            .with_context(|| format!("Failed to create file: {}", target_path.display()))?;
+            .into_diagnostic().wrap_err_with(|| format!("Failed to create file: {}", target_path.display()))?;
         info!("Created asset file: {}", target_path.display());
     }
 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use eyre::{Result, eyre};
+use miette::{Result, miette};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -16,7 +16,7 @@ struct CacheEntry {
 /// Returns the XDG cache directory for a site: `~/.cache/norgolith/{site_name}/`
 fn cache_dir_for_site(site_root: &Path) -> Result<PathBuf> {
     let cache_base = dirs::cache_dir()
-        .ok_or_else(|| eyre!("{}: cannot determine cache directory", "Failed".bold()))?;
+        .ok_or_else(|| miette!("{}: cannot determine cache directory", "Failed".bold()))?;
     let site_name = site_root
         .file_name()
         .and_then(|n| n.to_str())
@@ -103,13 +103,13 @@ impl BuildCache {
     pub fn save(&self) -> Result<()> {
         if !self.cache_dir.exists() {
             std::fs::create_dir_all(&self.cache_dir)
-                .map_err(|e| eyre!("{}: {}", "Failed to create cache directory".bold(), e))?;
+                .map_err(|e| miette!("{}: {}", "Failed to create cache directory".bold(), e))?;
         }
 
         // Write global hash
         let global_path = self.cache_dir.join(".global_hash");
         std::fs::write(&global_path, &self.global_hash)
-            .map_err(|e| eyre!("{}: {}", "Failed to write global hash".bold(), e))?;
+            .map_err(|e| miette!("{}: {}", "Failed to write global hash".bold(), e))?;
 
         // Write each entry
         for (rel_path, entry) in &self.entries {
@@ -118,7 +118,7 @@ impl BuildCache {
                 let _ = std::fs::create_dir_all(parent);
             }
             let json = serde_json::to_string_pretty(entry)
-                .map_err(|e| eyre!("{}: {}", "Failed to serialize cache entry".bold(), e))?;
+                .map_err(|e| miette!("{}: {}", "Failed to serialize cache entry".bold(), e))?;
             std::fs::write(&cache_path, json).unwrap_or_else(|e| {
                 warn!(
                     path = %cache_path.display(),

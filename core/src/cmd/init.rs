@@ -5,7 +5,7 @@ use colored::Colorize;
 use comfy_table::modifiers::UTF8_SOLID_INNER_BORDERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, ContentArrangement, Table};
-use eyre::{Result, bail, eyre};
+use miette::{Result, bail, miette};
 use indoc::formatdoc;
 use inquire::Text;
 use tokio::fs;
@@ -53,7 +53,7 @@ async fn create_config(root: &str, root_url: &str, language: &str, title: &str) 
 
     fs::write(config_path, site_config)
         .await
-        .map_err(|e| eyre!("Failed to write config file: {}", e))?;
+        .map_err(|e| miette!("Failed to write config file: {}", e))?;
 
     info!("Created norgolith.toml");
     Ok(())
@@ -79,7 +79,7 @@ async fn create_index_norg(root: &str) -> Result<()> {
     );
     fs::write(content_path, norg_index)
         .await
-        .map_err(|e| eyre!("Failed to write index.norg: {}", e))?;
+        .map_err(|e| miette!("Failed to write index.norg: {}", e))?;
 
     info!("Created index.norg");
     Ok(())
@@ -116,7 +116,7 @@ async fn create_html_templates(root: &str) -> Result<()> {
         let template_path = templates_dir.join(name.to_owned() + ".html");
         fs::write(template_path, contents)
             .await
-            .map_err(|e| eyre!("Failed to write template {}: {}", name, e))?;
+            .map_err(|e| miette!("Failed to write template {}: {}", name, e))?;
     }
 
     info!("Created HTML templates");
@@ -131,7 +131,7 @@ async fn create_rss_template(root: &str) -> Result<()> {
 
     fs::write(&template_path, rss_xml)
         .await
-        .map_err(|e| eyre!("Failed to write rss.xml: {}", e))?;
+        .map_err(|e| miette!("Failed to write rss.xml: {}", e))?;
 
     info!("Created RSS template");
     Ok(())
@@ -148,14 +148,14 @@ async fn create_assets(root: &str) -> Result<()> {
     debug!(style_path = %style_path.display(), "Writing style.css");
     fs::write(&style_path, base_style)
         .await
-        .map_err(|e| eyre!("Failed to write style.css: {}", e))?;
+        .map_err(|e| miette!("Failed to write style.css: {}", e))?;
 
     let norgolith_logo = include_str!("../../../res/norgolith.svg");
     let logo_path = assets_dir.join("norgolith.svg");
     debug!(logo_path = %logo_path.display(), "Writing norgolith.svg");
     fs::write(&logo_path, norgolith_logo)
         .await
-        .map_err(|e| eyre!("Failed to write norgolith.svg: {}", e))?;
+        .map_err(|e| miette!("Failed to write norgolith.svg: {}", e))?;
 
     info!("Created assets");
     Ok(())
@@ -172,7 +172,7 @@ async fn create_directories(path: &str) -> Result<()> {
         debug!(dir_path = %dir_path.display(), "Creating directory");
         fs::create_dir_all(dir_path)
             .await
-            .map_err(|e| eyre!("Failed to create directory {}: {}", dir, e))?;
+            .map_err(|e| miette!("Failed to create directory {}: {}", dir, e))?;
     }
 
     info!("Created site directories");
@@ -185,13 +185,13 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
 
     let path_exists = fs::try_exists(name)
         .await
-        .map_err(|e| eyre!("Failed to check if path exists: {}", e))?;
+        .map_err(|e| miette!("Failed to check if path exists: {}", e))?;
 
     if path_exists {
         // Get the canonical (absolute) path to the existing site root
         let path = fs::canonicalize(name)
             .await
-            .map_err(|e| eyre!("Failed to get canonnical path: {}", e))?;
+            .map_err(|e| miette!("Failed to get canonnical path: {}", e))?;
         bail!(
             "{}: the target directory {} already exists.",
             "Could not initialize the new Norgolith site".bold(),
@@ -204,7 +204,7 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
                 .with_default("http://localhost:3030")
                 .with_help_message("URL to your production site")
                 .prompt()
-                .map_err(|e| eyre!("Failed to get site URL: {}", e))?
+                .map_err(|e| miette!("Failed to get site URL: {}", e))?
         } else {
             String::from("http://localhost:3030")
         };
@@ -213,7 +213,7 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
                 .with_default("en-US")
                 .with_help_message("Your site language")
                 .prompt()
-                .map_err(|e| eyre!("Failed to get site language: {}", e))?
+                .map_err(|e| miette!("Failed to get site language: {}", e))?
         } else {
             String::from("en-US")
         };
@@ -222,7 +222,7 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
                 .with_default(name)
                 .with_help_message("Site title")
                 .prompt()
-                .map_err(|e| eyre!("Failed to get site title: {}", e))?
+                .map_err(|e| miette!("Failed to get site title: {}", e))?
         } else {
             String::from(name)
         };
@@ -238,7 +238,7 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
         // Get the canonical (absolute) path to the new site root
         let path = fs::canonicalize(name)
             .await
-            .map_err(|e| eyre!("Failed to get canonical path: {}", e))?;
+            .map_err(|e| miette!("Failed to get canonical path: {}", e))?;
 
         // Create structure table
         let mut structure_table = Table::new();
