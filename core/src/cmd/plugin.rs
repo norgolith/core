@@ -223,7 +223,7 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
             }
         })?;
     if !status.success() {
-        bail!("cargo build failed");
+        bail!("Plugin cargo build failed");
     }
     Ok(())
 }

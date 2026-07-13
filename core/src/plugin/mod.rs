@@ -338,7 +338,7 @@ extern "C" fn default_free(ptr: *mut std::os::raw::c_char) {
 fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
     let manifest_path = dir.join("plugin.toml");
     if !manifest_path.is_file() {
-        miette::bail!("no plugin.toml found");
+        miette::bail!("No plugin.toml found in {}", dir.display());
     }
 
     let manifest = PluginManifest::load(&manifest_path)?;
