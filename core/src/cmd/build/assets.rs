@@ -31,7 +31,7 @@ pub(super) fn minify_html_content(rendered: String) -> Result<String> {
 
 #[instrument(skip(src_path, dest_path))]
 fn minify_js_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
-    let content = std::fs::read(src_path).into_diagnostic()?;
+    let content = std::fs::read(src_path).into_diagnostic().wrap_err("Failed to read JS asset")?;
     let mut minified = Vec::new();
     let session = minify_js::Session::new();
     minify_js::minify(
@@ -54,15 +54,15 @@ fn minify_js_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
 
 #[instrument(skip(src_path, dest_path))]
 fn minify_css_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
-    let content = std::fs::read_to_string(src_path).into_diagnostic()?;
+    let content = std::fs::read_to_string(src_path).into_diagnostic().wrap_err("Failed to read CSS asset")?;
 
     let mut stylesheet =
         StyleSheet::parse(&content, ParserOptions::default()).map_err(|e| miette!("{}", e))?;
-    stylesheet.minify(MinifyOptions::default()).into_diagnostic()?;
+    stylesheet.minify(MinifyOptions::default()).into_diagnostic().wrap_err("Failed to minify CSS")?;
     let minified = stylesheet.to_css(PrinterOptions {
         minify: true,
         ..Default::default()
-    }).into_diagnostic()?;
+    }).into_diagnostic().wrap_err("Failed to serialize minified CSS")?;
 
     std::fs::write(dest_path, minified.code).into_diagnostic().wrap_err_with(|| {
         format!("Failed to write minified CSS to {}", dest_path.display()).bold()
@@ -72,7 +72,7 @@ fn minify_css_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
 
 #[instrument(skip(src_path, dest_path))]
 fn copy_binary_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
-    let content = std::fs::read(src_path).into_diagnostic()?;
+    let content = std::fs::read(src_path).into_diagnostic().wrap_err("Failed to read asset file")?;
     std::fs::write(dest_path, content).into_diagnostic().wrap_err_with(|| {
         format!(
             "Failed to copy asset from {} to {}",
@@ -124,7 +124,7 @@ pub(super) fn copy_assets(assets_dir: &Path, target_dir: &Path, minify: bool) ->
         let target_path = target_dir.join(rel_path);
         if entry.path().is_dir() {
             if !target_path.exists() {
-                std::fs::create_dir_all(target_path).into_diagnostic()?;
+                std::fs::create_dir_all(target_path).into_diagnostic().wrap_err("Failed to create asset directory")?;
             }
         } else {
             copy_asset_file(entry.path(), &target_path, minify)?;

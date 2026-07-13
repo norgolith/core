@@ -12,7 +12,7 @@ mod shortcode;
 mod tera;
 mod theme;
 
-use miette::{IntoDiagnostic, MietteHandlerOpts, Report, set_hook};
+use miette::{IntoDiagnostic, MietteHandlerOpts, Report, WrapErr, set_hook};
 use tracing_subscriber::{FmtSubscriber, filter::EnvFilter, fmt::time::ChronoLocal};
 
 #[tokio::main]
@@ -34,7 +34,7 @@ async fn main() -> Result<(), Report> {
     let logging_env =
         EnvFilter::try_from_env("LITH_LOG")
             .or_else(|_| EnvFilter::try_new("info"))
-            .into_diagnostic()?;
+            .into_diagnostic().wrap_err("Failed to configure logging")?;
     let subscriber = FmtSubscriber::builder()
         .with_target(false)
         .with_file(false)
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Report> {
         .with_timer(logging_timer)
         .with_env_filter(logging_env)
         .finish();
-    tracing::subscriber::set_global_default(subscriber).into_diagnostic()?;
+    tracing::subscriber::set_global_default(subscriber).into_diagnostic().wrap_err("Failed to initialize tracing subscriber")?;
 
     if let Err(e) = cli::start().await {
         eprintln!("{:?}", e);

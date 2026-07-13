@@ -67,7 +67,7 @@ fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
 #[instrument(level = "debug", skip(path, title))]
 async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
     debug!("Creating new norg document: {}", path.display());
-    let re = Regex::new(r"[,\s+?]+").into_diagnostic()?;
+    let re = Regex::new(r"[,\s+?]+").into_diagnostic().wrap_err("Failed to compile regex")?;
     let creation_date = Local::now().to_rfc3339_opts(SecondsFormat::Secs, false);
 
     // Prompt norg file metadata

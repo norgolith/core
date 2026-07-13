@@ -75,8 +75,8 @@ pub(super) fn build_category_pages(
 
     let content = shared::render_category_index(tera, posts, config, collections)?;
 
-    std::fs::create_dir_all(&categories_dir).into_diagnostic()?;
-    std::fs::write(categories_dir.join("index.html"), content).into_diagnostic()?;
+    std::fs::create_dir_all(&categories_dir).into_diagnostic().wrap_err("Failed to create categories directory")?;
+    std::fs::write(categories_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write categories index")?;
     let mut page_count = 1usize;
 
     for category in categories {
@@ -96,9 +96,9 @@ pub(super) fn build_category_pages(
         let content = shared::render_category_page(tera, &category, &cat_posts, config)?;
 
         let cat_dir = categories_dir.join(&category);
-        std::fs::create_dir_all(&cat_dir).into_diagnostic()?;
+        std::fs::create_dir_all(&cat_dir).into_diagnostic().wrap_err("Failed to create category directory")?;
 
-        std::fs::write(cat_dir.join("index.html"), content).into_diagnostic()?;
+        std::fs::write(cat_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write category page")?;
         page_count += 1;
     }
 

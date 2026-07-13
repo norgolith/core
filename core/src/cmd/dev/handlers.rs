@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, miette};
+use miette::{IntoDiagnostic, Result, WrapErr, miette};
 use futures_util::{SinkExt, StreamExt};
 use hyper::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use hyper::{Body, Request, Response, StatusCode, header::CONTENT_TYPE};
@@ -34,7 +34,7 @@ fn html_response(body: String, status: StatusCode) -> Result<Response<Body>> {
     Response::builder()
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .status(status)
-        .body(Body::from(body)).into_diagnostic()
+        .body(Body::from(body)).into_diagnostic().wrap_err("Failed to build HTML response")
 }
 
 #[instrument(skip(html))]
@@ -161,7 +161,7 @@ pub(super) async fn handle_asset(
         )
         .header(PRAGMA, "no-cache")
         .header(EXPIRES, 0)
-        .body(Body::from(content)).into_diagnostic()
+        .body(Body::from(content)).into_diagnostic().wrap_err("Failed to build asset response")
 }
 
 async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result<Response<Body>> {
@@ -173,7 +173,7 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
         return Response::builder()
             .header(CONTENT_TYPE, "application/xml; charset=utf-8")
             .status(StatusCode::OK)
-            .body(Body::from(html)).into_diagnostic();
+            .body(Body::from(html)).into_diagnostic().wrap_err("Failed to build XML feed response");
     }
 
     // Slow path: render on demand
@@ -195,11 +195,11 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
     Response::builder()
         .header(CONTENT_TYPE, "application/xml; charset=utf-8")
         .status(StatusCode::OK)
-        .body(Body::from(content)).into_diagnostic()
+        .body(Body::from(content)).into_diagnostic().wrap_err("Failed to build XML feed response")
 }
 
 async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<Response<Body>> {
-    let rel_path = path.strip_prefix(&state.paths.content).into_diagnostic()?.to_path_buf();
+    let rel_path = path.strip_prefix(&state.paths.content).into_diagnostic().wrap_err("Failed to resolve content path")?.to_path_buf();
     let url_path = format!("/{}", rel_path.with_extension("").display());
 
     // Fast path: lookup in pre-rendered memory cache
@@ -422,7 +422,7 @@ async fn handle_request(req: Request<Body>, state: Arc<ServerState>) -> Result<R
     match request_path {
         "/livereload.js" => Ok(Response::builder()
             .header(CONTENT_TYPE, "text/javascript")
-            .body(LIVE_RELOAD_SCRIPT.into()).into_diagnostic()?),
+            .body(LIVE_RELOAD_SCRIPT.into()).into_diagnostic().wrap_err("Failed to build livereload script response")?),
         path if path == format!("/{}", categories_dir) => handle_category_index(&state).await,
         path if path.starts_with(&format!("/{}/", categories_dir)) => {
             handle_category(path, &state).await

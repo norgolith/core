@@ -109,7 +109,7 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
 
     let mut dirs = std::collections::HashSet::new();
     for entry in entries {
-        let rel_path = entry.path().strip_prefix(&paths.content).into_diagnostic()?;
+        let rel_path = entry.path().strip_prefix(&paths.content).into_diagnostic().wrap_err("Failed to resolve content path")?;
         if let Ok(public_path) = determine_public_path(&paths.public, rel_path)
             && let Some(parent) = public_path.parent()
         {
@@ -117,7 +117,7 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
         }
     }
     for dir in &dirs {
-        std::fs::create_dir_all(dir).into_diagnostic()?;
+        std::fs::create_dir_all(dir).into_diagnostic().wrap_err("Failed to create output directory")?;
     }
     Ok(())
 }

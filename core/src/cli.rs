@@ -2,7 +2,7 @@ use std::env::set_current_dir;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, builder::PossibleValue};
-use miette::{IntoDiagnostic, Result, miette};
+use miette::{IntoDiagnostic, Result, WrapErr, miette};
 
 use crate::cmd;
 use crate::net;
@@ -169,7 +169,7 @@ pub async fn start() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(dir) = cli.project_dir {
-        set_current_dir(dir).into_diagnostic()?;
+        set_current_dir(dir).into_diagnostic().wrap_err("Failed to change to project directory")?;
     }
 
     match cli.command {
@@ -224,16 +224,16 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_init_site_with_name() -> Result<()> {
-        let dir = tempdir().into_diagnostic()?;
+        let dir = tempdir().into_diagnostic().wrap_err("Failed to create temp dir for init test")?;
 
-        let origin = std::env::current_dir().into_diagnostic()?;
-        std::env::set_current_dir(dir.path()).into_diagnostic()?;
+        let origin = std::env::current_dir().into_diagnostic().wrap_err("Failed to get current dir")?;
+        std::env::set_current_dir(dir.path()).into_diagnostic().wrap_err("Failed to change to temp dir")?;
 
         let test_name = String::from("my-site");
         let result = cmd::init(&test_name, false).await;
         assert!(result.is_ok());
 
-        std::env::set_current_dir(origin).into_diagnostic()?;
+        std::env::set_current_dir(origin).into_diagnostic().wrap_err("Failed to restore original dir")?;
 
         Ok(())
     }
@@ -242,14 +242,14 @@ mod tests {
     #[cfg_attr(feature = "ci", ignore)]
     #[serial]
     async fn test_check_and_serve() -> Result<()> {
-        let dir = tempdir().into_diagnostic()?;
+        let dir = tempdir().into_diagnostic().wrap_err("Failed to create temp dir for serve test")?;
 
-        let origin = std::env::current_dir().into_diagnostic()?;
-        std::env::set_current_dir(dir.path()).into_diagnostic()?;
+        let origin = std::env::current_dir().into_diagnostic().wrap_err("Failed to get current dir")?;
+        std::env::set_current_dir(dir.path()).into_diagnostic().wrap_err("Failed to change to temp dir")?;
 
         // Bind port
-        let temp_listener = std::net::TcpListener::bind("127.0.0.1:0").into_diagnostic()?;
-        let port = temp_listener.local_addr().into_diagnostic()?.port();
+        let temp_listener = std::net::TcpListener::bind("127.0.0.1:0").into_diagnostic().wrap_err("Failed to bind test port")?;
+        let port = temp_listener.local_addr().into_diagnostic().wrap_err("Failed to get listener address")?.port();
 
         // Create temporal site
         let test_site_name = String::from("my-unavailable-site");
@@ -258,7 +258,7 @@ mod tests {
         // Enter the test directory
         let path = dir.path().join(&test_site_name);
 
-        std::env::set_current_dir(path).into_diagnostic()?;
+        std::env::set_current_dir(path).into_diagnostic().wrap_err("Failed to change to site dir")?;
 
         let result = run_dev_server(port, false, false, false).await;
         assert!(result.is_err());
@@ -271,7 +271,7 @@ mod tests {
         );
 
         // Restore previous directory
-        std::env::set_current_dir(origin).into_diagnostic()?;
+        std::env::set_current_dir(origin).into_diagnostic().wrap_err("Failed to restore original dir")?;
 
         Ok(())
     }

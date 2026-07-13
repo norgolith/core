@@ -65,7 +65,7 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     debug!("Finding compatible version");
     let versions = tokio::task::block_in_place(|| -> Result<Vec<Version>> {
         Ok(repo
-            .tag_names(None).into_diagnostic()?
+            .tag_names(None).into_diagnostic().wrap_err("Failed to list git tags")?
             .iter()
             .flatten()
             .filter_map(|t| Version::parse(t).ok())
@@ -75,7 +75,7 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     let mut versions = versions;
 
     if let Some(req) = requirement {
-        let version_req = VersionReq::parse(&req).into_diagnostic()?;
+        let version_req = VersionReq::parse(&req).into_diagnostic().wrap_err("Failed to parse version requirement")?;
         versions.retain(|v| version_req.matches(v));
     }
 
@@ -94,13 +94,13 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
         let (object, reference) = repo.revparse_ext(&tag_name).map_err(|e| {
             error!(error = %e, "Failed to parse version reference");
             e
-        }).into_diagnostic()?;
+        }).into_diagnostic().wrap_err("Failed to parse version tag")?;
 
         repo.checkout_tree(&object, Some(CheckoutBuilder::new().force()))
             .map_err(|e| {
                 error!(error = %e, "Failed to checkout tree");
                 e
-            }).into_diagnostic()?;
+            }).into_diagnostic().wrap_err("Failed to checkout version tree")?;
 
         if let Some(reference) = reference {
             let ref_name = reference
@@ -109,7 +109,7 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
             repo.set_head(ref_name).map_err(|e| {
                 error!(error = %e, "Failed to set HEAD");
                 e
-            }).into_diagnostic()?;
+            }).into_diagnostic().wrap_err("Failed to set repository HEAD")?;
         }
 
         Ok(())
@@ -119,7 +119,7 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
 #[instrument(skip(src, dest, sp))]
 async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<()> {
     // If the theme directory is empty then early return
-    if fs::read_dir(src).await.into_diagnostic()?.next_entry().await.into_diagnostic()?.is_none() {
+    if fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source dir")?.next_entry().await.into_diagnostic().wrap_err("Failed to check theme source dir entries")?.is_none() {
         debug!("Source directory is empty, skipping backup");
         return Ok(());
     }
@@ -128,9 +128,9 @@ async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result
     // than just the last one before pulling/updating a theme
     if dest.exists() {
         debug!(backup_path = %dest.display(), "Removing existing backup");
-        tokio::fs::remove_dir_all(dest).await.into_diagnostic()?;
+        tokio::fs::remove_dir_all(dest).await.into_diagnostic().wrap_err("Failed to remove existing backup")?;
     }
-    tokio::fs::create_dir_all(dest).await.into_diagnostic()?;
+    tokio::fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create backup directory")?;
 
     sp.update_after_time(
         "Backing up existing theme files...",
@@ -150,16 +150,16 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
     // Clean existing theme directory
     if dest.exists() {
         debug!(dest = %dest.display(), "Cleaning existing theme directory");
-        fs::remove_dir_all(dest).await.into_diagnostic()?;
+        fs::remove_dir_all(dest).await.into_diagnostic().wrap_err("Failed to remove existing theme dir")?;
     }
-    fs::create_dir_all(dest).await.into_diagnostic()?;
+    fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create theme directory")?;
 
     sp.update_after_time(
         "Copying theme files...",
         std::time::Duration::from_millis(200),
     );
-    let mut entries = fs::read_dir(src).await.into_diagnostic()?;
-    while let Some(entry) = entries.next_entry().await.into_diagnostic()? {
+    let mut entries = fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source")?;
+    while let Some(entry) = entries.next_entry().await.into_diagnostic().wrap_err("Failed to read theme entry")? {
         let file_name = entry.file_name();
         let file_name_str = file_name.to_string_lossy().into_owned();
 
@@ -168,7 +168,7 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
             copy_dir_all(entry.path(), dest.join(file_name)).await?;
         } else if allowed_files.contains(&file_name_str.as_ref()) {
             debug!(file = %file_name_str, "Copying file");
-            fs::copy(entry.path(), dest.join(file_name)).await.into_diagnostic()?;
+            fs::copy(entry.path(), dest.join(file_name)).await.into_diagnostic().wrap_err("Failed to copy theme file")?;
         } else {
             debug!(file = %file_name_str, "Skipping disallowed file/directory");
         }
@@ -368,7 +368,7 @@ impl ThemeManager {
             std::time::Duration::from_millis(200),
         );
         debug!(path = %metadata_path.display(), "Writing metadata file");
-        fs::write(metadata_path, toml::to_string_pretty(&metadata).into_diagnostic()?)
+        fs::write(metadata_path, toml::to_string_pretty(&metadata).into_diagnostic().wrap_err("Failed to serialize theme metadata")?)
             .await
             .into_diagnostic().wrap_err("Failed to write metadata file")?;
         debug!("Metadata written successfully");

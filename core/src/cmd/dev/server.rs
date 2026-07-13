@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, bail, miette};
+use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, error, info, instrument};
@@ -47,8 +47,8 @@ impl ServerState {
     #[instrument(level = "debug", skip(self))]
     pub async fn reload_config(&self) -> Result<()> {
         debug!("Reloading config");
-        let config_content = tokio::fs::read_to_string(&self.paths.config_file).await.into_diagnostic()?;
-        let new_config: config::SiteConfig = toml::from_str(&config_content).into_diagnostic()?;
+        let config_content = tokio::fs::read_to_string(&self.paths.config_file).await.into_diagnostic().wrap_err("Failed to read config file")?;
+        let new_config: config::SiteConfig = toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
 
         let new_posts = shared::collect_all_posts_metadata(
             &self.paths.content,
@@ -255,10 +255,10 @@ pub(super) async fn setup_server_state(
 ) -> Result<Arc<ServerState>> {
     debug!("Setting up server state");
 
-    let config_content = tokio::fs::read_to_string(&root).await.into_diagnostic()?;
+    let config_content = tokio::fs::read_to_string(&root).await.into_diagnostic().wrap_err("Failed to read config file")?;
     debug!("Config file path: {:?}", root);
     debug!("Config content:\n{}", config_content);
-    let site_config: config::SiteConfig = toml::from_str(&config_content).into_diagnostic()?;
+    let site_config: config::SiteConfig = toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
     debug!("Parsed categories_dir: {}", site_config.categories_dir);
 
     let validation_errors = site_config.validate();
