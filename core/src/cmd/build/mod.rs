@@ -339,10 +339,10 @@ pub fn build(minify: bool) -> Result<()> {
         toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
-        for error in &validation_errors {
-            eprintln!("{}", error);
-        }
-        bail!("Site configuration has validation errors");
+        bail!(
+            "Site configuration has validation errors:\n{}",
+            validation_errors.join("\n")
+        );
     }
     debug!(?site_config, "Loaded site configuration");
     timings.config_ms = t.elapsed().as_millis();

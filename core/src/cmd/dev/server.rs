@@ -263,10 +263,10 @@ pub(super) async fn setup_server_state(
 
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
-        for error in &validation_errors {
-            eprintln!("{}", error);
-        }
-        bail!("Site configuration has validation errors");
+        bail!(
+            "Site configuration has validation errors:\n{}",
+            validation_errors.join("\n")
+        );
     }
 
     let root_dir = root.parent().unwrap().to_path_buf();
