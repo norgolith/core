@@ -31,10 +31,10 @@ pub(super) fn rewrite_urls(body: String, root_url: &str, routes_url: &str) -> St
 }
 
 fn html_response(body: String, status: StatusCode) -> Result<Response<Body>> {
-    Ok(Response::builder()
+    Response::builder()
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .status(status)
-        .body(Body::from(body)).into_diagnostic()?)
+        .body(Body::from(body)).into_diagnostic()
 }
 
 #[instrument(skip(html))]
@@ -152,7 +152,7 @@ pub(super) async fn handle_asset(
             }
         }
     };
-    Ok(Response::builder()
+    Response::builder()
         .header(CONTENT_TYPE, mime_type)
         .status(StatusCode::OK)
         .header(
@@ -161,7 +161,7 @@ pub(super) async fn handle_asset(
         )
         .header(PRAGMA, "no-cache")
         .header(EXPIRES, 0)
-        .body(Body::from(content)).into_diagnostic()?)
+        .body(Body::from(content)).into_diagnostic()
 }
 
 async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result<Response<Body>> {
@@ -170,10 +170,10 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
 
     // Fast path: lookup in pre-rendered memory cache
     if let Some(html) = fast_path_lookup(state, request_path).await {
-        return Ok(Response::builder()
+        return Response::builder()
             .header(CONTENT_TYPE, "application/xml; charset=utf-8")
             .status(StatusCode::OK)
-            .body(Body::from(html)).into_diagnostic()?);
+            .body(Body::from(html)).into_diagnostic();
     }
 
     // Slow path: render on demand
@@ -192,10 +192,10 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
         .render(template_name, &context)
         .map_err(|e| miette!("{}: {}", "Failed to render XML feed template".bold(), e))?;
 
-    Ok(Response::builder()
+    Response::builder()
         .header(CONTENT_TYPE, "application/xml; charset=utf-8")
         .status(StatusCode::OK)
-        .body(Body::from(content)).into_diagnostic()?)
+        .body(Body::from(content)).into_diagnostic()
 }
 
 async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<Response<Body>> {

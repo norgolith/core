@@ -12,11 +12,18 @@ mod shortcode;
 mod tera;
 mod theme;
 
-use miette::{IntoDiagnostic, Report};
+use miette::{IntoDiagnostic, MietteHandlerOpts, Report, set_hook};
 use tracing_subscriber::{FmtSubscriber, filter::EnvFilter, fmt::time::ChronoLocal};
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
+    set_hook(Box::new(|_| {
+        Box::new(MietteHandlerOpts::new()
+            .unicode(true)
+            .context_lines(3)
+            .build())
+    })).ok();
+
     // XXX: junk to test the conversion tool, remove later
     //let norg_doc = tokio::fs::read_to_string("/home/amartin/notes/languages/elixir.norg").await?;
     //let norg_html = converter::convert(norg_doc.clone());
