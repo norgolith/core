@@ -78,6 +78,7 @@ pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &s
     if let toml::Value::Table(ref mut table) = metadata {
         table.insert("raw".to_string(), toml::Value::String(html.to_string()));
         table.insert("permalink".to_string(), toml::Value::String(permalink));
+        table.insert("rel_path".to_string(), toml::Value::String(rel_path.to_string_lossy().to_string()));
     }
     metadata
 }

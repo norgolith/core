@@ -10,7 +10,7 @@ use hyper::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use hyper::{Body, Request, Response, StatusCode, header::CONTENT_TYPE};
 use tokio::net::TcpStream;
 use tokio::sync::broadcast;
-use tracing::{debug, error, instrument};
+use tracing::{debug, error, instrument, warn};
 
 use crate::shared;
 
@@ -415,7 +415,10 @@ async fn handle_request(req: Request<Body>, state: Arc<ServerState>) -> Result<R
     let request_path = req.uri().path();
     debug!(path = %request_path, "Handling request");
 
-    let categories_dir = state.config.read().await.categories_dir.clone();
+    let categories_dir = {
+        let config = state.config.read().await;
+        config.categories_dir.clone()
+    };
     match request_path {
         "/livereload.js" => Ok(Response::builder()
             .header(CONTENT_TYPE, "text/javascript")

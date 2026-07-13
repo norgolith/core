@@ -256,7 +256,10 @@ pub(super) async fn setup_server_state(
     debug!("Setting up server state");
 
     let config_content = tokio::fs::read_to_string(&root).await?;
+    debug!("Config file path: {:?}", root);
+    debug!("Config content:\n{}", config_content);
     let site_config: config::SiteConfig = toml::from_str(&config_content)?;
+    debug!("Parsed categories_dir: {}", site_config.categories_dir);
 
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
