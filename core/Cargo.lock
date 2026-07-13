@@ -2026,7 +2026,7 @@ checksum = "610a5acd306ec67f907abe5567859a3c693fb9886eb1f012ab8f2a47bef3db51"
 
 [[package]]
 name = "norgolith"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "blake3",
  "chrono",

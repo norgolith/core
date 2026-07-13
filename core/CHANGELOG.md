@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1](https://github.com/norgolith/core/compare/norgolith-v1.1.0...norgolith-v1.1.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* **metadata:** insert rel_path into metadata table ([e231984](https://github.com/norgolith/core/commit/e23198420292c096b43f23a559017214e722ed84))
+* **tera:** register missing tera-contrib filters ([b974f8f](https://github.com/norgolith/core/commit/b974f8fcde33a7b38bc0682903c65e0f28b206d8))
+
+
+### Documentation
+
+* use tree-sitter plugin for syntax highlight, tera code blocks instead of django ([e6a3e33](https://github.com/norgolith/core/commit/e6a3e33c2ccb4eab676385210afef2cf65b0f1d2))
+
 ## [1.1.0](https://github.com/norgolith/core/compare/norgolith-v1.0.1...norgolith-v1.1.0) (2026-07-10)
 
 
