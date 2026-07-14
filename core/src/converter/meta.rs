@@ -1,4 +1,4 @@
-use miette::Report;
+use miette::{miette, Report};
 use rust_norg::metadata::{NorgMeta, parse_metadata};
 use std::str::FromStr;
 use toml::{self, value::Datetime};
@@ -98,10 +98,10 @@ pub fn merge_toc_into_metadata(mut metadata: toml::Value, toc: toml::Value) -> t
 pub fn convert(document: &str, toc: Option<toml::Value>) -> std::result::Result<toml::Value, Report> {
     let extracted_meta = extract_meta(document);
     let meta = parse_metadata(&extracted_meta)
-        .map_err(|e| Report::msg(format!("Failed to parse metadata: {:?}", e)))?;
+        .map_err(|e| miette!("Failed to parse metadata: {:?}", e))?;
 
     let mut toml_value = norg_meta_to_toml(&meta)
-        .map_err(|e| Report::msg(format!("Failed to convert metadata: {}", e)))?;
+        .map_err(|e| miette!("Failed to convert metadata: {}", e))?;
     if let Some(toc) = toc {
         toml_value = merge_toc_into_metadata(toml_value, toc);
     }

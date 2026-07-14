@@ -180,7 +180,7 @@ fn resolve_collection<'a>(
         Ok(collections
             .iter()
             .find(|c| c.name == selected_name)
-            .unwrap())
+            .ok_or_else(|| miette!("Selected collection '{}' not found", selected_name))?)
     }
 }
 
@@ -195,7 +195,10 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
             "Unable to create site asset".bold()
         )
     })?;
-    let site_root = config_file.parent().unwrap().to_path_buf();
+    let site_root = config_file
+        .parent()
+        .ok_or_else(|| miette!("Config file has no parent directory: {}", config_file.display()))?
+        .to_path_buf();
 
     // "post" kind: resolve the target collection and delegate to Content creation
     let (resolved_kind, resolved_name);
