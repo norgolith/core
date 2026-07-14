@@ -22,7 +22,7 @@ version: 1.1.1
 
   +html.class font-mono px-4
   Norgolith is a Rust-powered static site generator designed for
-  {https://github.com/nvim-neorg/neorg}[Neorg] — built by Neorg enthusiasts, for Neorg enthusiasts.
+  {https://github.com/nvim-neorg/neorg}[Neorg] - built by Neorg enthusiasts, for Neorg enthusiasts.
   It gets out of your way by combining Rust's rock-solid foundations with opt-in validations and
   sane defaults, so you spend less time configuring and debugging, and spend more time creating
   appealing content.
@@ -31,7 +31,7 @@ version: 1.1.1
   @end
 
   > /*Precision meets simplicity*: Norgolith combines Rust's reliability with a community-driven
-  design. We handle the config — you own the content./
+  design. We handle the config - you own the content./
 
   +html.class text-base-alt mt-12 lg:mt-14
   ___
@@ -40,7 +40,7 @@ version: 1.1.1
    - *Built with Rust*: Extremely fast performance and type-safe pipelines, everything you need in a
      single binary with no external dependencies.
    - *Neorg-first*: Native support for Norg, powered by our in-house HTML conversion tool.
-   - *Zero-config workflow*: Ship sites with sane defaults — just write Norg.
+   - *Zero-config workflow*: Ship sites with sane defaults - just write Norg.
    - *Error-proof content*:
    -- Syntax validation via {https://github.com/nvim-neorg/rust-norg}[rust-norg].
    -- *Content schemas*: Opt-in metadata rules enforcement /before/ build time.

@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use colored::Colorize;
-use eyre::{Result, bail, eyre};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 use walkdir::WalkDir;
 
 use crate::shared::{BuildContext, SitePaths};
@@ -30,7 +30,12 @@ impl ServerState {
     pub async fn reload_templates(&self) -> Result<()> {
         debug!("Reloading templates");
         let new_tera = crate::tera::init(
-            self.paths.templates.to_str().unwrap(),
+            self.paths.templates.to_str().ok_or_else(|| {
+                miette!(
+                    "Templates path is not valid UTF-8: {}",
+                    self.paths.templates.display()
+                )
+            })?,
             &self.paths.theme_templates,
         )?;
         let mut tera = self.tera.write().await;
@@ -47,8 +52,11 @@ impl ServerState {
     #[instrument(level = "debug", skip(self))]
     pub async fn reload_config(&self) -> Result<()> {
         debug!("Reloading config");
-        let config_content = tokio::fs::read_to_string(&self.paths.config_file).await?;
-        let new_config: config::SiteConfig = toml::from_str(&config_content)?;
+        let config_content = tokio::fs::read_to_string(&self.paths.config_file).await.into_diagnostic().wrap_err("Failed to read config file")?;
+        let new_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+            miette!("Failed to parse site configuration: {}", e)
+                .with_source_code(NamedSource::new(self.paths.config_file.display().to_string(), config_content))
+        })?;
 
         let new_posts = shared::collect_all_posts_metadata(
             &self.paths.content,
@@ -113,7 +121,7 @@ impl ServerState {
                     self.reload_tx.receiver_count()
                 );
             })
-            .map_err(|e| eyre!("Failed to send reload signal: {}", e))
+            .map_err(|e| miette!("Failed to send reload signal: {}", e))
     }
 }
 
@@ -145,7 +153,7 @@ pub fn render_all_pages(
         };
 
         // Draft check
-        let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url);
+        let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url)?;
         let is_draft = metadata
             .get("draft")
             .and_then(|v| v.as_bool())
@@ -159,9 +167,17 @@ pub fn render_all_pages(
         let mut metadata = if let Some(cached) = cache.get(&cache_key, &content) {
             serde_json::from_value(cached).unwrap_or_else(|_| {
                 shared::load_metadata_from_content(&content, rel_path, routes_url)
+                    .unwrap_or_else(|e| {
+                        error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                        toml::Value::Table(toml::map::Map::new())
+                    })
             })
         } else {
             shared::load_metadata_from_content(&content, rel_path, routes_url)
+                .unwrap_or_else(|e| {
+                    error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                    toml::Value::Table(toml::map::Map::new())
+                })
         };
 
         ctx.plugins
@@ -255,21 +271,32 @@ pub(super) async fn setup_server_state(
 ) -> Result<Arc<ServerState>> {
     debug!("Setting up server state");
 
-    let config_content = tokio::fs::read_to_string(&root).await?;
+    let config_content = tokio::fs::read_to_string(&root).await.into_diagnostic().wrap_err("Failed to read config file")?;
     debug!("Config file path: {:?}", root);
     debug!("Config content:\n{}", config_content);
-    let site_config: config::SiteConfig = toml::from_str(&config_content)?;
+    let config_content_for_validation = config_content.clone();
+    let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+        miette!("Failed to parse site configuration: {}", e)
+            .with_source_code(NamedSource::new(root.display().to_string(), config_content))
+    })?;
     debug!("Parsed categories_dir: {}", site_config.categories_dir);
 
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
-        for error in &validation_errors {
-            eprintln!("{}", error);
-        }
-        bail!("Site configuration has validation errors");
+        return Err(miette!(
+            "Site configuration has validation errors:\n{}",
+            validation_errors.join("\n")
+        )
+        .with_source_code(NamedSource::new(
+            root.display().to_string(),
+            config_content_for_validation,
+        )));
     }
 
-    let root_dir = root.parent().unwrap().to_path_buf();
+    let root_dir = root
+        .parent()
+        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .to_path_buf();
     let mut paths = SitePaths::new(root_dir.clone());
 
     if let Ok(real) = tokio::fs::canonicalize(&paths.content).await {
@@ -288,7 +315,11 @@ pub(super) async fn setup_server_state(
         paths.theme_templates = real;
     }
 
-    let tera = crate::tera::init(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
+    let templates_dir = paths
+        .templates
+        .to_str()
+        .ok_or_else(|| miette!("Templates path is not valid UTF-8: {}", paths.templates.display()))?;
+    let tera = crate::tera::init(templates_dir, &paths.theme_templates)?;
 
     let (reload_tx, _) = broadcast::channel(16);
 
@@ -298,7 +329,9 @@ pub(super) async fn setup_server_state(
     let cache = crate::cache::BuildCache::open(&root_dir)?;
 
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
-    let _ = plugin::sandbox::apply_landlock(&root_dir);
+    if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
+        warn!("{}", e);
+    }
     if plugin_mgr.has_hook(plugin::HOOK_PRE_BUILD) {
         let input = serde_json::json!({
             "site_config": site_config,

@@ -19,7 +19,7 @@ path = "src/main.rs"
 chrono = { version = "0.4.39", features = ["serde"] }
 clap = { version = "4.5.27", features = ["deprecated", "derive", "env", "wrap_help"] }
 comfy-table = "7.1.3"
-eyre = "0.6.12"
+miette = { version = "7", features = ["fancy"] }
 hyper = { version = "=0.14.32", features = ["runtime", "server", "http1", "http2"] }
 tera = { version = "2", features = ["default", "fast", "glob_fs", "preserve_order", "unicode"] }
 tera-contrib = { version = "0.2.0", features = ["date", "filesize_format", "format", "json", "regex", "slug", "urlencode"] }

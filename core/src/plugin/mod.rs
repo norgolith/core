@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use colored::Colorize;
-use eyre::Result;
+use miette::{Result, bail};
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
 pub use manifest::{Capabilities, FilesystemAccess, HookConfig, PluginManifest};
@@ -18,7 +18,7 @@ pub use norgolith_plugin_sdk::{
     CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
 
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Hooks a plugin can implement. Each is an optional C ABI function pointer
 pub struct PluginHooks {
@@ -41,25 +41,20 @@ pub struct PluginInstance {
 }
 
 impl PluginInstance {
-    /// Call a hook on this plugin with safety wrappers (catch_unwind + timeout)
-    ///
-    /// Returns `Ok(None)` if plugin returned NULL (no change)
-    /// Returns `Ok(Some(html))` if plugin returned modified content
-    /// Returns `Err` on panic, timeout, invalid response, or plugin error
     pub fn call_hook(&self, f: PluginFn, input: &str) -> Result<Option<String>> {
         let timeout = Duration::from_millis(self.manifest.timeout_ms);
-        match ffi::call_hook_safe(f, input, timeout) {
-            Ok(Some(json)) => match ffi::parse_hook_response(&json) {
+        match ffi::call_hook_safe(f, input, timeout, &self.name) {
+            Ok(Some(json)) => match ffi::parse_hook_response(&self.name, &json) {
                 Ok(Some(html)) => Ok(Some(html)),
                 Ok(None) => Ok(None),
                 Err(e) => {
-                    warn!("Plugin '{}' returned invalid response: {}", self.name, e);
+                    debug!("Plugin '{}' returned invalid response: {}", self.name, e);
                     Err(e)
                 }
             },
             Ok(None) => Ok(None),
             Err(e) => {
-                warn!("Plugin '{}' hook failed: {}", self.name, e);
+                debug!("Plugin '{}' hook failed: {}", self.name, e);
                 Err(e)
             }
         }
@@ -335,10 +330,10 @@ extern "C" fn default_free(ptr: *mut std::os::raw::c_char) {
 }
 
 /// Load a single plugin from a directory containing `plugin.toml` + shared library
-fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
+fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
     let manifest_path = dir.join("plugin.toml");
     if !manifest_path.is_file() {
-        eyre::bail!("no plugin.toml found");
+        bail!("No plugin.toml found in {}", dir.display());
     }
 
     let manifest = PluginManifest::load(&manifest_path)?;
@@ -346,16 +341,16 @@ fn load_plugin(dir: &Path) -> eyre::Result<PluginInstance> {
     manifest.validate_semver()?;
 
     let lib_path = find_library(dir, &manifest.plugin.name)
-        .ok_or_else(|| eyre::eyre!("shared library not found"))?;
+        .ok_or_else(|| miette::miette!("Could not find compiled plugin library in {}", dir.display()))?;
 
     // SAFETY: we validate ABI before loading, and the init function is the only symbol we look up
     let lib = unsafe { libloading::Library::new(&lib_path) }
-        .map_err(|e| eyre::eyre!("failed to load {}: {}", lib_path.display(), e))?;
+        .map_err(|e| miette::miette!("Failed to load {}: {}", lib_path.display(), e))?;
 
     type InitFn = unsafe extern "C" fn(*mut PluginInfo, *mut u32, *mut [Option<PluginFn>; 4]);
 
     let init: libloading::Symbol<InitFn> = unsafe { lib.get(b"norgolith_plugin_init") }
-        .map_err(|e| eyre::eyre!("missing symbol norgolith_plugin_init: {}", e))?;
+        .map_err(|e| miette::miette!("Missing norgolith_plugin_init symbol: {}", e))?;
 
     let mut info = PluginInfo {
         abi_version: 0,

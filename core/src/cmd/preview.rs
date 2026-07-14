@@ -4,13 +4,13 @@ use std::{
 };
 
 use colored::Colorize as _;
-use eyre::{Result, bail};
+use miette::{Result, bail};
 use hyper::{
     Body, Request, Response, Server, StatusCode,
     header::CONTENT_TYPE,
     service::{make_service_fn, service_fn},
 };
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use crate::fs;
 
@@ -31,21 +31,30 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, mime_type.as_ref())
         .body(Body::from(content))
-        .unwrap())
+        .unwrap_or_else(|e| {
+            error!("Failed to build response: {e}");
+            Response::new(Body::from(""))
+        }))
 }
 
 fn handle_not_found() -> Response<Body> {
     if let Ok(content) = std::fs::read_to_string("./public/404.html") {
-        return Response::builder()
+        if let Ok(resp) = Response::builder()
             .status(StatusCode::NOT_FOUND)
             .header(CONTENT_TYPE, "text/html; charset=utf-8")
             .body(Body::from(content))
-            .expect("Could not build Not Found response");
+        {
+            return resp;
+        }
+        error!("Failed to build 404 response with custom page");
     }
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("not found"))
-        .expect("Could not build Not Found response")
+        .unwrap_or_else(|e| {
+            error!("Failed to build 404 response: {e}");
+            Response::new(Body::from("not found"))
+        })
 }
 
 fn sanitize_path(uri_path: &str) -> PathBuf {
@@ -90,7 +99,7 @@ pub async fn preview(port: u16, open: bool, host: bool) -> Result<()> {
     }
 
     if let Err(e) = server.await {
-        bail!("{}: {}", "Server error".bold(), e);
+        bail!("{}: {}", "Preview server stopped unexpectedly".bold(), e);
     }
 
     Ok(())

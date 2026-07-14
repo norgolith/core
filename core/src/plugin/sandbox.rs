@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use eyre::Result;
+use miette::Result;
 use tracing::warn;
 
 /// Apply Landlock filesystem restrictions to the current process
@@ -56,15 +56,15 @@ pub fn apply_landlock(site_dir: &Path) -> Result<()> {
 
         let ruleset = Ruleset::default()
             .handle_access(access)
-            .map_err(|e| eyre::eyre!("failed to create landlock ruleset: {}", e))?
+            .map_err(|e| miette::miette!("Failed to apply filesystem sandbox: {}", e))?
             .create()
-            .map_err(|e| eyre::eyre!("failed to create landlock ruleset: {}", e))?;
+            .map_err(|e| miette::miette!("Failed to apply filesystem sandbox: {}", e))?;
 
         let rules = path_beneath_rules(&allowed_paths, access);
 
         let ruleset = ruleset
             .add_rules(rules)
-            .map_err(|e| eyre::eyre!("failed to add landlock rules: {}", e))?;
+            .map_err(|e| miette::miette!("Failed to apply filesystem sandbox: {}", e))?;
 
         match ruleset.restrict_self() {
             Ok(status) => {

@@ -12,11 +12,18 @@ mod shortcode;
 mod tera;
 mod theme;
 
-use eyre::Result;
+use miette::{IntoDiagnostic, MietteHandlerOpts, Report, WrapErr, set_hook};
 use tracing_subscriber::{FmtSubscriber, filter::EnvFilter, fmt::time::ChronoLocal};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Report> {
+    set_hook(Box::new(|_| {
+        Box::new(MietteHandlerOpts::new()
+            .unicode(true)
+            .context_lines(3)
+            .build())
+    })).ok();
+
     // XXX: junk to test the conversion tool, remove later
     //let norg_doc = tokio::fs::read_to_string("/home/amartin/notes/languages/elixir.norg").await?;
     //let norg_html = converter::convert(norg_doc.clone());
@@ -25,7 +32,9 @@ async fn main() -> Result<()> {
 
     let logging_timer = ChronoLocal::new(String::from("%I:%M %p %F"));
     let logging_env =
-        EnvFilter::try_from_env("LITH_LOG").or_else(|_| EnvFilter::try_new("info"))?;
+        EnvFilter::try_from_env("LITH_LOG")
+            .or_else(|_| EnvFilter::try_new("info"))
+            .into_diagnostic().wrap_err("Failed to configure logging")?;
     let subscriber = FmtSubscriber::builder()
         .with_target(false)
         .with_file(false)
@@ -34,12 +43,9 @@ async fn main() -> Result<()> {
         .with_timer(logging_timer)
         .with_env_filter(logging_env)
         .finish();
-    tracing::subscriber::set_global_default(subscriber)?;
+    tracing::subscriber::set_global_default(subscriber).into_diagnostic().wrap_err("Failed to initialize tracing subscriber")?;
 
-    if let Err(e) = cli::start().await {
-        tracing::error!("{}", e);
-        std::process::exit(1);
-    }
+    cli::start().await?;
 
     Ok(())
 }

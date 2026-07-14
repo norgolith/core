@@ -1,6 +1,6 @@
-use eyre::Result;
+use miette::{Result, miette};
 use tera::Context;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Markers used by the converter to wrap @embed html content.
 const MARKER_OPEN: &str = "<!--lith:embed-->";
@@ -37,14 +37,10 @@ pub fn process(html: &str, tera: &tera::Tera, context: &Context) -> Result<Strin
 
                 // Only render through Tera if the island contains component syntax
                 if island.contains("{{ <") || island.contains("{% <") {
-                    match tera.render_str(island, context, false) {
-                        Ok(rendered) => result.push_str(&rendered),
-                        Err(e) => {
-                            warn!("Shortcode render error: {}", e);
-                            // Fall back to raw island content
-                            result.push_str(island);
-                        }
-                    }
+                    result.push_str(
+                        &tera.render_str(island, context, false)
+                            .map_err(|e| miette!("Failed to render shortcode: {}", e))?,
+                    );
                 } else {
                     // No component calls - pass through as-is
                     result.push_str(island);

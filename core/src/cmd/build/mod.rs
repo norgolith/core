@@ -9,7 +9,7 @@ use std::{
 };
 
 use colored::{ColoredString, Colorize};
-use eyre::{Result, WrapErr, bail, eyre};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use tera::Context;
 use tracing::{debug, error, instrument, warn};
 use walkdir::WalkDir;
@@ -34,12 +34,12 @@ fn href_root_re() -> &'static regex::Regex {
 fn prepare_build_directory(public_dir: &Path) -> Result<()> {
     debug!(path = %public_dir.display(), "Preparing build directory");
     if public_dir.exists() {
-        for entry in std::fs::read_dir(public_dir).wrap_err(format!(
+        for entry in std::fs::read_dir(public_dir).into_diagnostic().wrap_err(format!(
             "{}: {}",
             "Failed to read existing public directory".bold(),
             public_dir.display()
         ))? {
-            let entry = entry.wrap_err(format!(
+            let entry = entry.into_diagnostic().wrap_err(format!(
                 "{}: {}",
                 "Failed to iterate existing public directory".bold(),
                 public_dir.display()
@@ -52,20 +52,20 @@ fn prepare_build_directory(public_dir: &Path) -> Result<()> {
                 continue;
             }
 
-            let metadata = entry.metadata().wrap_err(format!(
+            let metadata = entry.metadata().into_diagnostic().wrap_err(format!(
                 "{}: {}",
                 "Failed to stat existing public entry".bold(),
                 path.display()
             ))?;
 
             if metadata.is_dir() {
-                std::fs::remove_dir_all(&path).wrap_err(format!(
+                std::fs::remove_dir_all(&path).into_diagnostic().wrap_err(format!(
                     "{}: {}",
                     "Failed to remove existing public directory entry".bold(),
                     path.display()
                 ))?;
             } else {
-                std::fs::remove_file(&path).wrap_err(format!(
+                std::fs::remove_file(&path).into_diagnostic().wrap_err(format!(
                     "{}: {}",
                     "Failed to remove existing public file entry".bold(),
                     path.display()
@@ -74,7 +74,7 @@ fn prepare_build_directory(public_dir: &Path) -> Result<()> {
         }
     } else {
         debug!(path = %public_dir.display(), "Creating public directory");
-        std::fs::create_dir_all(public_dir).wrap_err(format!(
+        std::fs::create_dir_all(public_dir).into_diagnostic().wrap_err(format!(
             "{}: {}",
             "Failed to create public directory".bold(),
             public_dir.display()
@@ -90,7 +90,7 @@ fn determine_public_path(public_dir: &Path, rel_path: &Path) -> Result<PathBuf> 
     let stem = rel_path
         .file_stem()
         .and_then(|s| s.to_str())
-        .ok_or_else(|| eyre!("Invalid file stem for path: {}", rel_path.display()))?;
+        .ok_or_else(|| miette!("Invalid file stem for path: {}", rel_path.display()))?;
     if stem == "index" {
         Ok(public_dir.join(rel_path).with_extension("html"))
     } else {
@@ -109,7 +109,7 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
 
     let mut dirs = std::collections::HashSet::new();
     for entry in entries {
-        let rel_path = entry.path().strip_prefix(&paths.content)?;
+        let rel_path = entry.path().strip_prefix(&paths.content).into_diagnostic().wrap_err("Failed to resolve content path")?;
         if let Ok(public_path) = determine_public_path(&paths.public, rel_path)
             && let Some(parent) = public_path.parent()
         {
@@ -117,7 +117,7 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
         }
     }
     for dir in &dirs {
-        std::fs::create_dir_all(dir)?;
+        std::fs::create_dir_all(dir).into_diagnostic().wrap_err("Failed to create output directory")?;
     }
     Ok(())
 }
@@ -129,7 +129,7 @@ fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
     {
         return Ok(false);
     }
-    std::fs::write(public_path, rendered).wrap_err(format!(
+    std::fs::write(public_path, rendered).into_diagnostic().wrap_err(format!(
         "{}: {}",
         "Failed to write to public path".bold(),
         public_path.display()
@@ -168,6 +168,7 @@ fn build_contents(
 
     let mut buffered_writes = Vec::new();
     let mut permalinks = Vec::new();
+    let mut page_errors = Vec::new();
     for result in results {
         match result {
             Ok(Some((public_path, content, permalink, cache_entry))) => {
@@ -178,8 +179,15 @@ fn build_contents(
                 }
             }
             Ok(None) => {}
-            Err(e) => error!("{:?}", e),
+            Err(e) => {
+                error!("{:#}", e);
+                page_errors.push(e);
+            }
         }
+    }
+    if !page_errors.is_empty() {
+        let count = page_errors.len();
+        bail!("{} page(s) failed to build (see errors above)", count);
     }
 
     let write_start = Instant::now();
@@ -208,7 +216,7 @@ fn build_content_entry(
 ) -> BuildResult {
     let rel_path = path
         .strip_prefix(&ctx.paths.content)
-        .wrap_err("Failed to strip prefix")?;
+        .into_diagnostic().wrap_err("Failed to strip prefix")?;
 
     let Ok(content) = std::fs::read_to_string(path) else {
         error!(
@@ -220,26 +228,26 @@ fn build_content_entry(
     };
 
     let metadata =
-        shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
-
+        shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
     if let Some(schema) = &ctx.site_config.content_schema
         && !rel_path.starts_with(&ctx.site_config.categories_dir)
     {
-        let errors = shared::validate_content_metadata(
+        shared::validate_content_metadata(
             &ctx.paths.content,
             path,
             &metadata,
             schema,
             false,
         )?;
-        if !errors.is_empty() {
-            return Err(eyre!("{}", errors));
-        }
     }
 
-    if toml::Value::as_bool(metadata.get("draft").unwrap_or(&toml::Value::from(false)))
-        .expect("draft metadata field should be a boolean")
-    {
+    let is_draft = match metadata.get("draft") {
+        Some(val) => val.as_bool().ok_or_else(|| {
+            miette!("'draft' field must be a boolean for '{}'", path.display())
+        })?,
+        None => false,
+    };
+    if is_draft {
         return Ok(None);
     }
 
@@ -254,13 +262,13 @@ fn build_content_entry(
                     &content,
                     rel_path,
                     &ctx.site_config.root_url,
-                );
+                )?;
                 let cache_val = serde_json::to_value(&md).unwrap_or_default();
                 (md, Some((cache_key, content.clone(), cache_val)))
             }
         }
     } else {
-        let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
+        let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
         let cache_val = serde_json::to_value(&md).unwrap_or_default();
         (md, Some((cache_key, content.clone(), cache_val)))
     };
@@ -334,32 +342,48 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Load site configuration
     let t = Instant::now();
-    let config_content = std::fs::read_to_string(&root).wrap_err("Failed to read config file")?;
-    let site_config: config::SiteConfig =
-        toml::from_str(&config_content).wrap_err("Failed to parse site configuration")?;
+    let config_content = std::fs::read_to_string(&root).into_diagnostic().wrap_err("Failed to read config file")?;
+    let config_content_for_validation = config_content.clone();
+    let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+        miette!("Failed to parse site configuration: {}", e)
+            .with_source_code(NamedSource::new(root.display().to_string(), config_content))
+    })?;
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
-        for error in &validation_errors {
-            eprintln!("{}", error);
-        }
-        bail!("Site configuration has validation errors");
+        return Err(miette!(
+            "Site configuration has validation errors:\n{}",
+            validation_errors.join("\n")
+        )
+        .with_source_code(NamedSource::new(
+            root.display().to_string(),
+            config_content_for_validation,
+        )));
     }
     debug!(?site_config, "Loaded site configuration");
     timings.config_ms = t.elapsed().as_millis();
 
-    let root_dir = root.parent().unwrap().to_path_buf();
+    let root_dir = root
+        .parent()
+        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .to_path_buf();
     let paths = SitePaths::new(root_dir.clone());
 
     // Initialize Tera
     let t = Instant::now();
     debug!("Initializing template engine");
-    let tera = crate::tera::init(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
+    let templates_dir = paths
+        .templates
+        .to_str()
+        .ok_or_else(|| miette!("Templates path is not valid UTF-8: {}", paths.templates.display()))?;
+    let tera = crate::tera::init(templates_dir, &paths.theme_templates)?;
     timings.tera_ms = t.elapsed().as_millis();
 
     // Load plugins and apply sandbox
     let t = Instant::now();
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
-    let _ = plugin::sandbox::apply_landlock(&root_dir);
+    if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
+        warn!("{}", e);
+    }
     timings.plugins_ms = t.elapsed().as_millis();
 
     println!();
@@ -408,13 +432,7 @@ pub fn build(minify: bool) -> Result<()> {
     )?
     .into_iter()
     .filter(|post| {
-        !post
-            .get("draft")
-            .map(|v| {
-                v.as_bool()
-                    .expect("draft metadata field should be a boolean")
-            })
-            .unwrap_or(false)
+        !post.get("draft").and_then(|v| v.as_bool()).unwrap_or(false)
     })
     .collect();
     timings.collect_posts_ms = t.elapsed().as_millis();
@@ -539,7 +557,7 @@ pub fn build(minify: bool) -> Result<()> {
 
             let xml = seo::generate_sitemap_xml(&urls, &site_config.root_url);
             let output_path = paths.public.join("sitemap.xml");
-            std::fs::write(&output_path, &xml).wrap_err("Failed to write sitemap.xml")?;
+            std::fs::write(&output_path, &xml).into_diagnostic().wrap_err("Failed to write sitemap.xml")?;
             seo_count += 1;
         }
 
@@ -549,7 +567,7 @@ pub fn build(minify: bool) -> Result<()> {
             let content =
                 seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
             let output_path = paths.public.join("robots.txt");
-            std::fs::write(&output_path, &content).wrap_err("Failed to write robots.txt")?;
+            std::fs::write(&output_path, &content).into_diagnostic().wrap_err("Failed to write robots.txt")?;
             seo_count += 1;
         }
     }

@@ -212,7 +212,7 @@ Ask your AI editor questions like:
 
 The MCP server source lives at `norgolith-mcp/src/main.rs` in the repository. The build script
 embeds documentation pages and source files at compile time using `include_str!`, so the server
-runs without filesystem access to the docs directory — everything is baked into the binary.
+runs without filesystem access to the docs directory - everything is baked into the binary.
 
 To rebuild the embedded content after changing docs:
 

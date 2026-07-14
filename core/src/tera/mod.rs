@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use eyre::{eyre, Result};
+use miette::{miette, Result};
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use tera::value::Key;
 use tera::{Error, Filter, Function, Kwargs, State, Tera, TeraResult, Value};
@@ -101,8 +101,8 @@ fn generate_nested_html(tree: &TocTree, list_type: &str) -> String {
         let node = &tree.nodes[node_idx];
 
         let mut escaped_title = Vec::new();
-        tera::escape_html(&node.title, &mut escaped_title).expect("escape_html failed");
-        let escaped_title = String::from_utf8(escaped_title).expect("not UTF-8");
+        tera::escape_html(&node.title, &mut escaped_title).ok();
+        let escaped_title = String::from_utf8(escaped_title).unwrap_or_default();
         let mut html = format!(
             "<li><a href=\"#{}\">{}</a>",
             utf8_percent_encode(&node.id, UNRESERVED),
@@ -260,14 +260,14 @@ pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> Result<Te
     collect_template_files(&mut files, Path::new(templates_dir), "xml");
 
     tera.add_template_files(files)
-        .map_err(|e| eyre!("Error loading templates: {}", e))?;
+        .map_err(|e| miette!("Error loading templates: {}", e))?;
 
     // Register built-in error templates AFTER all templates loaded
     // (v2 resolves inheritance at load time, so base.html must exist first)
     tera.add_raw_template("404.html", include_str!("../resources/templates/404.html"))
-        .map_err(|e| eyre!("Failed to register default 404 template: {}", e))?;
+        .map_err(|e| miette!("Failed to register default 404 template: {}", e))?;
     tera.add_raw_template("500.html", include_str!("../resources/templates/500.html"))
-        .map_err(|e| eyre!("Failed to register default 500 template: {}", e))?;
+        .map_err(|e| miette!("Failed to register default 500 template: {}", e))?;
 
     Ok(tera)
 }

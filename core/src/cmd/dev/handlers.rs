@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use colored::Colorize;
-use eyre::{Result, eyre};
+use miette::{IntoDiagnostic, Result, WrapErr, miette};
 use futures_util::{SinkExt, StreamExt};
 use hyper::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use hyper::{Body, Request, Response, StatusCode, header::CONTENT_TYPE};
@@ -31,10 +31,10 @@ pub(super) fn rewrite_urls(body: String, root_url: &str, routes_url: &str) -> St
 }
 
 fn html_response(body: String, status: StatusCode) -> Result<Response<Body>> {
-    Ok(Response::builder()
+    Response::builder()
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .status(status)
-        .body(Body::from(body))?)
+        .body(Body::from(body)).into_diagnostic().wrap_err("Failed to build HTML response")
 }
 
 #[instrument(skip(html))]
@@ -58,7 +58,7 @@ pub(super) async fn read_asset(path: &Path) -> Result<(Vec<u8>, String)> {
 
     let content = tokio::fs::read(path)
         .await
-        .map_err(|e| eyre!("Failed to read asset: {}", e))?;
+        .map_err(|e| miette!("Failed to read '{}': {}", path.display(), e))?;
     let mime_type = mime_guess::from_path(path)
         .first_or_octet_stream()
         .as_ref()
@@ -68,7 +68,7 @@ pub(super) async fn read_asset(path: &Path) -> Result<(Vec<u8>, String)> {
     Ok((content, mime_type))
 }
 
-pub(super) fn handle_not_found(state: &ServerState) -> Response<Body> {
+pub(super) fn handle_not_found(state: &ServerState) -> Result<Response<Body>> {
     let tera = state.tera.try_read().ok();
     let config = state.config.try_read().ok();
     if let (Some(tera), Some(config)) = (tera, config)
@@ -88,13 +88,13 @@ pub(super) fn handle_not_found(state: &ServerState) -> Response<Body> {
                 .status(StatusCode::NOT_FOUND)
                 .header(CONTENT_TYPE, "text/html; charset=utf-8")
                 .body(Body::from(rendered))
-                .expect("Could not build Not Found response");
+                .map_err(|e| miette!("Failed to build 404 response: {}", e));
         }
     }
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("not found"))
-        .expect("Could not build Not Found response")
+        .map_err(|e| miette!("Failed to build 404 response: {}", e))
 }
 
 pub(super) async fn resolve_url_norg_path(
@@ -147,12 +147,12 @@ pub(super) async fn handle_asset(
                 }
                 Err(_) => {
                     error!(asset_path = %request_path, "Asset not found in site or theme directories");
-                    return Ok(handle_not_found(state));
+                    return handle_not_found(state);
                 }
             }
         }
     };
-    Ok(Response::builder()
+    Response::builder()
         .header(CONTENT_TYPE, mime_type)
         .status(StatusCode::OK)
         .header(
@@ -161,7 +161,7 @@ pub(super) async fn handle_asset(
         )
         .header(PRAGMA, "no-cache")
         .header(EXPIRES, 0)
-        .body(Body::from(content))?)
+        .body(Body::from(content)).into_diagnostic().wrap_err("Failed to build asset response")
 }
 
 async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result<Response<Body>> {
@@ -170,16 +170,16 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
 
     // Fast path: lookup in pre-rendered memory cache
     if let Some(html) = fast_path_lookup(state, request_path).await {
-        return Ok(Response::builder()
+        return Response::builder()
             .header(CONTENT_TYPE, "application/xml; charset=utf-8")
             .status(StatusCode::OK)
-            .body(Body::from(html))?);
+            .body(Body::from(html)).into_diagnostic().wrap_err("Failed to build XML feed response");
     }
 
     // Slow path: render on demand
     let tera = state.tera.read().await;
     if !tera.get_template_names().any(|n| n == template_name) {
-        return Ok(handle_not_found(state));
+        return handle_not_found(state);
     }
 
     let config = state.config.read().await.clone();
@@ -190,16 +190,16 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
 
     let content = tera
         .render(template_name, &context)
-        .map_err(|e| eyre!("{}: {}", "Failed to render XML feed template".bold(), e))?;
+        .map_err(|e| miette!("Failed to render feed template '{}': {}", template_name, e))?;
 
-    Ok(Response::builder()
+    Response::builder()
         .header(CONTENT_TYPE, "application/xml; charset=utf-8")
         .status(StatusCode::OK)
-        .body(Body::from(content))?)
+        .body(Body::from(content)).into_diagnostic().wrap_err("Failed to build XML feed response")
 }
 
 async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<Response<Body>> {
-    let rel_path = path.strip_prefix(&state.paths.content)?.to_path_buf();
+    let rel_path = path.strip_prefix(&state.paths.content).into_diagnostic().wrap_err("Failed to resolve content path")?.to_path_buf();
     let url_path = format!("/{}", rel_path.with_extension("").display());
 
     // Fast path: lookup in pre-rendered memory cache
@@ -213,16 +213,20 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
     let tera = state.tera.read().await;
 
     let Ok(content) = tokio::fs::read_to_string(&path).await else {
-        return Ok(handle_not_found(&state));
+        return handle_not_found(&state);
     };
 
-    let metadata = shared::extract_metadata_from_content(&content, &rel_path, &state.routes_url);
+    let metadata = shared::extract_metadata_from_content(&content, &rel_path, &state.routes_url)
+        .map_err(|e| {
+            error!("Failed to extract metadata for {}: {}", rel_path.display(), e);
+            miette!("Failed to extract metadata for {}: {}", rel_path.display(), e)
+        })?;
     let is_draft = metadata
         .get("draft")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     if is_draft && !state.build_drafts {
-        return Ok(handle_not_found(&state));
+        return handle_not_found(&state);
     }
 
     let cache_key = rel_path.with_extension("");
@@ -233,10 +237,18 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
     let metadata = if let Some(cached) = metadata {
         match serde_json::from_value(cached.clone()) {
             Ok(md) => md,
-            Err(_) => shared::load_metadata_from_content(&content, &rel_path, &state.routes_url),
+            Err(_) => shared::load_metadata_from_content(&content, &rel_path, &state.routes_url)
+                .map_err(|e| {
+                    error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                    miette!("Failed to load metadata for {}: {}", rel_path.display(), e)
+                })?,
         }
     } else {
-        let md = shared::load_metadata_from_content(&content, &rel_path, &state.routes_url);
+        let md = shared::load_metadata_from_content(&content, &rel_path, &state.routes_url)
+            .map_err(|e| {
+                error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                miette!("Failed to load metadata for {}: {}", rel_path.display(), e)
+            })?;
         if let Ok(json_val) = serde_json::to_value(&md) {
             let mut cache_guard = state.cache.write().await;
             cache_guard.insert(&cache_key, &content, json_val);
@@ -263,12 +275,12 @@ async fn handle_content(request_path: &str, state: Arc<ServerState>) -> Result<R
     match resolve_url_norg_path(&state.paths.content, &req_path).await {
         Ok(path) => handle_norg_content(path, state).await,
         Err(io_err) => match io_err.kind() {
-            std::io::ErrorKind::NotFound => Ok(handle_not_found(&state)),
-            std::io::ErrorKind::PermissionDenied => Ok(Response::builder()
+            std::io::ErrorKind::NotFound => handle_not_found(&state),
+            std::io::ErrorKind::PermissionDenied => Response::builder()
                 .status(StatusCode::FORBIDDEN)
                 .body(Body::empty())
-                .unwrap()),
-            _ => Err(eyre!("Error reading '{}': {}", req_path.display(), io_err)),
+                .map_err(|e| miette!("Failed to build 403 response: {}", e)),
+            _ => Err(miette!("Error reading '{}': {}", req_path.display(), io_err)),
         },
     }
 }
@@ -294,15 +306,10 @@ async fn handle_category_index(state: &Arc<ServerState>) -> Result<Response<Body
 
     let tera = state.tera.read().await;
     let mut body = tera.render("categories.html", &context).map_err(|e| {
-        if e.source().is_some() {
-            let internal_err = e.source().unwrap();
-            eyre!(
-                "{}: {}",
-                "Failed to render 'categories.html' template".bold(),
-                internal_err
-            )
+        if let Some(source) = e.source() {
+            miette!("Failed to render 'categories.html' template: {}", source)
         } else {
-            eyre!("{}", "Failed to render 'categories.html' template".bold())
+            miette!("Failed to render 'categories.html' template")
         }
     })?;
     body = rewrite_urls(body, &config.root_url, &state.routes_url);
@@ -347,15 +354,10 @@ async fn handle_category(path: &str, state: &Arc<ServerState>) -> Result<Respons
 
     let tera = state.tera.read().await;
     let mut body = tera.render("category.html", &context).map_err(|e| {
-        if e.source().is_some() {
-            let internal_err = e.source().unwrap();
-            eyre!(
-                "{}: {}",
-                "Failed to render 'category.html' template".bold(),
-                internal_err
-            )
+        if let Some(source) = e.source() {
+            miette!("Failed to render 'category.html' template: {}", source)
         } else {
-            eyre!("{}", "Failed to render 'category.html' template".bold())
+            miette!("Failed to render 'category.html' template")
         }
     })?;
 
@@ -422,7 +424,7 @@ async fn handle_request(req: Request<Body>, state: Arc<ServerState>) -> Result<R
     match request_path {
         "/livereload.js" => Ok(Response::builder()
             .header(CONTENT_TYPE, "text/javascript")
-            .body(LIVE_RELOAD_SCRIPT.into())?),
+            .body(LIVE_RELOAD_SCRIPT.into()).into_diagnostic().wrap_err("Failed to build livereload script response")?),
         path if path == format!("/{}", categories_dir) => handle_category_index(&state).await,
         path if path.starts_with(&format!("/{}/", categories_dir)) => {
             handle_category(path, &state).await

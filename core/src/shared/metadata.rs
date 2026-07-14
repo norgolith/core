@@ -1,14 +1,13 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use colored::Colorize;
-use eyre::{Result, eyre};
-use tracing::{error, warn};
+use miette::{Result, miette};
+use tracing::warn;
 use walkdir::WalkDir;
 
 use crate::config::CollectionConfig;
 use crate::converter;
-use crate::schema::{ContentSchema, format_errors, validate_metadata};
+use crate::schema::{ContentSchema, ValidationErrors, format_errors, validate_metadata};
 
 /// Computes the permalink for a content file based on its relative path.
 fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
@@ -56,22 +55,11 @@ fn normalize_categories(metadata: &mut toml::Value) {
 /// Full metadata + HTML conversion from pre-read content.
 ///
 /// This is the inner function that does the actual work. It does NOT read from disk.
-pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &str) -> toml::Value {
-    let (html, toc) = match converter::html::convert(content, routes_url) {
-        Ok(v) => v,
-        Err(e) => {
-            warn!("Failed to convert {}: {}", rel_path.display(), e);
-            return toml::Value::Table(toml::map::Map::new());
-        }
-    };
-    let mut metadata =
-        match converter::meta::convert(content, Some(converter::html::toc_to_toml(&toc))) {
-            Ok(m) => m,
-            Err(e) => {
-                warn!("Failed to parse metadata for {}: {}", rel_path.display(), e);
-                toml::Value::Table(toml::map::Map::new())
-            }
-        };
+pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &str) -> Result<toml::Value> {
+    let (html, toc) = converter::html::convert(content, routes_url)
+        .map_err(|e| miette!("Failed to convert {}: {}", rel_path.display(), e))?;
+    let mut metadata = converter::meta::convert(content, Some(converter::html::toc_to_toml(&toc)))
+        .map_err(|e| miette!("Failed to parse metadata for {}: {}", rel_path.display(), e))?;
     let permalink = compute_permalink(rel_path, routes_url);
     normalize_datetimes(&mut metadata);
     normalize_categories(&mut metadata);
@@ -80,30 +68,22 @@ pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &s
         table.insert("permalink".to_string(), toml::Value::String(permalink));
         table.insert("rel_path".to_string(), toml::Value::String(rel_path.to_string_lossy().to_string()));
     }
-    metadata
+    Ok(metadata)
 }
 
-/// Lightweight metadata extraction from pre-read content (no parse_tree).
-///
-/// This is the inner function that does the actual work. It does NOT read from disk.
 pub fn extract_metadata_from_content(
     content: &str,
     rel_path: &Path,
     routes_url: &str,
-) -> toml::Value {
-    let mut metadata = match converter::meta::convert(content, None) {
-        Ok(m) => m,
-        Err(e) => {
-            warn!("Failed to parse metadata for {}: {}", rel_path.display(), e);
-            toml::Value::Table(toml::map::Map::new())
-        }
-    };
+) -> Result<toml::Value> {
+    let mut metadata = converter::meta::convert(content, None)
+        .map_err(|e| miette!("Failed to parse metadata for {}: {}", rel_path.display(), e))?;
     let permalink = compute_permalink(rel_path, routes_url);
     normalize_datetimes(&mut metadata);
     if let toml::Value::Table(ref mut table) = metadata {
         table.insert("permalink".to_string(), toml::Value::String(permalink));
     }
-    metadata
+    Ok(metadata)
 }
 
 /// Validates content metadata against a schema.
@@ -128,18 +108,18 @@ pub fn validate_content_metadata(
 ) -> Result<String> {
     let relative_path = path
         .strip_prefix(content_dir)
-        .map_err(|e| eyre!("Path {} is not under content_dir: {}", path.display(), e))?;
+        .map_err(|e| miette!("Path {} is not under content_dir: {}", path.display(), e))?;
     // We do not need to do anything with the metadata permalink here so we pass an empty string to it
     let metadata_map = metadata
         .as_table()
-        .ok_or_else(|| eyre!("Metadata for {} is not a table", path.display()))?
+        .ok_or_else(|| miette!("Metadata for {} is not a table", path.display()))?
         .iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
 
     let content_path = relative_path
         .to_str()
-        .ok_or_else(|| eyre!("Non-UTF-8 path: {}", path.display()))?
+        .ok_or_else(|| miette!("Non-UTF-8 path: {}", path.display()))?
         .replace('\\', "/")
         .trim_end_matches(".norg")
         .to_string();
@@ -149,7 +129,10 @@ pub fn validate_content_metadata(
     let errors = validate_metadata(&metadata_map, &merged_schema);
 
     if !errors.is_empty() {
-        return Ok(format_errors(path, &content_path, &errors, as_warnings));
+        if as_warnings {
+            return Ok(format_errors(path, &content_path, &errors, as_warnings));
+        }
+        return Err(miette::Report::new(ValidationErrors(errors)));
     }
     Ok(String::new())
 }
@@ -196,28 +179,22 @@ pub fn collect_all_posts_metadata(
             });
             is_norg_file && is_post
         })
-        .map(|e| {
+        .filter_map(|e| {
             let path = e.path().to_path_buf();
-            let rel_path = path.strip_prefix(content_dir).unwrap().to_path_buf();
-            (path, rel_path)
+            let rel_path = path.strip_prefix(content_dir).ok()?.to_path_buf();
+            Some((path, rel_path))
         })
         .collect();
 
     // Process metadata extraction
     let mut posts: Vec<toml::Value> = entries
         .into_iter()
-        .map(|(path, rel_path)| match std::fs::read_to_string(&path) {
-            Ok(content) => load_metadata_from_content(&content, &rel_path, routes_url),
-            Err(_) => {
-                error!(
-                    "{} {}",
-                    "Norg file not found for".bold(),
-                    rel_path.display()
-                );
-                toml::Value::Table(toml::map::Map::new())
-            }
+        .map(|(path, rel_path)| -> Result<toml::Value> {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|_| miette!("Failed to read {}: {}", rel_path.display(), path.display()))?;
+            load_metadata_from_content(&content, &rel_path, routes_url)
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
 
     posts.sort_by(|a, b| {
         let a_date = a

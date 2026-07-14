@@ -1,6 +1,6 @@
 use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 
-use eyre::{Result, eyre};
+use miette::{Result, miette};
 
 /// Bind to the given address, returning the listener if successful.
 ///
@@ -19,6 +19,6 @@ pub fn bind_available(port: u16, host: bool) -> Result<TcpListener> {
         } else {
             "requested port"
         };
-        eyre!("Could not bind to {} ({}): {}", label, port, e)
+        miette!("Could not bind to {} ({}): {}", label, port, e)
     })
 }

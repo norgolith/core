@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use eyre::{Context, Result, bail, eyre};
+use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use git2::{Repository, build::CheckoutBuilder};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -65,7 +65,7 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     debug!("Finding compatible version");
     let versions = tokio::task::block_in_place(|| -> Result<Vec<Version>> {
         Ok(repo
-            .tag_names(None)?
+            .tag_names(None).into_diagnostic().wrap_err("Failed to list git tags")?
             .iter()
             .flatten()
             .filter_map(|t| Version::parse(t).ok())
@@ -75,7 +75,7 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     let mut versions = versions;
 
     if let Some(req) = requirement {
-        let version_req = VersionReq::parse(&req)?;
+        let version_req = VersionReq::parse(&req).into_diagnostic().wrap_err("Failed to parse version requirement")?;
         versions.retain(|v| version_req.matches(v));
     }
 
@@ -83,7 +83,7 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     versions
         .last()
         .cloned()
-        .ok_or_else(|| eyre!("No matching versions found"))
+        .ok_or_else(|| miette!("No matching versions found"))
 }
 
 #[instrument(skip(repo, version))]
@@ -94,22 +94,22 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
         let (object, reference) = repo.revparse_ext(&tag_name).map_err(|e| {
             error!(error = %e, "Failed to parse version reference");
             e
-        })?;
+        }).into_diagnostic().wrap_err("Failed to parse version tag")?;
 
         repo.checkout_tree(&object, Some(CheckoutBuilder::new().force()))
             .map_err(|e| {
                 error!(error = %e, "Failed to checkout tree");
                 e
-            })?;
+            }).into_diagnostic().wrap_err("Failed to checkout version tree")?;
 
         if let Some(reference) = reference {
             let ref_name = reference
                 .name()
-                .ok_or_else(|| eyre!("Invalid reference name"))?;
+                .ok_or_else(|| miette!("Invalid reference name"))?;
             repo.set_head(ref_name).map_err(|e| {
                 error!(error = %e, "Failed to set HEAD");
                 e
-            })?;
+            }).into_diagnostic().wrap_err("Failed to set repository HEAD")?;
         }
 
         Ok(())
@@ -119,7 +119,7 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
 #[instrument(skip(src, dest, sp))]
 async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<()> {
     // If the theme directory is empty then early return
-    if fs::read_dir(src).await?.next_entry().await?.is_none() {
+    if fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source dir")?.next_entry().await.into_diagnostic().wrap_err("Failed to check theme source dir entries")?.is_none() {
         debug!("Source directory is empty, skipping backup");
         return Ok(());
     }
@@ -128,9 +128,9 @@ async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result
     // than just the last one before pulling/updating a theme
     if dest.exists() {
         debug!(backup_path = %dest.display(), "Removing existing backup");
-        tokio::fs::remove_dir_all(dest).await?;
+        tokio::fs::remove_dir_all(dest).await.into_diagnostic().wrap_err("Failed to remove existing backup")?;
     }
-    tokio::fs::create_dir_all(dest).await?;
+    tokio::fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create backup directory")?;
 
     sp.update_after_time(
         "Backing up existing theme files...",
@@ -150,16 +150,16 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
     // Clean existing theme directory
     if dest.exists() {
         debug!(dest = %dest.display(), "Cleaning existing theme directory");
-        fs::remove_dir_all(dest).await?;
+        fs::remove_dir_all(dest).await.into_diagnostic().wrap_err("Failed to remove existing theme dir")?;
     }
-    fs::create_dir_all(dest).await?;
+    fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create theme directory")?;
 
     sp.update_after_time(
         "Copying theme files...",
         std::time::Duration::from_millis(200),
     );
-    let mut entries = fs::read_dir(src).await?;
-    while let Some(entry) = entries.next_entry().await? {
+    let mut entries = fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source")?;
+    while let Some(entry) = entries.next_entry().await.into_diagnostic().wrap_err("Failed to read theme entry")? {
         let file_name = entry.file_name();
         let file_name_str = file_name.to_string_lossy().into_owned();
 
@@ -168,7 +168,7 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
             copy_dir_all(entry.path(), dest.join(file_name)).await?;
         } else if allowed_files.contains(&file_name_str.as_ref()) {
             debug!(file = %file_name_str, "Copying file");
-            fs::copy(entry.path(), dest.join(file_name)).await?;
+            fs::copy(entry.path(), dest.join(file_name)).await.into_diagnostic().wrap_err("Failed to copy theme file")?;
         } else {
             debug!(file = %file_name_str, "Skipping disallowed file/directory");
         }
@@ -231,25 +231,25 @@ impl ThemeManager {
     pub async fn pull(&mut self, sp: &mut Spinner) -> Result<Self> {
         debug!("Starting theme pull operation");
         let repo_url = resolve_repo_shorthand(&self.repo).await?;
-        let temp_dir = tempdir().context("Failed to create temporary directory")?;
+        let temp_dir = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
         debug!(temp_dir = %temp_dir.path().display(), "Created temporary directory");
 
         // Clone repository
         debug!(url = %repo_url, "Cloning theme directory");
         let repo = Repository::clone(&repo_url, temp_dir.path())
-            .context("Failed to clone theme repository")?;
+            .into_diagnostic().wrap_err("Failed to clone theme repository")?;
 
         // Get the version tag
         let version = if self.version.to_string() == "0.0.0" {
             debug!("Looking for latest version");
             get_version(&repo, None)
                 .await
-                .context("No valid semantic versions found in repository")?
+                .wrap_err("No valid semantic versions found in repository")?
         } else {
             debug!(current_version = %self.version, "Looking for specific version");
             get_version(&repo, Some(self.version.to_string()))
                 .await
-                .context(format!("Version {} not found in repository", self.version))?
+                .wrap_err(format!("Version {} not found in repository", self.version))?
         };
         debug!(selected_version = %version, "Found version");
         checkout_version(&repo, &version).await?;
@@ -266,19 +266,19 @@ impl ThemeManager {
         debug!(backup_path = %backup_dir.display(), "Starting theme backup");
         backup_theme_files(&self.theme_dir, &backup_dir, sp)
             .await
-            .context("Failed to backup theme files")?;
+            .wrap_err("Failed to backup theme files")?;
 
         // Copy theme files
         debug!(theme_dir = %self.theme_dir.display(), "Copying theme files to destination");
         copy_theme_files(temp_dir.path(), &self.theme_dir, sp)
             .await
-            .context("Failed to copy theme files")?;
+            .wrap_err("Failed to copy theme files")?;
 
         // Write metadata
         self.version = version;
         self.write_metadata(sp)
             .await
-            .context("Failed to write theme metadata")?;
+            .wrap_err("Failed to write theme metadata")?;
 
         debug!("Theme pull completed successfully");
         Ok(self.clone())
@@ -288,13 +288,13 @@ impl ThemeManager {
     pub async fn update(&mut self, sp: &mut Spinner) -> Result<Self> {
         debug!("Starting theme update operation");
         let repo_url = resolve_repo_shorthand(&self.repo).await?;
-        let temp_dir = tempdir().context("Failed to create temporary directory")?;
+        let temp_dir = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
         debug!(temp_dir = %temp_dir.path().display(), "Created temporary directory");
 
         // Clone repository
         debug!(url = %repo_url, "Cloning theme repository for update");
         let repo = Repository::clone(&repo_url, temp_dir.path())
-            .context("Failed to clone theme repository")?;
+            .into_diagnostic().wrap_err("Failed to clone theme repository")?;
 
         // Calculate version requirement
         let version_req = if self.pin {
@@ -307,14 +307,14 @@ impl ThemeManager {
         // Get updatable version
         let latest_version = get_version(&repo, Some(version_req))
             .await
-            .context("No valid update versions found")?;
+            .wrap_err("No valid update versions found")?;
 
         if latest_version > self.version {
             // Checkout new version
             debug!(current_version = %self.version, new_version = %latest_version, "New version available");
             checkout_version(&repo, &latest_version)
                 .await
-                .context("Failed to checkout new theme version")?;
+                .wrap_err("Failed to checkout new theme version")?;
 
             // Check theme's min_version against current norgolith version
             check_min_version(&temp_dir.path().join("theme.toml"), sp);
@@ -327,18 +327,18 @@ impl ThemeManager {
                 .join(".theme_backup");
             backup_theme_files(&self.theme_dir, &backup_dir, sp)
                 .await
-                .context("Failed to backup theme files")?;
+                .wrap_err("Failed to backup theme files")?;
 
             // Copy new theme version files
             copy_theme_files(temp_dir.path(), &self.theme_dir, sp)
                 .await
-                .context("Failed to update theme files")?;
+                .wrap_err("Failed to update theme files")?;
 
             // Update metadata
             self.version = latest_version;
             self.write_metadata(sp)
                 .await
-                .context("Failed to update theme metadata")?;
+                .wrap_err("Failed to update theme metadata")?;
             sp.stop_and_persist("✓", "Theme updated successfully");
         } else {
             sp.stop_and_persist(
@@ -368,9 +368,9 @@ impl ThemeManager {
             std::time::Duration::from_millis(200),
         );
         debug!(path = %metadata_path.display(), "Writing metadata file");
-        fs::write(metadata_path, toml::to_string_pretty(&metadata)?)
+        fs::write(metadata_path, toml::to_string_pretty(&metadata).into_diagnostic().wrap_err("Failed to serialize theme metadata")?)
             .await
-            .context("Failed to write metadata file")?;
+            .into_diagnostic().wrap_err("Failed to write metadata file")?;
         debug!("Metadata written successfully");
 
         Ok(())

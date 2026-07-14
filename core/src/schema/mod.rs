@@ -1,4 +1,5 @@
 use colored::Colorize;
+use miette::Diagnostic;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
@@ -8,22 +9,28 @@ mod validator;
 
 pub use validator::validate_metadata;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Diagnostic)]
 pub enum ValidationError {
+    #[diagnostic(help("Add the missing field to your content metadata"))]
     MissingField(String),
+    #[diagnostic(help("Update the field value to match the expected type"))]
     TypeMismatch {
         field: String,
         expected: String,
         actual: String,
     },
+    #[diagnostic(help("Review the field constraints in your schema"))]
     ConstraintViolation {
         field: String,
         message: String,
     },
+    #[diagnostic(help("Fix the rule condition or the metadata values"))]
     RuleConditionFailed {
         message: String,
     },
 }
+
+impl std::error::Error for ValidationError {}
 
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,6 +61,19 @@ impl std::fmt::Display for ValidationError {
                 write!(f, "{}: {}", "Rule condition failed".bold(), message)
             }
         }
+    }
+}
+
+
+#[derive(Debug, Diagnostic)]
+#[diagnostic(help("Fix the listed metadata field(s) and rebuild"))]
+pub struct ValidationErrors(#[related] pub Vec<ValidationError>);
+
+impl std::error::Error for ValidationErrors {}
+
+impl std::fmt::Display for ValidationErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Schema validation failed ({} errors)", self.0.len())
     }
 }
 

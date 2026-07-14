@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 use colored::Colorize;
-use eyre::{Context, Result, bail, eyre};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use indoc::formatdoc;
 use inquire::{Confirm, Select, Text, validator::Validation};
 use spinoff::{Spinner, spinners};
@@ -17,7 +17,7 @@ use crate::{
 /// Finds the site root by searching for `norgolith.toml` in the current directory
 /// and its parents, then returns the theme directory path.
 async fn find_theme_dir() -> Result<PathBuf> {
-    let mut current_dir = std::env::current_dir()?;
+    let mut current_dir = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
     let found_site_root = fs::find_in_previous_dirs("file", "norgolith.toml", &mut current_dir)?;
 
     match found_site_root {
@@ -67,7 +67,7 @@ async fn pull_theme(repo: &str, version: &Option<String>, pin: bool) -> Result<(
     };
     if let Some(version) = version {
         theme.version =
-            semver::Version::parse(version).context("No valid semantic version provided")?;
+            semver::Version::parse(version).into_diagnostic().wrap_err("No valid semantic version provided")?;
     }
 
     let mut sp = Spinner::new(
@@ -90,8 +90,11 @@ async fn update_theme() -> Result<()> {
     // Check if there is a '.metadata.toml' in the theme directory before proceeding
     if theme_dir.join(".metadata.toml").exists() {
         // Load the current theme metadata
-        let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await?;
-        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content)?;
+        let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await.into_diagnostic().wrap_err("Failed to read theme metadata")?;
+        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content).map_err(|e| {
+            miette!("Failed to parse theme metadata: {}", e)
+                .with_source_code(NamedSource::new(theme_dir.join(".metadata.toml").display().to_string(), metadata_content))
+        })?;
 
         let mut theme = ThemeManager {
             repo: theme_metadata.repo.clone(),
@@ -117,7 +120,7 @@ async fn rollback_theme() -> Result<()> {
 
     let backup_dir = theme_dir
         .parent()
-        .ok_or_else(|| eyre!("Invalid theme directory"))?
+        .ok_or_else(|| miette!("Invalid theme directory"))?
         .join(".theme_backup");
 
     if !backup_dir.exists() {
@@ -129,13 +132,13 @@ async fn rollback_theme() -> Result<()> {
     if theme_dir.exists() && theme_dir.join("theme.toml").exists() {
         tokio::fs::remove_dir_all(theme_dir.clone())
             .await
-            .context("Failed to remove current theme")?;
+            .into_diagnostic().wrap_err("Failed to remove current theme")?;
     }
 
     // Restore backup
     fs::copy_dir_all(backup_dir, theme_dir)
         .await
-        .context("Failed to restore backup")?;
+        .wrap_err("Failed to restore backup")?;
 
     sp.stop_and_persist("✓", "Successfully restored previous theme state");
 
@@ -151,7 +154,7 @@ async fn init_theme() -> Result<()> {
     if theme_metadata.exists() {
         let overwrite = Confirm::new("A theme already exists. Overwrite it?")
             .with_default(false)
-            .prompt()?;
+            .prompt().into_diagnostic().wrap_err("Failed to prompt user about theme overwrite")?;
 
         if !overwrite {
             info!("Theme initialization canceled");
@@ -162,13 +165,13 @@ async fn init_theme() -> Result<()> {
     // Collect theme metadata
     let name = Text::new("Theme name:")
         .with_help_message("e.g. 'Norgolith Pico'")
-        .prompt()?;
+        .prompt().into_diagnostic().wrap_err("Failed to read theme name")?;
     let author = Text::new("Author:")
         .with_help_message("Your name or organization")
-        .prompt()?;
+        .prompt().into_diagnostic().wrap_err("Failed to read author name")?;
     let description = Text::new("Description:")
         .with_help_message("Short description of your theme")
-        .prompt()?;
+        .prompt().into_diagnostic().wrap_err("Failed to read theme description")?;
     let version = Text::new("Version:")
         .with_default("0.1.0")
         .with_validator(|v: &str| match semver::Version::parse(v) {
@@ -177,7 +180,7 @@ async fn init_theme() -> Result<()> {
                 "Invalid semantic version format".into(),
             )),
         })
-        .prompt()?;
+        .prompt().into_diagnostic().wrap_err("Failed to read theme version")?;
     let license = Select::new(
         "License:",
         vec![
@@ -192,7 +195,7 @@ async fn init_theme() -> Result<()> {
     )
     // .with_starting_cursor(0)
     .with_help_message("Choose a license for your theme")
-    .prompt()?;
+    .prompt().into_diagnostic().wrap_err("Failed to read theme license")?;
 
     let min_version = Text::new("Minimum supported Norgolith version (optional):")
         .with_help_message("e.g. '0.5.0' - warns users running older norgolith versions that the theme may not work properly")
@@ -215,7 +218,7 @@ async fn init_theme() -> Result<()> {
         .with_help_message(
             "Format: 'github:user/repo', 'codeberg:user/repo' or 'sourcehut:user/repo'",
         )
-        .prompt()?;
+        .prompt().into_diagnostic().wrap_err("Failed to read repository URL")?;
 
     let theme_config = theme::ThemeMetadata {
         name,
@@ -235,7 +238,7 @@ async fn init_theme() -> Result<()> {
         theme_dir.join("assets/images"),
     ];
     for dir in theme_directories {
-        tokio::fs::create_dir_all(dir).await?;
+        tokio::fs::create_dir_all(dir).await.into_diagnostic().wrap_err("Failed to create theme directory")?;
     }
 
     // Write default html templates
@@ -249,7 +252,7 @@ async fn init_theme() -> Result<()> {
     ]);
     for (&name, &contents) in templates.iter() {
         let template_path = theme_templates.join(name.to_owned() + ".html");
-        tokio::fs::write(template_path, contents).await?;
+        tokio::fs::write(template_path, contents).await.into_diagnostic().wrap_err("Failed to write theme template")?;
     }
 
     // Write README
@@ -280,15 +283,15 @@ async fn init_theme() -> Result<()> {
     );
     tokio::fs::write(theme_dir.join("README.md"), readme)
         .await
-        .context("Failed to write README.md")?;
+        .into_diagnostic().wrap_err("Failed to write README.md")?;
 
     // Write theme.toml
     tokio::fs::write(
         theme_dir.join("theme.toml"),
-        toml::to_string_pretty(&theme_config)?,
+        toml::to_string_pretty(&theme_config).into_diagnostic().wrap_err("Failed to serialize theme config")?,
     )
     .await
-    .context("Failed to write theme.toml")?;
+    .into_diagnostic().wrap_err("Failed to write theme.toml")?;
 
     info!("\nTheme initialized successfully!");
     println!("Next steps:");
@@ -304,10 +307,16 @@ async fn show_theme_info() -> Result<()> {
 
     // Check if there is a '.metadata.toml' in the theme directory before proceeding
     if theme_dir.join(".metadata.toml").exists() {
-        let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await?;
-        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content)?;
-        let theme_toml_content = tokio::fs::read_to_string(theme_dir.join("theme.toml")).await?;
-        let theme_toml: ThemeMetadata = toml::from_str(&theme_toml_content)?;
+        let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await.into_diagnostic().wrap_err("Failed to read theme metadata")?;
+        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content).map_err(|e| {
+            miette!("Failed to parse theme metadata: {}", e)
+                .with_source_code(NamedSource::new(theme_dir.join(".metadata.toml").display().to_string(), metadata_content))
+        })?;
+        let theme_toml_content = tokio::fs::read_to_string(theme_dir.join("theme.toml")).await.into_diagnostic().wrap_err("Failed to read theme config")?;
+        let theme_toml: ThemeMetadata = toml::from_str(&theme_toml_content).map_err(|e| {
+            miette!("Failed to parse theme config: {}", e)
+                .with_source_code(NamedSource::new(theme_dir.join("theme.toml").display().to_string(), theme_toml_content))
+        })?;
 
         let mut theme_info: Vec<String> = vec![
             format!("\n{}", "Metadata".bold().green()),
