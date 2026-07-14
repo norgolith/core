@@ -58,7 +58,7 @@ pub(super) async fn read_asset(path: &Path) -> Result<(Vec<u8>, String)> {
 
     let content = tokio::fs::read(path)
         .await
-        .map_err(|e| miette!("Failed to read asset: {}", e))?;
+        .map_err(|e| miette!("Failed to read '{}': {}", path.display(), e))?;
     let mime_type = mime_guess::from_path(path)
         .first_or_octet_stream()
         .as_ref()
@@ -190,7 +190,7 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
 
     let content = tera
         .render(template_name, &context)
-        .map_err(|e| miette!("{}: {}", "Failed to render XML feed template".bold(), e))?;
+        .map_err(|e| miette!("Failed to render feed template '{}': {}", template_name, e))?;
 
     Response::builder()
         .header(CONTENT_TYPE, "application/xml; charset=utf-8")
@@ -294,15 +294,10 @@ async fn handle_category_index(state: &Arc<ServerState>) -> Result<Response<Body
 
     let tera = state.tera.read().await;
     let mut body = tera.render("categories.html", &context).map_err(|e| {
-        if e.source().is_some() {
-            let internal_err = e.source().unwrap();
-            miette!(
-                "{}: {}",
-                "Failed to render 'categories.html' template".bold(),
-                internal_err
-            )
+        if let Some(source) = e.source() {
+            miette!("Failed to render 'categories.html' template: {}", source)
         } else {
-            miette!("{}", "Failed to render 'categories.html' template".bold())
+            miette!("Failed to render 'categories.html' template")
         }
     })?;
     body = rewrite_urls(body, &config.root_url, &state.routes_url);
@@ -347,15 +342,10 @@ async fn handle_category(path: &str, state: &Arc<ServerState>) -> Result<Respons
 
     let tera = state.tera.read().await;
     let mut body = tera.render("category.html", &context).map_err(|e| {
-        if e.source().is_some() {
-            let internal_err = e.source().unwrap();
-            miette!(
-                "{}: {}",
-                "Failed to render 'category.html' template".bold(),
-                internal_err
-            )
+        if let Some(source) = e.source() {
+            miette!("Failed to render 'category.html' template: {}", source)
         } else {
-            miette!("{}", "Failed to render 'category.html' template".bold())
+            miette!("Failed to render 'category.html' template")
         }
     })?;
 

@@ -345,12 +345,12 @@ fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
 
     // SAFETY: we validate ABI before loading, and the init function is the only symbol we look up
     let lib = unsafe { libloading::Library::new(&lib_path) }
-        .map_err(|e| miette::miette!("failed to load {}: {}", lib_path.display(), e))?;
+        .map_err(|e| miette::miette!("Failed to load {}: {}", lib_path.display(), e))?;
 
     type InitFn = unsafe extern "C" fn(*mut PluginInfo, *mut u32, *mut [Option<PluginFn>; 4]);
 
     let init: libloading::Symbol<InitFn> = unsafe { lib.get(b"norgolith_plugin_init") }
-        .map_err(|e| miette::miette!("missing symbol norgolith_plugin_init: {}", e))?;
+        .map_err(|e| miette::miette!("Missing norgolith_plugin_init symbol: {}", e))?;
 
     let mut info = PluginInfo {
         abi_version: 0,

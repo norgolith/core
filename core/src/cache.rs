@@ -61,7 +61,9 @@ impl BuildCache {
         if stored_global.as_deref() != Some(global_hash.as_str()) {
             debug!("Global state changed (or first build), clearing cache");
             entries.clear();
-            let _ = std::fs::remove_dir_all(&cache_dir);
+            if let Err(e) = std::fs::remove_dir_all(&cache_dir) {
+                warn!("Failed to clear stale cache directory: {}", e);
+            }
         }
 
         Ok(Self {
@@ -103,7 +105,13 @@ impl BuildCache {
     pub fn save(&self) -> Result<()> {
         if !self.cache_dir.exists() {
             std::fs::create_dir_all(&self.cache_dir)
-                .map_err(|e| miette!("{}: {}", "Failed to create cache directory".bold(), e))?;
+                .map_err(|e| {
+                    miette!(
+                        "{}: {}",
+                        format!("Failed to create cache directory '{}'", self.cache_dir.display()).bold(),
+                        e
+                    )
+                })?;
         }
 
         // Write global hash

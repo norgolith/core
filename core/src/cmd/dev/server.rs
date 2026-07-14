@@ -6,7 +6,7 @@ use colored::Colorize;
 use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 use walkdir::WalkDir;
 
 use crate::shared::{BuildContext, SitePaths};
@@ -298,7 +298,9 @@ pub(super) async fn setup_server_state(
     let cache = crate::cache::BuildCache::open(&root_dir)?;
 
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
-    let _ = plugin::sandbox::apply_landlock(&root_dir);
+    if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
+        warn!("{}", e);
+    }
     if plugin_mgr.has_hook(plugin::HOOK_PRE_BUILD) {
         let input = serde_json::json!({
             "site_config": site_config,

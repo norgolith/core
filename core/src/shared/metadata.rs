@@ -196,10 +196,10 @@ pub fn collect_all_posts_metadata(
             });
             is_norg_file && is_post
         })
-        .map(|e| {
+        .filter_map(|e| {
             let path = e.path().to_path_buf();
-            let rel_path = path.strip_prefix(content_dir).unwrap().to_path_buf();
-            (path, rel_path)
+            let rel_path = path.strip_prefix(content_dir).ok()?.to_path_buf();
+            Some((path, rel_path))
         })
         .collect();
 

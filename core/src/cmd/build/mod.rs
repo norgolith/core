@@ -237,9 +237,13 @@ fn build_content_entry(
         }
     }
 
-    if toml::Value::as_bool(metadata.get("draft").unwrap_or(&toml::Value::from(false)))
-        .expect("draft metadata field should be a boolean")
-    {
+    let is_draft = match metadata.get("draft") {
+        Some(val) => val.as_bool().ok_or_else(|| {
+            miette!("'draft' field must be a boolean for '{}'", path.display())
+        })?,
+        None => false,
+    };
+    if is_draft {
         return Ok(None);
     }
 
@@ -359,7 +363,9 @@ pub fn build(minify: bool) -> Result<()> {
     // Load plugins and apply sandbox
     let t = Instant::now();
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
-    let _ = plugin::sandbox::apply_landlock(&root_dir);
+    if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
+        warn!("{}", e);
+    }
     timings.plugins_ms = t.elapsed().as_millis();
 
     println!();
@@ -408,13 +414,7 @@ pub fn build(minify: bool) -> Result<()> {
     )?
     .into_iter()
     .filter(|post| {
-        !post
-            .get("draft")
-            .map(|v| {
-                v.as_bool()
-                    .expect("draft metadata field should be a boolean")
-            })
-            .unwrap_or(false)
+        !post.get("draft").and_then(|v| v.as_bool()).unwrap_or(false)
     })
     .collect();
     timings.collect_posts_ms = t.elapsed().as_millis();

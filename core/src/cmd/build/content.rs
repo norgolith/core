@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use colored::Colorize;
 use miette::{IntoDiagnostic, Result, WrapErr, miette};
 use rss::Channel;
 use tera::{Context, Tera};
@@ -32,7 +31,7 @@ pub(super) fn generate_xml_feeds(
     for template_name in &xml_templates {
         let rendered = tera
             .render(template_name, &context)
-            .map_err(|e| miette!("{}: {}", "Failed to render XML template".bold(), e))?;
+            .map_err(|e| miette!("Failed to render '{}': {}", template_name, e))?;
 
         if (template_name.contains("rss") && template_name.ends_with(".xml"))
             && let Err(e) = Channel::read_from(rendered.as_bytes())

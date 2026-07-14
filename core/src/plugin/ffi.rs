@@ -76,10 +76,10 @@ pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Opt
                     None => "unknown panic".to_string(),
                 },
             };
-            Err(miette::miette!("plugin panicked: {}", msg))
+            Err(miette::miette!("Plugin panicked: {}", msg))
         }
         Err(_timeout) => Err(miette::miette!(
-            "plugin hook timed out after {}ms",
+            "Plugin hook timed out after {}ms",
             timeout.as_millis()
         )),
     }
