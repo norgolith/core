@@ -18,7 +18,7 @@ pub use norgolith_plugin_sdk::{
     CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
 
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Hooks a plugin can implement. Each is an optional C ABI function pointer
 pub struct PluginHooks {
@@ -48,13 +48,13 @@ impl PluginInstance {
                 Ok(Some(html)) => Ok(Some(html)),
                 Ok(None) => Ok(None),
                 Err(e) => {
-                    warn!("Plugin '{}' returned invalid response: {}", self.name, e);
+                    debug!("Plugin '{}' returned invalid response: {}", self.name, e);
                     Err(e)
                 }
             },
             Ok(None) => Ok(None),
             Err(e) => {
-                warn!("Plugin '{}' hook failed: {}", self.name, e);
+                debug!("Plugin '{}' hook failed: {}", self.name, e);
                 Err(e)
             }
         }
