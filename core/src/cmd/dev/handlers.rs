@@ -68,7 +68,7 @@ pub(super) async fn read_asset(path: &Path) -> Result<(Vec<u8>, String)> {
     Ok((content, mime_type))
 }
 
-pub(super) fn handle_not_found(state: &ServerState) -> Response<Body> {
+pub(super) fn handle_not_found(state: &ServerState) -> Result<Response<Body>> {
     let tera = state.tera.try_read().ok();
     let config = state.config.try_read().ok();
     if let (Some(tera), Some(config)) = (tera, config)
@@ -88,13 +88,13 @@ pub(super) fn handle_not_found(state: &ServerState) -> Response<Body> {
                 .status(StatusCode::NOT_FOUND)
                 .header(CONTENT_TYPE, "text/html; charset=utf-8")
                 .body(Body::from(rendered))
-                .expect("Could not build Not Found response");
+                .map_err(|e| miette!("Failed to build 404 response: {}", e));
         }
     }
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("not found"))
-        .expect("Could not build Not Found response")
+        .map_err(|e| miette!("Failed to build 404 response: {}", e))
 }
 
 pub(super) async fn resolve_url_norg_path(
@@ -147,7 +147,7 @@ pub(super) async fn handle_asset(
                 }
                 Err(_) => {
                     error!(asset_path = %request_path, "Asset not found in site or theme directories");
-                    return Ok(handle_not_found(state));
+                    return handle_not_found(state);
                 }
             }
         }
@@ -179,7 +179,7 @@ async fn handle_xml_feed(request_path: &str, state: &Arc<ServerState>) -> Result
     // Slow path: render on demand
     let tera = state.tera.read().await;
     if !tera.get_template_names().any(|n| n == template_name) {
-        return Ok(handle_not_found(state));
+        return handle_not_found(state);
     }
 
     let config = state.config.read().await.clone();
@@ -213,7 +213,7 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
     let tera = state.tera.read().await;
 
     let Ok(content) = tokio::fs::read_to_string(&path).await else {
-        return Ok(handle_not_found(&state));
+        return handle_not_found(&state);
     };
 
     let metadata = shared::extract_metadata_from_content(&content, &rel_path, &state.routes_url);
@@ -222,7 +222,7 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     if is_draft && !state.build_drafts {
-        return Ok(handle_not_found(&state));
+        return handle_not_found(&state);
     }
 
     let cache_key = rel_path.with_extension("");
@@ -263,11 +263,11 @@ async fn handle_content(request_path: &str, state: Arc<ServerState>) -> Result<R
     match resolve_url_norg_path(&state.paths.content, &req_path).await {
         Ok(path) => handle_norg_content(path, state).await,
         Err(io_err) => match io_err.kind() {
-            std::io::ErrorKind::NotFound => Ok(handle_not_found(&state)),
-            std::io::ErrorKind::PermissionDenied => Ok(Response::builder()
+            std::io::ErrorKind::NotFound => handle_not_found(&state),
+            std::io::ErrorKind::PermissionDenied => Response::builder()
                 .status(StatusCode::FORBIDDEN)
                 .body(Body::empty())
-                .unwrap()),
+                .map_err(|e| miette!("Failed to build 403 response: {}", e)),
             _ => Err(miette!("Error reading '{}': {}", req_path.display(), io_err)),
         },
     }
