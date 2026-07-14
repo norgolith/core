@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use indoc::formatdoc;
 use inquire::{Confirm, Select, Text, validator::Validation};
 use spinoff::{Spinner, spinners};
@@ -91,7 +91,10 @@ async fn update_theme() -> Result<()> {
     if theme_dir.join(".metadata.toml").exists() {
         // Load the current theme metadata
         let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await.into_diagnostic().wrap_err("Failed to read theme metadata")?;
-        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content).into_diagnostic().wrap_err("Failed to parse theme metadata")?;
+        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content).map_err(|e| {
+            miette!("Failed to parse theme metadata: {}", e)
+                .with_source_code(NamedSource::new(theme_dir.join(".metadata.toml").display().to_string(), metadata_content))
+        })?;
 
         let mut theme = ThemeManager {
             repo: theme_metadata.repo.clone(),
@@ -305,9 +308,15 @@ async fn show_theme_info() -> Result<()> {
     // Check if there is a '.metadata.toml' in the theme directory before proceeding
     if theme_dir.join(".metadata.toml").exists() {
         let metadata_content = tokio::fs::read_to_string(theme_dir.join(".metadata.toml")).await.into_diagnostic().wrap_err("Failed to read theme metadata")?;
-        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content).into_diagnostic().wrap_err("Failed to parse theme metadata")?;
+        let theme_metadata: ThemeInstalledMetadata = toml::from_str(&metadata_content).map_err(|e| {
+            miette!("Failed to parse theme metadata: {}", e)
+                .with_source_code(NamedSource::new(theme_dir.join(".metadata.toml").display().to_string(), metadata_content))
+        })?;
         let theme_toml_content = tokio::fs::read_to_string(theme_dir.join("theme.toml")).await.into_diagnostic().wrap_err("Failed to read theme config")?;
-        let theme_toml: ThemeMetadata = toml::from_str(&theme_toml_content).into_diagnostic().wrap_err("Failed to parse theme config")?;
+        let theme_toml: ThemeMetadata = toml::from_str(&theme_toml_content).map_err(|e| {
+            miette!("Failed to parse theme config: {}", e)
+                .with_source_code(NamedSource::new(theme_dir.join("theme.toml").display().to_string(), theme_toml_content))
+        })?;
 
         let mut theme_info: Vec<String> = vec![
             format!("\n{}", "Metadata".bold().green()),
