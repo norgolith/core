@@ -101,8 +101,8 @@ fn generate_nested_html(tree: &TocTree, list_type: &str) -> String {
         let node = &tree.nodes[node_idx];
 
         let mut escaped_title = Vec::new();
-        tera::escape_html(&node.title, &mut escaped_title).expect("escape_html failed");
-        let escaped_title = String::from_utf8(escaped_title).expect("not UTF-8");
+        tera::escape_html(&node.title, &mut escaped_title).ok();
+        let escaped_title = String::from_utf8(escaped_title).unwrap_or_default();
         let mut html = format!(
             "<li><a href=\"#{}\">{}</a>",
             utf8_percent_encode(&node.id, UNRESERVED),

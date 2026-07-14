@@ -470,8 +470,8 @@ impl NorgToHtml for NorgAST {
                         // because we are forced to use the `safe` filter. This workaround aims to fix those
                         // problems, and (hopefully) also including XML rendering.
                         let mut escaped = Vec::new();
-                        tera::escape_html(content, &mut escaped).expect("escape_html write never fails");
-                        let content = &String::from_utf8(escaped).expect("escape_html produces valid UTF-8");
+                        tera::escape_html(content, &mut escaped).ok();
+                        let content = &String::from_utf8(escaped).unwrap_or_default();
                         code_tag.push('>');
                         code_tag.push_str("<code");
                         if !parameters.is_empty() {

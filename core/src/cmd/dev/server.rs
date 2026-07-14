@@ -30,7 +30,12 @@ impl ServerState {
     pub async fn reload_templates(&self) -> Result<()> {
         debug!("Reloading templates");
         let new_tera = crate::tera::init(
-            self.paths.templates.to_str().unwrap(),
+            self.paths.templates.to_str().ok_or_else(|| {
+                miette!(
+                    "Templates path is not valid UTF-8: {}",
+                    self.paths.templates.display()
+                )
+            })?,
             &self.paths.theme_templates,
         )?;
         let mut tera = self.tera.write().await;
@@ -288,7 +293,10 @@ pub(super) async fn setup_server_state(
         )));
     }
 
-    let root_dir = root.parent().unwrap().to_path_buf();
+    let root_dir = root
+        .parent()
+        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .to_path_buf();
     let mut paths = SitePaths::new(root_dir.clone());
 
     if let Ok(real) = tokio::fs::canonicalize(&paths.content).await {
@@ -307,7 +315,11 @@ pub(super) async fn setup_server_state(
         paths.theme_templates = real;
     }
 
-    let tera = crate::tera::init(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
+    let templates_dir = paths
+        .templates
+        .to_str()
+        .ok_or_else(|| miette!("Templates path is not valid UTF-8: {}", paths.templates.display()))?;
+    let tera = crate::tera::init(templates_dir, &paths.theme_templates)?;
 
     let (reload_tx, _) = broadcast::channel(16);
 

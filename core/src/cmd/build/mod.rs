@@ -168,6 +168,7 @@ fn build_contents(
 
     let mut buffered_writes = Vec::new();
     let mut permalinks = Vec::new();
+    let mut page_errors = Vec::new();
     for result in results {
         match result {
             Ok(Some((public_path, content, permalink, cache_entry))) => {
@@ -178,8 +179,15 @@ fn build_contents(
                 }
             }
             Ok(None) => {}
-            Err(e) => error!("{:?}", e),
+            Err(e) => {
+                error!("{:#}", e);
+                page_errors.push(e);
+            }
         }
+    }
+    if !page_errors.is_empty() {
+        let count = page_errors.len();
+        bail!("{} page(s) failed to build (see errors above)", count);
     }
 
     let write_start = Instant::now();
@@ -354,13 +362,20 @@ pub fn build(minify: bool) -> Result<()> {
     debug!(?site_config, "Loaded site configuration");
     timings.config_ms = t.elapsed().as_millis();
 
-    let root_dir = root.parent().unwrap().to_path_buf();
+    let root_dir = root
+        .parent()
+        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .to_path_buf();
     let paths = SitePaths::new(root_dir.clone());
 
     // Initialize Tera
     let t = Instant::now();
     debug!("Initializing template engine");
-    let tera = crate::tera::init(paths.templates.to_str().unwrap(), &paths.theme_templates)?;
+    let templates_dir = paths
+        .templates
+        .to_str()
+        .ok_or_else(|| miette!("Templates path is not valid UTF-8: {}", paths.templates.display()))?;
+    let tera = crate::tera::init(templates_dir, &paths.theme_templates)?;
     timings.tera_ms = t.elapsed().as_millis();
 
     // Load plugins and apply sandbox
