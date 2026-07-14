@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/norgolith/core/compare/norgolith-v1.1.1...norgolith-v1.1.2) (2026-07-14)
+
+
+### Refactoring
+
+* replace eyre with miette, improve error handling ([#197](https://github.com/norgolith/core/issues/197)) ([b6efc0b](https://github.com/norgolith/core/commit/b6efc0b8327a7f50bf3c2a8dc9b06180c601aacd))
+
 ## [1.1.1](https://github.com/norgolith/core/compare/norgolith-v1.1.0...norgolith-v1.1.1) (2026-07-13)
 
 
