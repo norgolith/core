@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, error, info, instrument, warn};
@@ -258,6 +258,7 @@ pub(super) async fn setup_server_state(
     let config_content = tokio::fs::read_to_string(&root).await.into_diagnostic().wrap_err("Failed to read config file")?;
     debug!("Config file path: {:?}", root);
     debug!("Config content:\n{}", config_content);
+    let config_content_for_validation = config_content.clone();
     let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
         miette!("Failed to parse site configuration: {}", e)
             .with_source_code(NamedSource::new(root.display().to_string(), config_content))
@@ -266,10 +267,14 @@ pub(super) async fn setup_server_state(
 
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
-        bail!(
+        return Err(miette!(
             "Site configuration has validation errors:\n{}",
             validation_errors.join("\n")
-        );
+        )
+        .with_source_code(NamedSource::new(
+            root.display().to_string(),
+            config_content_for_validation,
+        )));
     }
 
     let root_dir = root.parent().unwrap().to_path_buf();

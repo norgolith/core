@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::schema::ContentSchema;
@@ -117,28 +116,24 @@ impl SiteConfig {
         let mut errors = Vec::new();
 
         if self.root_url.is_empty() {
-            errors.push(format!(
-                "{}: 'rootUrl' must not be empty",
-                "Validation failed".bold()
-            ));
+            errors.push(
+                "'rootUrl' must not be empty — set 'rootUrl = \"https://example.com\"' in norgolith.toml".into(),
+            );
         }
         if self.title.is_empty() {
-            errors.push(format!(
-                "{}: 'title' must not be empty",
-                "Validation failed".bold()
-            ));
+            errors.push(
+                "'title' must not be empty — set 'title = \"My Site\"' in norgolith.toml".into(),
+            );
         }
         if self.author.is_empty() {
-            errors.push(format!(
-                "{}: 'author' must not be empty",
-                "Validation failed".bold()
-            ));
+            errors.push(
+                "'author' must not be empty — set 'author = \"Your Name\"' in norgolith.toml".into(),
+            );
         }
         if self.language.is_empty() {
-            errors.push(format!(
-                "{}: 'language' must not be empty",
-                "Validation failed".bold()
-            ));
+            errors.push(
+                "'language' must not be empty — set 'language = \"en\"' in norgolith.toml".into(),
+            );
         }
 
         errors

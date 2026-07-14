@@ -336,16 +336,21 @@ pub fn build(minify: bool) -> Result<()> {
     // Load site configuration
     let t = Instant::now();
     let config_content = std::fs::read_to_string(&root).into_diagnostic().wrap_err("Failed to read config file")?;
+    let config_content_for_validation = config_content.clone();
     let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
         miette!("Failed to parse site configuration: {}", e)
             .with_source_code(NamedSource::new(root.display().to_string(), config_content))
     })?;
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
-        bail!(
+        return Err(miette!(
             "Site configuration has validation errors:\n{}",
             validation_errors.join("\n")
-        );
+        )
+        .with_source_code(NamedSource::new(
+            root.display().to_string(),
+            config_content_for_validation,
+        )));
     }
     debug!(?site_config, "Loaded site configuration");
     timings.config_ms = t.elapsed().as_millis();
