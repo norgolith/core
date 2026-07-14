@@ -9,7 +9,7 @@ use std::{
 };
 
 use colored::{ColoredString, Colorize};
-use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use tera::Context;
 use tracing::{debug, error, instrument, warn};
 use walkdir::WalkDir;
@@ -336,8 +336,10 @@ pub fn build(minify: bool) -> Result<()> {
     // Load site configuration
     let t = Instant::now();
     let config_content = std::fs::read_to_string(&root).into_diagnostic().wrap_err("Failed to read config file")?;
-    let site_config: config::SiteConfig =
-        toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
+    let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+        miette!("Failed to parse site configuration: {}", e)
+            .with_source_code(NamedSource::new(root.display().to_string(), config_content))
+    })?;
     let validation_errors = site_config.validate();
     if !validation_errors.is_empty() {
         bail!(

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, error, info, instrument, warn};
@@ -258,7 +258,10 @@ pub(super) async fn setup_server_state(
     let config_content = tokio::fs::read_to_string(&root).await.into_diagnostic().wrap_err("Failed to read config file")?;
     debug!("Config file path: {:?}", root);
     debug!("Config content:\n{}", config_content);
-    let site_config: config::SiteConfig = toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
+    let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+        miette!("Failed to parse site configuration: {}", e)
+            .with_source_code(NamedSource::new(root.display().to_string(), config_content))
+    })?;
     debug!("Parsed categories_dir: {}", site_config.categories_dir);
 
     let validation_errors = site_config.validate();
