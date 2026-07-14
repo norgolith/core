@@ -2,7 +2,7 @@ use std::{io, path::{Path, PathBuf}};
 
 use clap::Subcommand;
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail};
+use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use flate2::read::GzDecoder;
 use git2::Repository;
 use serde::Deserialize;
@@ -257,7 +257,8 @@ fn install_to_plugins(lib_path: &Path, manifest_path: &Path, name: &str) -> Resu
     let cwd = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
     let dest_dir = cwd.join("plugins").join(name);
     std::fs::create_dir_all(&dest_dir).into_diagnostic().wrap_err("Failed to create plugin install directory")?;
-    std::fs::copy(lib_path, dest_dir.join(lib_path.file_name().unwrap())).into_diagnostic().wrap_err("Failed to copy plugin library")?;
+    let filename = lib_path.file_name().ok_or_else(|| miette!("Plugin library path has no filename: {}", lib_path.display()))?;
+    std::fs::copy(lib_path, dest_dir.join(filename)).into_diagnostic().wrap_err("Failed to copy plugin library")?;
     std::fs::copy(manifest_path, dest_dir.join("plugin.toml")).into_diagnostic().wrap_err("Failed to copy plugin manifest")?;
     Ok(())
 }
