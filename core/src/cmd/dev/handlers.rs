@@ -216,7 +216,11 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
         return handle_not_found(&state);
     };
 
-    let metadata = shared::extract_metadata_from_content(&content, &rel_path, &state.routes_url);
+    let metadata = shared::extract_metadata_from_content(&content, &rel_path, &state.routes_url)
+        .map_err(|e| {
+            error!("Failed to extract metadata for {}: {}", rel_path.display(), e);
+            miette!("Failed to extract metadata for {}: {}", rel_path.display(), e)
+        })?;
     let is_draft = metadata
         .get("draft")
         .and_then(|v| v.as_bool())
@@ -233,10 +237,18 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
     let metadata = if let Some(cached) = metadata {
         match serde_json::from_value(cached.clone()) {
             Ok(md) => md,
-            Err(_) => shared::load_metadata_from_content(&content, &rel_path, &state.routes_url),
+            Err(_) => shared::load_metadata_from_content(&content, &rel_path, &state.routes_url)
+                .map_err(|e| {
+                    error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                    miette!("Failed to load metadata for {}: {}", rel_path.display(), e)
+                })?,
         }
     } else {
-        let md = shared::load_metadata_from_content(&content, &rel_path, &state.routes_url);
+        let md = shared::load_metadata_from_content(&content, &rel_path, &state.routes_url)
+            .map_err(|e| {
+                error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                miette!("Failed to load metadata for {}: {}", rel_path.display(), e)
+            })?;
         if let Ok(json_val) = serde_json::to_value(&md) {
             let mut cache_guard = state.cache.write().await;
             cache_guard.insert(&cache_key, &content, json_val);

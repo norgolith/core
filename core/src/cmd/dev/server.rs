@@ -148,7 +148,7 @@ pub fn render_all_pages(
         };
 
         // Draft check
-        let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url);
+        let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url)?;
         let is_draft = metadata
             .get("draft")
             .and_then(|v| v.as_bool())
@@ -162,9 +162,17 @@ pub fn render_all_pages(
         let mut metadata = if let Some(cached) = cache.get(&cache_key, &content) {
             serde_json::from_value(cached).unwrap_or_else(|_| {
                 shared::load_metadata_from_content(&content, rel_path, routes_url)
+                    .unwrap_or_else(|e| {
+                        error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                        toml::Value::Table(toml::map::Map::new())
+                    })
             })
         } else {
             shared::load_metadata_from_content(&content, rel_path, routes_url)
+                .unwrap_or_else(|e| {
+                    error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                    toml::Value::Table(toml::map::Map::new())
+                })
         };
 
         ctx.plugins

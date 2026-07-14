@@ -220,8 +220,7 @@ fn build_content_entry(
     };
 
     let metadata =
-        shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
-
+        shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
     if let Some(schema) = &ctx.site_config.content_schema
         && !rel_path.starts_with(&ctx.site_config.categories_dir)
     {
@@ -255,13 +254,13 @@ fn build_content_entry(
                     &content,
                     rel_path,
                     &ctx.site_config.root_url,
-                );
+                )?;
                 let cache_val = serde_json::to_value(&md).unwrap_or_default();
                 (md, Some((cache_key, content.clone(), cache_val)))
             }
         }
     } else {
-        let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url);
+        let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
         let cache_val = serde_json::to_value(&md).unwrap_or_default();
         (md, Some((cache_key, content.clone(), cache_val)))
     };

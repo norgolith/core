@@ -43,7 +43,7 @@ pub struct PluginInstance {
 impl PluginInstance {
     pub fn call_hook(&self, f: PluginFn, input: &str) -> Result<Option<String>> {
         let timeout = Duration::from_millis(self.manifest.timeout_ms);
-        match ffi::call_hook_safe(f, input, timeout) {
+        match ffi::call_hook_safe(f, input, timeout, &self.name) {
             Ok(Some(json)) => match ffi::parse_hook_response(&self.name, &json) {
                 Ok(Some(html)) => Ok(Some(html)),
                 Ok(None) => Ok(None),

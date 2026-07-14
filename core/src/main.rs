@@ -45,10 +45,7 @@ async fn main() -> Result<(), Report> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).into_diagnostic().wrap_err("Failed to initialize tracing subscriber")?;
 
-    if let Err(e) = cli::start().await {
-        eprintln!("{:?}", e);
-        std::process::exit(1);
-    }
+    cli::start().await?;
 
     Ok(())
 }
