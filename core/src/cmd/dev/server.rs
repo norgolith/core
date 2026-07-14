@@ -48,7 +48,10 @@ impl ServerState {
     pub async fn reload_config(&self) -> Result<()> {
         debug!("Reloading config");
         let config_content = tokio::fs::read_to_string(&self.paths.config_file).await.into_diagnostic().wrap_err("Failed to read config file")?;
-        let new_config: config::SiteConfig = toml::from_str(&config_content).into_diagnostic().wrap_err("Failed to parse site configuration")?;
+        let new_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+            miette!("Failed to parse site configuration: {}", e)
+                .with_source_code(NamedSource::new(self.paths.config_file.display().to_string(), config_content))
+        })?;
 
         let new_posts = shared::collect_all_posts_metadata(
             &self.paths.content,
