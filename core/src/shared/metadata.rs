@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 
 use crate::config::CollectionConfig;
 use crate::converter;
-use crate::schema::{ContentSchema, format_errors, validate_metadata};
+use crate::schema::{ContentSchema, ValidationErrors, format_errors, validate_metadata};
 
 /// Computes the permalink for a content file based on its relative path.
 fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
@@ -149,7 +149,10 @@ pub fn validate_content_metadata(
     let errors = validate_metadata(&metadata_map, &merged_schema);
 
     if !errors.is_empty() {
-        return Ok(format_errors(path, &content_path, &errors, as_warnings));
+        if as_warnings {
+            return Ok(format_errors(path, &content_path, &errors, as_warnings));
+        }
+        return Err(miette::Report::new(ValidationErrors(errors)));
     }
     Ok(String::new())
 }

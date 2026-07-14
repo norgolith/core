@@ -225,16 +225,13 @@ fn build_content_entry(
     if let Some(schema) = &ctx.site_config.content_schema
         && !rel_path.starts_with(&ctx.site_config.categories_dir)
     {
-        let errors = shared::validate_content_metadata(
+        shared::validate_content_metadata(
             &ctx.paths.content,
             path,
             &metadata,
             schema,
             false,
         )?;
-        if !errors.is_empty() {
-            return Err(miette!("{}", errors));
-        }
     }
 
     let is_draft = match metadata.get("draft") {
