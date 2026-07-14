@@ -161,7 +161,7 @@ pub async fn dev(
     }
 
     if let Err(e) = server.await {
-        bail!("{}: {}", "Development server error".bold(), e);
+        bail!("{}: {}", "Development server stopped unexpectedly".bold(), e);
     }
 
     println!("\n{} Development server stopped.", "→".cyan().bold());

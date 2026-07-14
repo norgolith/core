@@ -109,7 +109,7 @@ impl BuildCache {
         // Write global hash
         let global_path = self.cache_dir.join(".global_hash");
         std::fs::write(&global_path, &self.global_hash)
-            .map_err(|e| miette!("{}: {}", "Failed to write global hash".bold(), e))?;
+            .map_err(|e| miette!("{}: {}", "Failed to save cache index".bold(), e))?;
 
         // Write each entry
         for (rel_path, entry) in &self.entries {
@@ -118,7 +118,7 @@ impl BuildCache {
                 let _ = std::fs::create_dir_all(parent);
             }
             let json = serde_json::to_string_pretty(entry)
-                .map_err(|e| miette!("{}: {}", "Failed to serialize cache entry".bold(), e))?;
+                .map_err(|e| miette!("{}: {}", format!("Failed to encode cache entry for '{}'", rel_path.display()).bold(), e))?;
             std::fs::write(&cache_path, json).unwrap_or_else(|e| {
                 warn!(
                     path = %cache_path.display(),

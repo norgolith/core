@@ -210,11 +210,11 @@ register_plugin!("{name}")
 
 fn build_plugin(source_dir: &Path) -> Result<()> {
     println!("{}", "Building plugin...".dimmed());
-    let status = std::process::Command::new("cargo")
+    let output = std::process::Command::new("cargo")
         .arg("build")
         .arg("--release")
         .current_dir(source_dir)
-        .status()
+        .output()
         .map_err(|e| {
             if e.kind() == io::ErrorKind::NotFound {
                 miette::miette!("cargo not found in PATH. Install Rust from https://rustup.rs")
@@ -222,8 +222,9 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
                 miette::miette!("Failed to run cargo: {e}")
             }
         })?;
-    if !status.success() {
-        bail!("Plugin cargo build failed");
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Plugin cargo build failed:\n{}", stderr.trim());
     }
     Ok(())
 }

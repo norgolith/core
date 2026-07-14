@@ -90,7 +90,7 @@ pub async fn preview(port: u16, open: bool, host: bool) -> Result<()> {
     }
 
     if let Err(e) = server.await {
-        bail!("{}: {}", "Preview server error".bold(), e);
+        bail!("{}: {}", "Preview server stopped unexpectedly".bold(), e);
     }
 
     Ok(())

@@ -46,7 +46,7 @@ pub type FreeStringFn = extern "C" fn(*mut c_char);
 /// can add a `plugin_free` callback to let each plugin provide its own deallocator
 pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Option<String>> {
     let c_input =
-        CString::new(input).map_err(|e| miette::miette!("failed to create CString: {}", e))?;
+        CString::new(input).map_err(|e| miette::miette!("Failed to prepare plugin input data: {}", e))?;
 
     let (tx, rx) = mpsc::channel();
 
@@ -85,14 +85,9 @@ pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration) -> Result<Opt
     }
 }
 
-/// Parse a hook response JSON and extract the HTML field
-///
-/// Returns `Ok(None)` if html is null (no change)
-/// Returns `Ok(Some(html))` if html is present
-/// Returns `Err` on error status or invalid JSON
-pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
-    let val: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| miette::miette!("invalid JSON from plugin: {}", e))?;
+pub fn parse_hook_response(plugin_name: &str, json: &str) -> Result<Option<String>> {
+    let val: serde_json::Value = serde_json::from_str(json)
+        .map_err(|e| miette::miette!("Invalid response from plugin '{}': {}", plugin_name, e))?;
 
     if let Some(status) = val.get("status").and_then(|v| v.as_str())
         && status == "error"
@@ -101,7 +96,7 @@ pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
             .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown error");
-        bail!("plugin error: {}", msg);
+        bail!("plugin '{}' returned error: {}", plugin_name, msg);
     }
 
     match val.get("html").and_then(|v| v.as_str()) {
@@ -110,10 +105,9 @@ pub fn parse_hook_response(json: &str) -> Result<Option<String>> {
     }
 }
 
-/// Parse a hook response for pre_build/post_build (status only)
-pub fn parse_status_response(json: &str) -> Result<()> {
-    let val: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| miette::miette!("invalid JSON from plugin: {}", e))?;
+pub fn parse_status_response(plugin_name: &str, json: &str) -> Result<()> {
+    let val: serde_json::Value = serde_json::from_str(json)
+        .map_err(|e| miette::miette!("Invalid response from plugin '{}': {}", plugin_name, e))?;
 
     if let Some(status) = val.get("status").and_then(|v| v.as_str())
         && status == "error"
@@ -122,7 +116,7 @@ pub fn parse_status_response(json: &str) -> Result<()> {
             .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown error");
-        bail!("plugin error: {}", msg);
+        bail!("plugin '{}' returned error: {}", plugin_name, msg);
     }
     Ok(())
 }
@@ -135,7 +129,7 @@ mod tests {
     fn test_parse_hook_response_with_html() {
         let json = r#"{"html": "<h1>Hello</h1>"}"#;
         assert_eq!(
-            parse_hook_response(json).unwrap(),
+            parse_hook_response("test_plugin", json).unwrap(),
             Some("<h1>Hello</h1>".to_string())
         );
     }
@@ -143,12 +137,12 @@ mod tests {
     #[test]
     fn test_parse_hook_response_null_html() {
         let json = r#"{"html": null}"#;
-        assert_eq!(parse_hook_response(json).unwrap(), None);
+        assert_eq!(parse_hook_response("test_plugin", json).unwrap(), None);
     }
 
     #[test]
     fn test_parse_hook_response_error() {
         let json = r#"{"status": "error", "message": "something broke"}"#;
-        assert!(parse_hook_response(json).is_err());
+        assert!(parse_hook_response("test_plugin", json).is_err());
     }
 }

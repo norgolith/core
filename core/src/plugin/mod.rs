@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use colored::Colorize;
-use miette::Result;
+use miette::{Result, bail};
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
 pub use manifest::{Capabilities, FilesystemAccess, HookConfig, PluginManifest};
@@ -41,15 +41,10 @@ pub struct PluginInstance {
 }
 
 impl PluginInstance {
-    /// Call a hook on this plugin with safety wrappers (catch_unwind + timeout)
-    ///
-    /// Returns `Ok(None)` if plugin returned NULL (no change)
-    /// Returns `Ok(Some(html))` if plugin returned modified content
-    /// Returns `Err` on panic, timeout, invalid response, or plugin error
     pub fn call_hook(&self, f: PluginFn, input: &str) -> Result<Option<String>> {
         let timeout = Duration::from_millis(self.manifest.timeout_ms);
         match ffi::call_hook_safe(f, input, timeout) {
-            Ok(Some(json)) => match ffi::parse_hook_response(&json) {
+            Ok(Some(json)) => match ffi::parse_hook_response(&self.name, &json) {
                 Ok(Some(html)) => Ok(Some(html)),
                 Ok(None) => Ok(None),
                 Err(e) => {
@@ -338,7 +333,7 @@ extern "C" fn default_free(ptr: *mut std::os::raw::c_char) {
 fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
     let manifest_path = dir.join("plugin.toml");
     if !manifest_path.is_file() {
-        miette::bail!("No plugin.toml found in {}", dir.display());
+        bail!("No plugin.toml found in {}", dir.display());
     }
 
     let manifest = PluginManifest::load(&manifest_path)?;
@@ -346,7 +341,7 @@ fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
     manifest.validate_semver()?;
 
     let lib_path = find_library(dir, &manifest.plugin.name)
-        .ok_or_else(|| miette::miette!("shared library not found"))?;
+        .ok_or_else(|| miette::miette!("Could not find compiled plugin library in {}", dir.display()))?;
 
     // SAFETY: we validate ABI before loading, and the init function is the only symbol we look up
     let lib = unsafe { libloading::Library::new(&lib_path) }
