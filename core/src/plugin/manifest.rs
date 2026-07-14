@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use miette::{Result, bail, miette};
+use miette::{NamedSource, Result, bail, miette};
 use norgolith_plugin_sdk::{
     CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
@@ -116,7 +116,8 @@ impl PluginManifest {
         let content = std::fs::read_to_string(path)
             .map_err(|e| miette!("Failed to read {}: {}", path.display(), e))?;
         let manifest: PluginManifest = toml::from_str(&content)
-            .map_err(|e| miette!("Failed to parse {}: {}", path.display(), e))?;
+            .map_err(|e| miette!("Failed to parse {}: {}", path.display(), e)
+                .with_source_code(NamedSource::new(path.display().to_string(), content)))?;
         Ok(manifest)
     }
 
