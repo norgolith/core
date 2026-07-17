@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.1.3](https://github.com/norgolith/core/compare/norgolith-v1.1.2...norgolith-v1.1.3) (2026-07-17)
+
+
+### Bug Fixes
+
+* **converter:** handle empty Norg documents after metadata strip ([853a943](https://github.com/norgolith/core/commit/853a943758a238acdce1e2898925222cce0b1bbd))
+* **metadata:** insert rel_path into metadata table ([e231984](https://github.com/norgolith/core/commit/e23198420292c096b43f23a559017214e722ed84))
+* **plugin:** improve error messages when cargo was not found in PATH ([9b5add2](https://github.com/norgolith/core/commit/9b5add2e89a6a71ba70cefe7f56415c967ace1ff))
+* prefix collection names in render_category_index to avoid variable collision ([92e7c68](https://github.com/norgolith/core/commit/92e7c6813e4ad2a016a56821cd18b7cfa5203af9))
+* **tera:** register missing tera-contrib filters ([b974f8f](https://github.com/norgolith/core/commit/b974f8fcde33a7b38bc0682903c65e0f28b206d8))
+
+
+### Refactoring
+
+* nuke plugin.toml version field ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+* replace eyre with miette, improve error handling ([#197](https://github.com/norgolith/core/issues/197)) ([b6efc0b](https://github.com/norgolith/core/commit/b6efc0b8327a7f50bf3c2a8dc9b06180c601aacd))
+
+
+### Documentation
+
+* add FFI plugin version guidance ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+* remove plugin.toml version field from documentation ([ed511fc](https://github.com/norgolith/core/commit/ed511fc28353fe48910f8a9602c1dba7dd16842a))
+* use tree-sitter plugin for syntax highlight, tera code blocks instead of django ([e6a3e33](https://github.com/norgolith/core/commit/e6a3e33c2ccb4eab676385210afef2cf65b0f1d2))
+
+
+### Miscellaneous
+
+* release master ([#188](https://github.com/norgolith/core/issues/188)) ([141e452](https://github.com/norgolith/core/commit/141e4525ae1070b03a4c1db86d8e9f1808d739ca))
+* release master ([#194](https://github.com/norgolith/core/issues/194)) ([5786b31](https://github.com/norgolith/core/commit/5786b31d83953d6f2d6a5af710519feb57393179))
+* release master ([#198](https://github.com/norgolith/core/issues/198)) ([0e18531](https://github.com/norgolith/core/commit/0e1853101ca9e351a31e04320507b105fba8272b))
+
 ## [1.1.2](https://github.com/norgolith/core/compare/norgolith-v1.1.1...norgolith-v1.1.2) (2026-07-14)
 
 
