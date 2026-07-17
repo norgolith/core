@@ -34,7 +34,7 @@ notify = "8.0.0"
 notify-debouncer-full = "0.5.0"
 serde = { version = "1.0.217", features = ["derive"] }
 mime_guess = "2.0.5"
-tokio-tungstenite = "0.26.1"
+tokio-tungstenite = "0.30.0"
 futures-util = { version = "0.3.31", features = ["sink"] }
 walkdir = "2.5.0"
 minify-html = "0.18.1"
