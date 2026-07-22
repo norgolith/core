@@ -61,8 +61,10 @@ impl BuildCache {
         if stored_global.as_deref() != Some(global_hash.as_str()) {
             debug!("Global state changed (or first build), clearing cache");
             entries.clear();
-            if let Err(e) = std::fs::remove_dir_all(&cache_dir) {
-                warn!("Failed to clear stale cache directory: {}", e);
+            if cache_dir.exists() {
+                std::fs::remove_dir_all(&cache_dir).unwrap_or_else(|e| {
+                    warn!("Failed to clear stale cache directory: {}", e);
+                });
             }
         }
 

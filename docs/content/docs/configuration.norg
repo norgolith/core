@@ -94,6 +94,36 @@ Norgolith uses a `norgolith.toml` file to manage site-wide settings, content sch
      - `enable`: Enable or disable syntax highlighting. `false` by default.
      - `engine`: Choose between `prism` (default) or `hljs`.
 
+** SEO
+   Norgolith generates SEO metadata out-of-the-box: sitemap, robots.txt, OpenGraph, and Twitter Cards. Configure in the `[seo]` and `[robots]` sections.
+
+*** Example: SEO Configuration
+    @code toml
+    [seo]
+    sitemap = true
+    open_graph = true
+    default_image = "/assets/og-default.png"
+    twitter_site = "@myhandle"
+    twitter_creator = "@myhandle"
+
+    [robots]
+    enable = true
+    preset = "no_llms"  # "allow_all", "no_llms", or "block_all"
+    custom_file = "robots.custom.txt"
+    @end
+
+**** `[seo]` Options
+     - `sitemap`: Enable sitemap.xml generation. `true` by default.
+     - `open_graph`: Enable OpenGraph and Twitter Card meta tags. `true` by default.
+     - `default_image`: Fallback image URL for OG/Twitter when a page has no image set.
+     - `twitter_site`: `@username` for the `twitter:site` meta tag.
+     - `twitter_creator`: `@username` for the `twitter:creator` meta tag.
+
+**** `[robots]` Options
+     - `enable`: Enable robots.txt generation. `true` by default.
+     - `preset`: Built-in preset. `"allow_all"` (default if unset), `"no_llms"` (blocks 150+ AI crawlers), or `"block_all"`.
+     - `custom_file`: Path to a custom robots.txt file. Overrides `preset` when set.
+
 ** RSS
    Norgolith supports RSS feeds out-of-the-box for the site posts (any content in the `posts/` subdirectory), and is enabled by default. You can configure its behaviour in the `[rss]` section.
 

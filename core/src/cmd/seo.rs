@@ -14,17 +14,19 @@ User-agent: *
 Disallow: /
 ";
 
-// This const is updated by scripts/update-robots-presets.sh
-// To update: run the script, which fetches from ai.robots.txt
+// BEGIN ROBOTS_NO_LLMS_GENERATED
+// Updated: 2026-07-22 by scripts/update-robots-presets.sh
 const ROBOTS_NO_LLMS: &str = r"User-agent: AddSearchBot
 User-agent: AgentTimes
 User-agent: AI2Bot
 User-agent: AI2Bot-DeepResearchEval
 User-agent: Ai2Bot-Dolma
 User-agent: aiHitBot
-User-agent: amazon-kendra
+User-agent: AIWebIndex
 User-agent: Amazonbot
 User-agent: AmazonBuyForMe
+User-agent: amazon-kendra
+User-agent: amazon-QBusiness
 User-agent: Amzn-SearchBot
 User-agent: Amzn-User
 User-agent: Andibot
@@ -50,11 +52,11 @@ User-agent: Channel3Bot
 User-agent: ChatGLM-Spider
 User-agent: ChatGPT Agent
 User-agent: ChatGPT-User
+User-agent: ClaudeBot
 User-agent: Claude-Code
 User-agent: Claude-SearchBot
 User-agent: Claude-User
 User-agent: Claude-Web
-User-agent: ClaudeBot
 User-agent: Cloudflare-AutoRAG
 User-agent: CloudVertexBot
 User-agent: Code
@@ -64,6 +66,7 @@ User-agent: Cotoyogi
 User-agent: CragCrawler
 User-agent: Crawl4AI
 User-agent: Crawlspace
+User-agent: Cursor
 User-agent: Datenbank Crawler
 User-agent: DeepSeekBot
 User-agent: Devin
@@ -80,13 +83,13 @@ User-agent: FriendlyCrawler
 User-agent: GeistHaus-PageFetcher
 User-agent: Gemini-Deep-Research
 User-agent: Google-Agent
+User-agent: GoogleAgent-Mariner
+User-agent: GoogleAgent-URLContext
 User-agent: Google-CloudVertexBot
 User-agent: Google-Extended
 User-agent: Google-Firebase
 User-agent: Google-Gemini-CLI
 User-agent: Google-NotebookLM
-User-agent: GoogleAgent-Mariner
-User-agent: GoogleAgent-URLContext
 User-agent: GoogleOther
 User-agent: GoogleOther-Image
 User-agent: GoogleOther-Video
@@ -106,8 +109,8 @@ User-agent: Kangaroo Bot
 User-agent: Kimi-User
 User-agent: KlaviyoAIBot
 User-agent: KunatoCrawler
-User-agent: laion-huggingface-processor
 User-agent: LAIONDownloader
+User-agent: laion-huggingface-processor
 User-agent: LCC
 User-agent: LinerBot
 User-agent: Linguee Bot
@@ -120,6 +123,7 @@ User-agent: Meta-ExternalFetcher
 User-agent: meta-webindexer
 User-agent: MistralAI-User
 User-agent: MistralAI-User/1.0
+User-agent: Mozilla-Tabstack
 User-agent: MyCentralAIScraperBot
 User-agent: NagetBot
 User-agent: netEstate Imprint Crawler
@@ -135,23 +139,23 @@ User-agent: Operator
 User-agent: PanguBot
 User-agent: Panscient
 User-agent: panscient.com
-User-agent: Perplexity-User
 User-agent: PerplexityBot
+User-agent: Perplexity-User
 User-agent: PetalBot
 User-agent: PhindBot
 User-agent: Poggio-Citations
 User-agent: Poseidon Research Crawler
 User-agent: QualifiedBot
-User-agent: Querit-SearchBot
 User-agent: QueritBot
+User-agent: Querit-SearchBot
 User-agent: QuillBot
 User-agent: quillbot.com
 User-agent: SBIntuitionsBot
 User-agent: Scrapy
 User-agent: SemrushBot-OCOB
 User-agent: SemrushBot-SWA
-User-agent: Shap-User
 User-agent: ShapBot
+User-agent: Shap-User
 User-agent: Sidetrade indexer bot
 User-agent: Spider
 User-agent: TavilyBot
@@ -160,22 +164,24 @@ User-agent: TerraCotta
 User-agent: Thinkbot
 User-agent: TikTokSpider
 User-agent: Timpibot
+User-agent: TongyiBot
 User-agent: Trae
 User-agent: TwinAgent
 User-agent: UseAI
 User-agent: VelenPublicWebCrawler
 User-agent: WARDBot
-User-agent: Webzio-Extended
 User-agent: webzio-extended
+User-agent: Webzio-Extended
 User-agent: wpbot
 User-agent: WRTNBot
 User-agent: YaK
 User-agent: YandexAdditional
 User-agent: YandexAdditionalBot
+User-agent: YiyanBot
 User-agent: YouBot
 User-agent: ZanistaBot
 Disallow: /";
-
+// END ROBOTS_NO_LLMS_GENERATED
 /// Represents a URL entry for the sitemap XML.
 #[derive(Debug, Clone)]
 pub struct SitemapUrl {
@@ -245,8 +251,6 @@ pub fn generate_sitemap_xml(urls: &[SitemapUrl], root_url: &str) -> String {
         if let Some(ref lastmod) = url.lastmod {
             let _ = writeln!(buf, "    <lastmod>{}</lastmod>", lastmod);
         }
-        let _ = writeln!(buf, "    <changefreq>weekly</changefreq>");
-        let _ = writeln!(buf, "    <priority>0.5</priority>");
         let _ = writeln!(buf, "  </url>");
     }
 
@@ -276,8 +280,7 @@ mod tests {
         }];
         let xml = generate_sitemap_xml(&urls, "https://example.com");
         assert!(xml.contains("<loc>https://example.com/about/</loc>"));
-        assert!(xml.contains("<changefreq>weekly</changefreq>"));
-        assert!(xml.contains("<priority>0.5</priority>"));
+
         assert!(!xml.contains("<lastmod>"));
     }
 

@@ -26,6 +26,10 @@ pub struct SiteConfigSeo {
     pub open_graph: bool,
     #[serde(default, rename = "default_image")]
     pub default_image: Option<String>,
+    #[serde(default)]
+    pub twitter_site: Option<String>,
+    #[serde(default)]
+    pub twitter_creator: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
