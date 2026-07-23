@@ -72,6 +72,24 @@ fn default_true() -> bool {
     true
 }
 
+fn default_seo() -> Option<SiteConfigSeo> {
+    Some(SiteConfigSeo {
+        sitemap: true,
+        open_graph: true,
+        default_image: None,
+        twitter_site: None,
+        twitter_creator: None,
+    })
+}
+
+fn default_robots() -> Option<SiteConfigRobots> {
+    Some(SiteConfigRobots {
+        enable: true,
+        preset: None,
+        custom: None,
+    })
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SiteConfig {
     #[serde(rename = "rootUrl")]
@@ -88,8 +106,9 @@ pub struct SiteConfig {
     pub collections: Vec<CollectionConfig>,
     #[serde(default = "default_categories_dir", rename = "categoriesDir")]
     pub categories_dir: String,
-    #[serde(default)]
+    #[serde(default = "default_seo")]
     pub seo: Option<SiteConfigSeo>,
+    #[serde(default = "default_robots")]
     pub robots: Option<SiteConfigRobots>,
     #[serde(default, rename = "plugins")]
     pub plugins: Option<HashMap<String, toml::Value>>,
@@ -108,8 +127,8 @@ impl Default for SiteConfig {
             extra: None,
             collections: default_collections(),
             categories_dir: default_categories_dir(),
-            seo: None,
-            robots: None,
+            seo: default_seo(),
+            robots: default_robots(),
             plugins: None,
         }
     }
