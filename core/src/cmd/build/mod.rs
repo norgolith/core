@@ -5,6 +5,7 @@ mod timings;
 
 use std::{
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
     sync::OnceLock,
     time::Instant,
 };
@@ -230,12 +231,16 @@ fn build_contents(
     }
 
     let write_start = Instant::now();
-    let mut built_count = 0usize;
-    for (public_path, content) in &buffered_writes {
-        if write_public_file(public_path, content)? {
-            built_count += 1;
-        }
-    }
+    let built_count = AtomicUsize::new(0);
+    buffered_writes
+        .par_iter()
+        .try_for_each(|(public_path, content)| -> Result<()> {
+            if write_public_file(public_path, content)? {
+                built_count.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(())
+        })?;
+    let built_count = built_count.load(Ordering::Relaxed);
     let write_ms = write_start.elapsed().as_millis();
 
     let mut timings = BuildTimings::new();
@@ -749,6 +754,10 @@ pub fn build(minify: bool) -> Result<()> {
 
     if tracing::enabled!(tracing::Level::DEBUG) {
         timings.print_summary(total_ms);
+        let clone_ms = shared::clone_accumulator_total_ms();
+        if clone_ms > 0 {
+            println!("  shared_context.clone() total: {}ms", clone_ms);
+        }
     }
 
     Ok(())

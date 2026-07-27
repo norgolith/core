@@ -1,5 +1,9 @@
 
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::LazyLock;
+use std::time::Instant;
+
 use colored::Colorize;
 use miette::{Result, miette};
 use tera::{Context, Tera};
@@ -8,6 +12,12 @@ use crate::config::SiteConfig;
 
 use super::PrecomputedCollections;
 use super::metadata::collect_all_posts_categories;
+
+static CLONE_ACCUMULATOR: LazyLock<AtomicU64> = LazyLock::new(|| AtomicU64::new(0));
+
+pub fn clone_accumulator_total_ms() -> u64 {
+    CLONE_ACCUMULATOR.load(Ordering::Relaxed) / 1000
+}
 
 /// Pre-computes collection subsets once, avoiding O(posts × collections) per page.
 pub fn precompute_collection_subsets(
@@ -73,7 +83,11 @@ pub fn render_norg_page(
         .and_then(|v| v.as_str())
         .unwrap_or("default");
 
+    let clone_start = Instant::now();
     let mut context = shared_context.clone();
+    let clone_us = clone_start.elapsed().as_micros() as u64;
+    CLONE_ACCUMULATOR.fetch_add(clone_us, Ordering::Relaxed);
+
     context.insert("content", content);
     context.insert("metadata", metadata);
 

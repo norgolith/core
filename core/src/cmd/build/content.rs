@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use miette::{IntoDiagnostic, Result, WrapErr, miette};
+use rayon::prelude::*;
 use rss::Channel;
 use tera::{Context, Tera};
 use tracing::{instrument, warn};
@@ -76,32 +77,34 @@ pub(super) fn build_category_pages(
 
     std::fs::create_dir_all(&categories_dir).into_diagnostic().wrap_err("Failed to create categories directory")?;
     std::fs::write(categories_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write categories index")?;
-    let mut page_count = 1usize;
 
-    for category in categories {
-        let cat_posts: Vec<_> = posts
-            .iter()
-            .filter(|post| {
-                post.get("categories")
-                    .and_then(|c| c.as_array())
-                    .map(|cats| {
-                        cats.iter()
-                            .any(|c| c.as_str().map(|s| s.trim()) == Some(category.as_str()))
-                    })
-                    .unwrap_or(false)
-            })
-            .collect();
+    categories
+        .par_iter()
+        .map(|category| -> Result<()> {
+            let cat_posts: Vec<_> = posts
+                .iter()
+                .filter(|post| {
+                    post.get("categories")
+                        .and_then(|c| c.as_array())
+                        .map(|cats| {
+                            cats.iter()
+                                .any(|c| c.as_str().map(|s| s.trim()) == Some(category.as_str()))
+                        })
+                        .unwrap_or(false)
+                })
+                .collect();
 
-        let content = shared::render_category_page(tera, &category, &cat_posts, config)?;
+            let content = shared::render_category_page(tera, category, &cat_posts, config)?;
 
-        let cat_dir = categories_dir.join(&category);
-        std::fs::create_dir_all(&cat_dir).into_diagnostic().wrap_err("Failed to create category directory")?;
+            let cat_dir = categories_dir.join(category);
+            std::fs::create_dir_all(&cat_dir).into_diagnostic().wrap_err("Failed to create category directory")?;
 
-        std::fs::write(cat_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write category page")?;
-        page_count += 1;
-    }
+            std::fs::write(cat_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write category page")?;
+            Ok(())
+        })
+        .collect::<Result<Vec<()>>>()?;
 
-    Ok(page_count)
+    Ok(1 + categories.len())
 }
 
 #[instrument(level = "debug", skip(tera, shared_context, public_dir))]

@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::sync::OnceLock;
 
+use rayon::prelude::*;
+
 use colored::Colorize;
 use miette::{IntoDiagnostic, Result, WrapErr, miette};
 use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
@@ -122,8 +124,7 @@ fn copy_asset_file(src_path: &Path, dest_path: &Path, minify: bool) -> Result<()
 
 #[instrument(skip(assets_dir, target_dir, minify))]
 pub(super) fn copy_assets(assets_dir: &Path, target_dir: &Path, minify: bool) -> Result<usize> {
-    let mut file_count = 0usize;
-    for entry in WalkDir::new(assets_dir)
+    let entries: Vec<_> = WalkDir::new(assets_dir)
         .follow_links(true)
         .into_iter()
         .filter_map(|e| match e {
@@ -133,7 +134,10 @@ pub(super) fn copy_assets(assets_dir: &Path, target_dir: &Path, minify: bool) ->
                 None
             }
         })
-    {
+        .collect();
+
+    let mut file_ops = Vec::new();
+    for entry in &entries {
         let Some(rel_path) = entry.path().strip_prefix(assets_dir).ok() else {
             warn!(
                 "Skipping asset outside assets directory: {}",
@@ -144,13 +148,16 @@ pub(super) fn copy_assets(assets_dir: &Path, target_dir: &Path, minify: bool) ->
         let target_path = target_dir.join(rel_path);
         if entry.path().is_dir() {
             if !target_path.exists() {
-                std::fs::create_dir_all(target_path).into_diagnostic().wrap_err("Failed to create asset directory")?;
+                std::fs::create_dir_all(&target_path).into_diagnostic().wrap_err("Failed to create asset directory")?;
             }
         } else {
-            copy_asset_file(entry.path(), &target_path, minify)?;
-            file_count += 1;
+            file_ops.push((entry.path().to_path_buf(), target_path));
         }
     }
 
-    Ok(file_count)
+    file_ops
+        .par_iter()
+        .try_for_each(|(src, dst)| copy_asset_file(src, dst, minify))?;
+
+    Ok(file_ops.len())
 }
