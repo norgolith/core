@@ -47,8 +47,8 @@ pub async fn dev(
     } else {
         format!("http://localhost:{}", port)
     };
-    let state = setup_server_state(root, drafts, routes_url).await?;
     let server_start = std::time::Instant::now();
+    let state = setup_server_state(root, drafts, routes_url).await?;
     let rt = Handle::current();
 
     let _guard_receiver = state.reload_tx.subscribe();
