@@ -14,19 +14,30 @@ pub(super) fn should_minify_asset(src: &Path) -> bool {
     !file_stem.ends_with(".min") && (file_ext == "js" || file_ext == "css")
 }
 
-fn minify_html_cfg() -> &'static minify_html::Cfg {
-    static CFG: OnceLock<minify_html::Cfg> = OnceLock::new();
-    CFG.get_or_init(|| minify_html::Cfg {
+fn minify_html_cfg() -> &'static minify_html_onepass::Cfg {
+    static CFG: OnceLock<minify_html_onepass::Cfg> = OnceLock::new();
+    CFG.get_or_init(|| minify_html_onepass::Cfg {
         minify_js: true,
         minify_css: true,
-        ..minify_html::Cfg::default()
     })
 }
 
 #[instrument]
-pub(super) fn minify_html_content(rendered: String) -> Result<String> {
-    String::from_utf8(minify_html::minify(rendered.as_bytes(), minify_html_cfg()))
-        .map_err(|e| miette!("{}: {}", "HTML minification failed".bold(), e))
+pub(super) fn minify_html_content(mut rendered: String) -> Result<String> {
+    let new_len = minify_html_onepass::in_place(
+        unsafe { rendered.as_bytes_mut() },
+        minify_html_cfg(),
+    )
+    .map_err(|e| {
+        miette!(
+            "{} at position {}: {:?}",
+            "HTML minification failed".bold(),
+            e.position,
+            e.error_type
+        )
+    })?;
+    rendered.truncate(new_len);
+    Ok(rendered)
 }
 
 #[instrument(skip(src_path, dest_path))]
