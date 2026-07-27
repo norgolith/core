@@ -85,7 +85,7 @@ impl ServerState {
         let tera = self.tera.read().await;
         let config = self.config.read().await.clone();
         let posts = self.posts.read().await.clone();
-        let cache = self.cache.read().await;
+        let mut cache = self.cache.write().await;
 
         match render_all_pages(
             BuildContext {
@@ -96,7 +96,7 @@ impl ServerState {
             },
             &posts,
             &self.routes_url,
-            &cache,
+            &mut cache,
             None,
         ) {
             Ok(new_pages) => {
@@ -132,7 +132,7 @@ pub fn render_all_pages(
     ctx: BuildContext<'_>,
     posts: &[toml::Value],
     routes_url: &str,
-    cache: &crate::cache::BuildCache,
+    cache: &mut crate::cache::BuildCache,
     progress: Option<&ProgressBar>,
 ) -> Result<HashMap<String, String>> {
     use rayon::prelude::*;
@@ -140,7 +140,6 @@ pub fn render_all_pages(
     let collections = shared::precompute_collection_subsets(posts, ctx.site_config);
     let shared_context = shared::build_shared_context(posts, ctx.site_config, &collections);
 
-    // Collect entries first for parallel iteration
     let entries: Vec<_> = WalkDir::new(&ctx.paths.content)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -148,7 +147,9 @@ pub fn render_all_pages(
         .map(|e| e.path().to_path_buf())
         .collect();
 
-    let results: Vec<Result<Option<(String, String)>>> = entries
+    let cache_ref: &crate::cache::BuildCache = &*cache;
+
+    let results: Vec<Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>> = entries
         .par_iter()
         .map(|path| {
             let rel_path = match path.strip_prefix(&ctx.paths.content) {
@@ -164,7 +165,6 @@ pub fn render_all_pages(
                 return Ok(None);
             };
 
-            // Draft check
             let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url)?;
             let is_draft = metadata
                 .get("draft")
@@ -174,9 +174,20 @@ pub fn render_all_pages(
                 return Ok(None);
             }
 
-            // Full load with HTML conversion (reuse build_cache if available)
             let cache_key = rel_path.with_extension("");
-            let mut metadata = if let Some(cached) = cache.get(&cache_key, &content) {
+
+            // ponytail: skip re-render if cache has rendered HTML
+            if let Some(cached_html) = cache_ref.get_rendered(&cache_key) {
+                let body = super::handlers::rewrite_urls(
+                    cached_html,
+                    &ctx.site_config.root_url,
+                    routes_url,
+                );
+                let url_path = format!("/{}", rel_path.with_extension("").display());
+                return Ok(Some((url_path, body, None)));
+            }
+
+            let mut metadata = if let Some(cached) = cache_ref.get(&cache_key, &content) {
                 serde_json::from_value(cached).unwrap_or_else(|_| {
                     shared::load_metadata_from_content(&content, rel_path, routes_url)
                         .unwrap_or_else(|e| {
@@ -195,7 +206,6 @@ pub fn render_all_pages(
             ctx.plugins
                 .run_post_convert(ctx.site_config, &mut metadata, rel_path);
 
-            // Process shortcode component calls inside @embed html islands.
             if let Some(raw) = metadata.get("raw").and_then(|v| v.as_str())
                 && raw.contains("<!--lith:embed-->")
             {
@@ -217,13 +227,23 @@ pub fn render_all_pages(
             let body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
 
             let url_path = format!("/{}", rel_path.with_extension("").display());
-            Ok(Some((url_path, body)))
+
+            let cache_data = (
+                cache_key,
+                content,
+                serde_json::to_value(&metadata).unwrap_or_default(),
+            );
+
+            Ok(Some((url_path, body, Some(cache_data))))
         })
         .collect();
 
     let mut pages = HashMap::new();
     for result in results {
-        if let Some((url, body)) = result? {
+        if let Some((url, body, cache_back)) = result? {
+            if let Some((key, content, md)) = cache_back {
+                cache.insert_rendered(&key, &content, md, &body);
+            }
             pages.insert(url, body);
         }
     }
@@ -351,7 +371,7 @@ pub(super) async fn setup_server_state(
 
     meta_spinner.finish_and_clear();
 
-    let cache = crate::cache::BuildCache::open(&root_dir)?;
+    let mut cache = crate::cache::BuildCache::open(&root_dir)?;
 
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
     if !plugin_mgr.is_empty() {
@@ -403,7 +423,7 @@ pub(super) async fn setup_server_state(
         },
         &posts,
         &routes_url,
-        &cache,
+        &mut cache,
         Some(&render_bar),
     )?;
 
