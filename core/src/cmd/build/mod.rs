@@ -1,6 +1,6 @@
 mod assets;
 mod content;
-mod progress;
+pub mod progress;
 mod timings;
 
 use std::{

@@ -117,21 +117,21 @@ pub async fn dev(
         });
 
     let localhost_address = format!(
-        "{} {}   {}",
+        "  {} {}   {}",
         "•".green(),
         "Local:".bold(),
         format!("http://localhost:{}/", port.to_string().cyan().bold()).blue()
     );
     let lan_address = if host {
         format!(
-            "{} {} {}",
+            "  {} {} {}",
             "•".green(),
             "Network:".bold(),
             format!("http://{}:{}/", local_ip, port.to_string().cyan().bold()).blue()
         )
     } else {
         format!(
-            "{} {} {} {} {}",
+            "  {} {} {} {} {}",
             "•".green().dimmed(),
             "Network:".bold().dimmed(),
             "use".dimmed(),
@@ -140,7 +140,7 @@ pub async fn dev(
         )
     };
     println!(
-        "Server started in {}\n{}\n{}\n\n{}\n",
+        "\nServer started in {}\n{}\n{}\n\n{}\n",
         shared::get_elapsed_time(server_start),
         localhost_address,
         lan_address,
