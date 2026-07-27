@@ -25,8 +25,21 @@ use assets::copy_assets;
 use content::{build_category_pages, build_error_pages, generate_xml_feeds};
 use timings::BuildTimings;
 
+#[derive(Default)]
+pub(super) struct PageTimings {
+    pub file_ms: u128,
+    pub meta_ms: u128,
+    pub schema_ms: u128,
+    pub draft_ms: u128,
+    pub cache_get_ms: u128,
+    pub load_ms: u128,
+    pub render_ms: u128,
+    pub href_ms: u128,
+    pub minify_ms: u128,
+}
+
 pub(super) type CacheInsert = (PathBuf, String, serde_json::Value);
-pub(super) type BuildResult = Result<Option<(PathBuf, String, String, Option<CacheInsert>)>>;
+pub(super) type BuildResult = Result<Option<(PathBuf, String, String, Option<CacheInsert>, PageTimings)>>;
 
 fn href_root_re() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
@@ -177,14 +190,32 @@ fn build_contents(
     let mut buffered_writes = Vec::new();
     let mut permalinks = Vec::new();
     let mut page_errors = Vec::new();
+    let mut page_sum_file = 0u128;
+    let mut page_sum_meta = 0u128;
+    let mut page_sum_schema = 0u128;
+    let mut page_sum_draft = 0u128;
+    let mut page_sum_cache_get = 0u128;
+    let mut page_sum_load = 0u128;
+    let mut page_sum_render = 0u128;
+    let mut page_sum_href = 0u128;
+    let mut page_sum_minify = 0u128;
     for result in results {
         match result {
-            Ok(Some((public_path, content, permalink, cache_entry))) => {
+            Ok(Some((public_path, content, permalink, cache_entry, pt))) => {
                 buffered_writes.push((public_path, content));
                 permalinks.push(permalink);
                 if let Some((key, content_str, metadata)) = cache_entry {
                     cache.insert(&key, &content_str, metadata);
                 }
+                page_sum_file += pt.file_ms;
+                page_sum_meta += pt.meta_ms;
+                page_sum_schema += pt.schema_ms;
+                page_sum_draft += pt.draft_ms;
+                page_sum_cache_get += pt.cache_get_ms;
+                page_sum_load += pt.load_ms;
+                page_sum_render += pt.render_ms;
+                page_sum_href += pt.href_ms;
+                page_sum_minify += pt.minify_ms;
             }
             Ok(None) => {}
             Err(e) => {
@@ -208,13 +239,21 @@ fn build_contents(
     let write_ms = write_start.elapsed().as_millis();
 
     let mut timings = BuildTimings::new();
+    timings.page_file_ms = page_sum_file / 1000;
+    timings.page_meta_ms = page_sum_meta / 1000;
+    timings.page_schema_ms = page_sum_schema / 1000;
+    timings.page_draft_ms = page_sum_draft / 1000;
+    timings.page_cache_get_ms = page_sum_cache_get / 1000;
+    timings.page_load_ms = page_sum_load / 1000;
+    timings.page_render_ms = page_sum_render / 1000;
+    timings.page_href_ms = page_sum_href / 1000;
+    timings.page_minify_ms = page_sum_minify / 1000;
     timings.page_write_ms = write_ms;
     timings.page_count = built_count;
 
     Ok((built_count, permalinks, timings))
 }
 
-#[instrument(level = "debug", skip(path, ctx, shared_context, cache))]
 fn build_content_entry(
     path: &Path,
     ctx: BuildContext<'_>,
@@ -226,6 +265,7 @@ fn build_content_entry(
         .strip_prefix(&ctx.paths.content)
         .into_diagnostic().wrap_err("Failed to strip prefix")?;
 
+    let t = Instant::now();
     let Ok(content) = std::fs::read_to_string(path) else {
         error!(
             "{} {}",
@@ -234,9 +274,14 @@ fn build_content_entry(
         );
         return Ok(None);
     };
+    let file_ms = t.elapsed().as_micros();
 
+    let t = Instant::now();
     let metadata =
         shared::extract_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
+    let meta_ms = t.elapsed().as_micros();
+
+    let t = Instant::now();
     if let Some(schema) = &ctx.site_config.content_schema
         && !rel_path.starts_with(&ctx.site_config.categories_dir)
     {
@@ -248,7 +293,9 @@ fn build_content_entry(
             false,
         )?;
     }
+    let schema_ms = t.elapsed().as_micros();
 
+    let t = Instant::now();
     let is_draft = match metadata.get("draft") {
         Some(val) => val.as_bool().ok_or_else(|| {
             miette!("'draft' field must be a boolean for '{}'", path.display())
@@ -258,10 +305,15 @@ fn build_content_entry(
     if is_draft {
         return Ok(None);
     }
+    let draft_ms = t.elapsed().as_micros();
 
     let cache_key = rel_path.with_extension("");
-    let cached = cache.get(&cache_key, &content);
 
+    let t = Instant::now();
+    let cached = cache.get(&cache_key, &content);
+    let cache_get_ms = t.elapsed().as_micros();
+
+    let t = Instant::now();
     let (mut metadata, cache_insert) = if let Some(cached) = cached {
         match serde_json::from_value::<toml::Value>(cached.clone()) {
             Ok(md) => (md, None),
@@ -280,6 +332,7 @@ fn build_content_entry(
         let cache_val = serde_json::to_value(&md).unwrap_or_default();
         (md, Some((cache_key, content.clone(), cache_val)))
     };
+    let load_ms = t.elapsed().as_micros();
 
     ctx.plugins
         .run_post_convert(ctx.site_config, &mut metadata, rel_path);
@@ -301,22 +354,28 @@ fn build_content_entry(
 
     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
 
+    let t = Instant::now();
     let mut rendered = shared::render_norg_page(ctx.tera, &metadata, shared_context)?;
+    let render_ms = t.elapsed().as_micros();
 
     rendered = ctx
         .plugins
         .run_post_render(ctx.site_config, rendered, &metadata, rel_path);
 
+    let t = Instant::now();
     let href_re = href_root_re();
     rendered = href_re
         .replace_all(&rendered, format!("href=\"{}/", ctx.site_config.root_url))
         .into_owned();
+    let href_ms = t.elapsed().as_micros();
 
+    let t = Instant::now();
     let rendered = if minify && !rendered.is_empty() {
         assets::minify_html_content(rendered)?
     } else {
         rendered
     };
+    let minify_ms = t.elapsed().as_micros();
 
     let permalink = metadata
         .get("permalink")
@@ -324,7 +383,19 @@ fn build_content_entry(
         .unwrap_or("/")
         .to_string();
 
-    Ok(Some((public_path, rendered, permalink, cache_insert)))
+    let pt = PageTimings {
+        file_ms,
+        meta_ms,
+        schema_ms,
+        draft_ms,
+        cache_get_ms,
+        load_ms,
+        render_ms,
+        href_ms,
+        minify_ms,
+    };
+
+    Ok(Some((public_path, rendered, permalink, cache_insert, pt)))
 }
 
 #[instrument(skip(minify))]
@@ -474,6 +545,15 @@ pub fn build(minify: bool) -> Result<()> {
         build_contents(ctx, &shared_context, &mut cache, minify, &mp)?;
     timings.content_ms = t.elapsed().as_millis();
     timings.page_count = page_count;
+    timings.page_file_ms = content_timings.page_file_ms;
+    timings.page_meta_ms = content_timings.page_meta_ms;
+    timings.page_schema_ms = content_timings.page_schema_ms;
+    timings.page_draft_ms = content_timings.page_draft_ms;
+    timings.page_cache_get_ms = content_timings.page_cache_get_ms;
+    timings.page_load_ms = content_timings.page_load_ms;
+    timings.page_render_ms = content_timings.page_render_ms;
+    timings.page_href_ms = content_timings.page_href_ms;
+    timings.page_minify_ms = content_timings.page_minify_ms;
     timings.page_write_ms = content_timings.page_write_ms;
     mp.println(format!(
         "  {} {}  {:<12}  {}",
