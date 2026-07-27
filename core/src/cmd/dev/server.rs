@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use colored::Colorize;
+use indicatif::{MultiProgress, ProgressBar};
 use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, error, info, instrument, warn};
 use walkdir::WalkDir;
 
+use crate::cmd::build::progress::{make_bar, make_spinner};
 use crate::shared::{BuildContext, SitePaths};
 use crate::{config, plugin, shortcode, shared};
 
@@ -95,6 +97,7 @@ impl ServerState {
             &posts,
             &self.routes_url,
             &cache,
+            None,
         ) {
             Ok(new_pages) => {
                 let mut pages = self.rendered_pages.write().await;
@@ -130,6 +133,7 @@ pub fn render_all_pages(
     posts: &[toml::Value],
     routes_url: &str,
     cache: &crate::cache::BuildCache,
+    progress: Option<&ProgressBar>,
 ) -> Result<HashMap<String, String>> {
     let mut pages = HashMap::new();
 
@@ -206,6 +210,10 @@ pub fn render_all_pages(
 
         let url_path = format!("/{}", rel_path.with_extension("").display());
         pages.insert(url_path, body);
+
+        if let Some(b) = progress {
+            b.inc(1);
+        }
     }
 
     // Pre-render category index
@@ -323,12 +331,25 @@ pub(super) async fn setup_server_state(
 
     let (reload_tx, _) = broadcast::channel(16);
 
+    let mp = MultiProgress::new();
+    let meta_spinner = make_spinner(&mp, "Collecting posts metadata");
+
     let posts =
         shared::collect_all_posts_metadata(&paths.content, &routes_url, &site_config.collections)?;
+
+    meta_spinner.finish_and_clear();
 
     let cache = crate::cache::BuildCache::open(&root_dir)?;
 
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
+    if !plugin_mgr.is_empty() {
+        mp.println(format!(
+            "  {} {}  {} plugins",
+            "•".green(),
+            format!("{:<12}", "Plugins").bold(),
+            plugin_mgr.len()
+        )).ok();
+    }
     if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
         warn!("{}", e);
     }
@@ -353,6 +374,14 @@ pub(super) async fn setup_server_state(
         }
     }
 
+    let entry_count: usize = WalkDir::new(&paths.content)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "norg"))
+        .count();
+
+    let render_bar = make_bar(&mp, entry_count as u64, "Loading pages in-memory");
+
     let rendered_pages = render_all_pages(
         BuildContext {
             tera: &tera,
@@ -363,7 +392,11 @@ pub(super) async fn setup_server_state(
         &posts,
         &routes_url,
         &cache,
+        Some(&render_bar),
     )?;
+
+    render_bar.finish_and_clear();
+    drop(mp);
 
     let tera = Arc::new(RwLock::new(tera));
 
