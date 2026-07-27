@@ -1,5 +1,6 @@
 mod assets;
 mod content;
+mod progress;
 mod timings;
 
 use std::{
@@ -9,12 +10,14 @@ use std::{
 };
 
 use colored::{ColoredString, Colorize};
+use indicatif::MultiProgress;
 use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use tera::Context;
 use tracing::{debug, error, instrument, warn};
 use walkdir::WalkDir;
 
 use super::seo;
+use progress::{make_bar, make_spinner};
 use crate::shared::{BuildContext, SitePaths};
 use crate::{cache::BuildCache, config, fs, plugin, shortcode, shared};
 
@@ -137,12 +140,13 @@ fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
     Ok(true)
 }
 
-#[instrument(level = "debug", skip(ctx, shared_context, cache))]
+#[instrument(level = "debug", skip(ctx, shared_context, cache, mp))]
 fn build_contents(
     ctx: BuildContext<'_>,
     shared_context: &Context,
     cache: &mut BuildCache,
     minify: bool,
+    mp: &MultiProgress,
 ) -> Result<(usize, Vec<String>, BuildTimings)> {
     use rayon::prelude::*;
 
@@ -158,13 +162,17 @@ fn build_contents(
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "norg"))
         .collect();
 
+    let bar = make_bar(mp, entries.len() as u64, "Building content");
+
     let results: Vec<BuildResult> = entries
         .par_iter()
         .map(|entry| {
             let path = entry.path();
+            bar.inc(1);
             build_content_entry(path, ctx, shared_context, cache, minify)
         })
         .collect();
+    bar.finish_and_clear();
 
     let mut buffered_writes = Vec::new();
     let mut permalinks = Vec::new();
@@ -328,7 +336,8 @@ pub fn build(minify: bool) -> Result<()> {
         );
     };
 
-    println!(
+    let mp = MultiProgress::new();
+    mp.println(format!(
         "{} Building site{}...",
         "→".cyan().bold(),
         if minify {
@@ -336,7 +345,7 @@ pub fn build(minify: bool) -> Result<()> {
         } else {
             ColoredString::from("")
         }
-    );
+    )).ok();
     let build_start = Instant::now();
     let mut timings = BuildTimings::new();
 
@@ -386,14 +395,13 @@ pub fn build(minify: bool) -> Result<()> {
     }
     timings.plugins_ms = t.elapsed().as_millis();
 
-    println!();
     if !plugin_mgr.is_empty() {
-        println!(
+        mp.println(format!(
             "  {} {}  {} plugins",
             "•".green(),
             format!("{:<12}", "Plugins").bold(),
             plugin_mgr.len()
-        );
+        )).ok();
     }
 
     // pre_build hook
@@ -425,6 +433,7 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Collect post metadata
     let t = Instant::now();
+    let meta_spinner = make_spinner(&mp, "Collecting posts metadata");
     let posts: Vec<_> = shared::collect_all_posts_metadata(
         &paths.content,
         &site_config.root_url,
@@ -436,6 +445,7 @@ pub fn build(minify: bool) -> Result<()> {
     })
     .collect();
     timings.collect_posts_ms = t.elapsed().as_millis();
+    meta_spinner.finish_and_clear();
 
     // Pre-compute collection subsets
     let t = Instant::now();
@@ -461,30 +471,30 @@ pub fn build(minify: bool) -> Result<()> {
         plugins: &plugin_mgr,
     };
     let (page_count, permalinks, content_timings) =
-        build_contents(ctx, &shared_context, &mut cache, minify)?;
+        build_contents(ctx, &shared_context, &mut cache, minify, &mp)?;
     timings.content_ms = t.elapsed().as_millis();
     timings.page_count = page_count;
     timings.page_write_ms = content_timings.page_write_ms;
-    println!(
+    mp.println(format!(
         "  {} {}  {:<12}  {}",
         "•".green(),
         format!("{:<12}", "Content").bold(),
         format!("{} pages", page_count),
         shared::get_elapsed_time(t).dimmed()
-    );
+    )).ok();
 
     // Category pages
     let t = Instant::now();
     let cat_count = build_category_pages(&tera, &paths.public, &posts, &site_config, &collections)?;
     timings.categories_ms = t.elapsed().as_millis();
     if cat_count > 0 {
-        println!(
+        mp.println(format!(
             "  {} {}  {:<12}  {}",
             "•".green(),
             format!("{:<12}", "Categories").bold(),
             format!("{} pages", cat_count),
             shared::get_elapsed_time(t).dimmed()
-        );
+        )).ok();
     }
 
     // XML feeds
@@ -492,13 +502,13 @@ pub fn build(minify: bool) -> Result<()> {
     let (feed_count, feed_names) = generate_xml_feeds(&tera, &shared_context, &paths.public)?;
     timings.feeds_ms = t.elapsed().as_millis();
     if feed_count > 0 {
-        println!(
+        mp.println(format!(
             "  {} {}  {:<12}  {}",
             "•".green(),
             format!("{:<12}", "Feeds").bold(),
             format!("{} files", feed_count),
             shared::get_elapsed_time(t).dimmed()
-        );
+        )).ok();
     }
 
     // SEO generation
@@ -573,13 +583,13 @@ pub fn build(minify: bool) -> Result<()> {
     }
     timings.seo_ms = t.elapsed().as_millis();
     if seo_count > 0 {
-        println!(
+        mp.println(format!(
             "  {} {}  {:<12}  {}",
             "•".green(),
             format!("{:<12}", "SEO").bold(),
             format!("{} files", seo_count),
             shared::get_elapsed_time(t).dimmed()
-        );
+        )).ok();
     }
 
     // Assets
@@ -591,26 +601,26 @@ pub fn build(minify: bool) -> Result<()> {
     }
     asset_count += copy_assets(&paths.assets, &public_assets_dir, minify)?;
     timings.assets_ms = t.elapsed().as_millis();
-    println!(
+    mp.println(format!(
         "  {} {}  {:<12}  {}",
         "•".green(),
         format!("{:<12}", "Assets").bold(),
         format!("{} files", asset_count),
         shared::get_elapsed_time(t).dimmed()
-    );
+    )).ok();
 
     // Error pages
     let t = Instant::now();
     let error_page_count = build_error_pages(&tera, &shared_context, &paths.public)?;
     timings.error_pages_ms = t.elapsed().as_millis();
     if error_page_count > 0 {
-        println!(
+        mp.println(format!(
             "  {} {}  {:<12}  {}",
             "•".green(),
             format!("{:<12}", "Error pages").bold(),
             format!("{} files", error_page_count),
             shared::get_elapsed_time(t).dimmed()
-        );
+        )).ok();
     }
 
     // post_build hook
@@ -630,6 +640,7 @@ pub fn build(minify: bool) -> Result<()> {
         }
     }
 
+    drop(mp);
     println!();
     let total_ms = build_start.elapsed().as_millis();
     println!(

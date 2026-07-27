@@ -101,7 +101,6 @@ impl PluginManager {
             let dir = entry.path();
             match load_plugin(&dir) {
                 Ok(instance) => {
-                    info!("Loaded plugin '{}' v{}", instance.name, instance.version);
                     manager.plugins.push(instance);
                 }
                 Err(e) => {
