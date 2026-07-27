@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use miette::{Result, miette};
+use rayon::prelude::*;
 use tracing::warn;
 use walkdir::WalkDir;
 
@@ -188,7 +189,7 @@ pub fn collect_all_posts_metadata(
 
     // Process metadata extraction
     let mut posts: Vec<toml::Value> = entries
-        .into_iter()
+        .into_par_iter()
         .map(|(path, rel_path)| -> Result<toml::Value> {
             let content = std::fs::read_to_string(&path)
                 .map_err(|_| miette!("Failed to read {}: {}", rel_path.display(), path.display()))?;
