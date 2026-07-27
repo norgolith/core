@@ -32,6 +32,8 @@ jobs:
             target: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v6
+      - name: Regenerate lock file
+        run: cargo generate-lockfile
       - name: Build
         uses: houseabsolute/actions-rust-cross@v0
         with:
