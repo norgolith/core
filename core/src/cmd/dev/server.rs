@@ -135,84 +135,96 @@ pub fn render_all_pages(
     cache: &crate::cache::BuildCache,
     progress: Option<&ProgressBar>,
 ) -> Result<HashMap<String, String>> {
-    let mut pages = HashMap::new();
+    use rayon::prelude::*;
 
     let collections = shared::precompute_collection_subsets(posts, ctx.site_config);
     let shared_context = shared::build_shared_context(posts, ctx.site_config, &collections);
 
-    // Render content pages
-    for entry in WalkDir::new(&ctx.paths.content)
+    // Collect entries first for parallel iteration
+    let entries: Vec<_> = WalkDir::new(&ctx.paths.content)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "norg"))
-    {
-        let path = entry.path();
-        let rel_path = match path.strip_prefix(&ctx.paths.content) {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
+        .map(|e| e.path().to_path_buf())
+        .collect();
 
-        let Ok(content) = std::fs::read_to_string(path) else {
-            continue;
-        };
+    let results: Vec<Result<Option<(String, String)>>> = entries
+        .par_iter()
+        .map(|path| {
+            let rel_path = match path.strip_prefix(&ctx.paths.content) {
+                Ok(p) => p,
+                Err(_) => return Ok(None),
+            };
 
-        // Draft check
-        let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url)?;
-        let is_draft = metadata
-            .get("draft")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        if is_draft {
-            continue;
-        }
+            if let Some(b) = progress {
+                b.inc(1);
+            }
 
-        // Full load with HTML conversion (reuse build_cache if available)
-        let cache_key = rel_path.with_extension("");
-        let mut metadata = if let Some(cached) = cache.get(&cache_key, &content) {
-            serde_json::from_value(cached).unwrap_or_else(|_| {
+            let Ok(content) = std::fs::read_to_string(path) else {
+                return Ok(None);
+            };
+
+            // Draft check
+            let metadata = shared::extract_metadata_from_content(&content, rel_path, routes_url)?;
+            let is_draft = metadata
+                .get("draft")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if is_draft {
+                return Ok(None);
+            }
+
+            // Full load with HTML conversion (reuse build_cache if available)
+            let cache_key = rel_path.with_extension("");
+            let mut metadata = if let Some(cached) = cache.get(&cache_key, &content) {
+                serde_json::from_value(cached).unwrap_or_else(|_| {
+                    shared::load_metadata_from_content(&content, rel_path, routes_url)
+                        .unwrap_or_else(|e| {
+                            error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                            toml::Value::Table(toml::map::Map::new())
+                        })
+                })
+            } else {
                 shared::load_metadata_from_content(&content, rel_path, routes_url)
                     .unwrap_or_else(|e| {
                         error!("Failed to load metadata for {}: {}", rel_path.display(), e);
                         toml::Value::Table(toml::map::Map::new())
                     })
-            })
-        } else {
-            shared::load_metadata_from_content(&content, rel_path, routes_url)
-                .unwrap_or_else(|e| {
-                    error!("Failed to load metadata for {}: {}", rel_path.display(), e);
-                    toml::Value::Table(toml::map::Map::new())
-                })
-        };
+            };
 
-        ctx.plugins
-            .run_post_convert(ctx.site_config, &mut metadata, rel_path);
+            ctx.plugins
+                .run_post_convert(ctx.site_config, &mut metadata, rel_path);
 
-        // Process shortcode component calls inside @embed html islands.
-        if let Some(raw) = metadata.get("raw").and_then(|v| v.as_str())
-            && raw.contains("<!--lith:embed-->")
-        {
-            let mut shortcode_ctx = shared_context.clone();
-            shortcode_ctx.insert("metadata", &metadata);
-            if let Ok(processed) = shortcode::process(raw, ctx.tera, &shortcode_ctx)
-                && let toml::Value::Table(ref mut table) = metadata
+            // Process shortcode component calls inside @embed html islands.
+            if let Some(raw) = metadata.get("raw").and_then(|v| v.as_str())
+                && raw.contains("<!--lith:embed-->")
             {
-                table.insert("raw".to_string(), toml::Value::String(processed));
+                let mut shortcode_ctx = shared_context.clone();
+                shortcode_ctx.insert("metadata", &metadata);
+                if let Ok(processed) = shortcode::process(raw, ctx.tera, &shortcode_ctx)
+                    && let toml::Value::Table(ref mut table) = metadata
+                {
+                    table.insert("raw".to_string(), toml::Value::String(processed));
+                }
             }
-        }
 
-        let mut body = shared::render_norg_page(ctx.tera, &metadata, &shared_context)?;
+            let body = shared::render_norg_page(ctx.tera, &metadata, &shared_context)?;
 
-        body = ctx
-            .plugins
-            .run_post_render(ctx.site_config, body, &metadata, rel_path);
+            let body = ctx
+                .plugins
+                .run_post_render(ctx.site_config, body, &metadata, rel_path);
 
-        body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
+            let body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
 
-        let url_path = format!("/{}", rel_path.with_extension("").display());
-        pages.insert(url_path, body);
+            let url_path = format!("/{}", rel_path.with_extension("").display());
+            Ok(Some((url_path, body)))
+        })
+        .collect();
 
-        if let Some(b) = progress {
-            b.inc(1);
+    let mut pages = HashMap::new();
+    for result in results {
+        if let Some((url, body)) = result? {
+            pages.insert(url, body);
         }
     }
 
