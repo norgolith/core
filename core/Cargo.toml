@@ -43,7 +43,7 @@ regex = "1.11.1"
 semver = { version = "1.0.25", features = ["serde"] }
 git2 = { version = "0.20.4", features = ["vendored-libgit2", "vendored-openssl"] }
 tempfile = "3.17.1"
-inquire = { version = "0.7.5", features = ["chrono", "date"] }
+inquire = { version = "0.9.4", features = ["chrono", "date"] }
 spinoff = "0.8.0"
 tokio-stream = { version = "0.1.17", features = ["sync", "net"] }
 tracing = "0.1.41"
