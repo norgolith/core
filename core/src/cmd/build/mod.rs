@@ -39,7 +39,7 @@ pub(super) struct PageTimings {
     pub minify_ms: u128,
 }
 
-pub(super) type CacheInsert = (PathBuf, String, serde_json::Value);
+pub(super) type CacheInsert = (PathBuf, String, serde_json::Value, Option<String>);
 pub(super) type BuildResult = Result<Option<(PathBuf, String, String, Option<CacheInsert>, PageTimings)>>;
 
 fn href_root_re() -> &'static regex::Regex {
@@ -205,8 +205,12 @@ fn build_contents(
             Ok(Some((public_path, content, permalink, cache_entry, pt))) => {
                 buffered_writes.push((public_path, content));
                 permalinks.push(permalink);
-                if let Some((key, content_str, metadata)) = cache_entry {
-                    cache.insert(&key, &content_str, metadata);
+                if let Some((key, content_str, metadata, rendered_html)) = cache_entry {
+                    if let Some(html) = rendered_html {
+                        cache.insert_rendered(&key, &content_str, metadata, &html);
+                    } else {
+                        cache.insert(&key, &content_str, metadata);
+                    }
                 }
                 page_sum_file += pt.file_ms;
                 page_sum_meta += pt.meta_ms;
@@ -319,9 +323,25 @@ fn build_content_entry(
     let cache_get_ms = t.elapsed().as_micros();
 
     let t = Instant::now();
-    let (mut metadata, cache_insert) = if let Some(cached) = cached {
+    let (mut metadata, cache_insert, from_cache) = if let Some(cached) = cached {
         match serde_json::from_value::<toml::Value>(cached.clone()) {
-            Ok(md) => (md, None),
+            Ok(md) => {
+                // Try short-circuit with cached rendered HTML
+                if let Some(html) = cache.get_rendered(&cache_key) {
+                    let load_ms = t.elapsed().as_micros();
+                    let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
+                    let permalink = md.get("permalink")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("/")
+                        .to_string();
+                    let pt = PageTimings {
+                        file_ms, meta_ms, schema_ms, draft_ms, cache_get_ms, load_ms,
+                        ..Default::default()
+                    };
+                    return Ok(Some((public_path, html, permalink, None, pt)));
+                }
+                (md, None, true)
+            }
             Err(_) => {
                 let md = shared::load_metadata_from_content(
                     &content,
@@ -329,13 +349,13 @@ fn build_content_entry(
                     &ctx.site_config.root_url,
                 )?;
                 let cache_val = serde_json::to_value(&md).unwrap_or_default();
-                (md, Some((cache_key, content.clone(), cache_val)))
+                (md, Some((cache_key.clone(), content.clone(), cache_val, None::<String>)), false)
             }
         }
     } else {
         let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
         let cache_val = serde_json::to_value(&md).unwrap_or_default();
-        (md, Some((cache_key, content.clone(), cache_val)))
+        (md, Some((cache_key.clone(), content.clone(), cache_val, None::<String>)), false)
     };
     let load_ms = t.elapsed().as_micros();
 
@@ -400,7 +420,16 @@ fn build_content_entry(
         minify_ms,
     };
 
-    Ok(Some((public_path, rendered, permalink, cache_insert, pt)))
+    let cache_entry: Option<CacheInsert> = if from_cache {
+        let cache_val = serde_json::to_value(&metadata).unwrap_or_default();
+        Some((cache_key, content.clone(), cache_val, Some(rendered.clone())))
+    } else if let Some((key, content_str, metadata_val, _)) = cache_insert {
+        Some((key, content_str, metadata_val, Some(rendered.clone())))
+    } else {
+        None
+    };
+
+    Ok(Some((public_path, rendered, permalink, cache_entry, pt)))
 }
 
 #[instrument(skip(minify))]

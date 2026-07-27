@@ -6,11 +6,12 @@ use miette::{Result, miette};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
-/// Cached metadata entry with content hash for invalidation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CacheEntry {
     content_hash: String,
     metadata: serde_json::Value,
+    #[serde(default)]
+    rendered_html: Option<String>,
 }
 
 /// Returns the XDG cache directory for a site: `~/.cache/norgolith/{site_name}/`
@@ -91,6 +92,36 @@ impl BuildCache {
         }
     }
 
+    /// Looks up cached rendered HTML for a file.
+    ///
+    /// Returns `Some(html)` if cache hit (content unchanged AND rendered_html exists).
+    /// Returns `None` on miss.
+    pub fn get_rendered(&self, rel_path: &Path) -> Option<String> {
+        self.entries.get(rel_path)?.rendered_html.clone()
+    }
+
+    /// Stores metadata and rendered HTML in a single cache entry.
+    ///
+    /// Merges the functionality of insert() but also persists the rendered
+    /// HTML so the next build can skip Tera render, href rewrite, and minify.
+    pub fn insert_rendered(
+        &mut self,
+        rel_path: &Path,
+        content: &str,
+        metadata: serde_json::Value,
+        rendered_html: &str,
+    ) {
+        let hash = blake3_hash(content);
+        self.entries.insert(
+            rel_path.to_path_buf(),
+            CacheEntry {
+                content_hash: hash,
+                metadata,
+                rendered_html: Some(rendered_html.to_string()),
+            },
+        );
+    }
+
     /// Stores metadata in the cache.
     pub fn insert(&mut self, rel_path: &Path, content: &str, metadata: serde_json::Value) {
         let hash = blake3_hash(content);
@@ -99,6 +130,7 @@ impl BuildCache {
             CacheEntry {
                 content_hash: hash,
                 metadata,
+                rendered_html: None,
             },
         );
     }
