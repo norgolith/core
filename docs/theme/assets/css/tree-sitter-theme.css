@@ -1,0 +1,184 @@
+/* norgolith-tree-sitter-highlight -- Default Syntax Theme */
+/* Catppuccin Mocha palette */
+/* Generated from nvim-treesitter capture names */
+
+/* Base code block styling */
+pre code {
+    display: block;
+    overflow-x: auto;
+    padding: 1em;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Source Code Pro", monospace;
+    font-size: 0.9em;
+    line-height: 1.5;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 8px;
+}
+
+/* Keywords */
+.ts-keyword { color: #cba6f7; font-weight: bold; }
+.ts-keyword.ts-conditional { color: #cba6f7; font-weight: bold; }
+.ts-keyword.ts-conditional.ts-ternary { color: #cba6f7; }
+.ts-keyword.ts-coroutine { color: #89b4fa; font-style: italic; }
+.ts-keyword.ts-debug { color: #6c7086; }
+.ts-keyword.ts-directive { color: #6c7086; font-style: italic; }
+.ts-keyword.ts-directive.ts-define { color: #f38ba8; }
+.ts-keyword.ts-exception { color: #f38ba8; }
+.ts-keyword.ts-function { color: #89b4fa; font-weight: bold; }
+.ts-keyword.ts-import { color: #f5c2e7; }
+.ts-keyword.ts-modifier { color: #cba6f7; }
+.ts-keyword.ts-operator { color: #89b4fa; }
+.ts-keyword.ts-repeat { color: #cba6f7; }
+.ts-keyword.ts-return { color: #f38ba8; }
+.ts-keyword.ts-type { color: #f9e2af; font-weight: bold; }
+
+/* Functions */
+.ts-function { color: #89b4fa; }
+.ts-function.ts-builtin { color: #89b4fa; font-style: italic; }
+.ts-function.ts-call { color: #89b4fa; }
+.ts-function.ts-macro { color: #89b4fa; }
+.ts-function.ts-method { color: #89b4fa; }
+.ts-function.ts-method.ts-call { color: #89b4fa; }
+
+/* Strings */
+.ts-string { color: #a6e3a1; }
+.ts-string.ts-documentation { color: #a6e3a1; font-style: italic; }
+.ts-string.ts-escape { color: #f5c2e7; }
+.ts-string.ts-regexp { color: #f5c2e7; }
+.ts-string.ts-special { color: #f5c2e7; font-style: italic; }
+.ts-string.ts-special.ts-key { color: #f5c2e7; }
+.ts-string.ts-special.ts-path { color: #f5c2e7; }
+.ts-string.ts-special.ts-symbol { color: #f5c2e7; }
+.ts-string.ts-special.ts-url { color: #89b4fa; text-decoration: underline; }
+
+/* Characters */
+.ts-character { color: #f9e2af; }
+.ts-character.ts-special { color: #f5c2e7; }
+
+/* Numbers */
+.ts-number { color: #fab387; }
+.ts-number.ts-float { color: #fab387; }
+
+/* Comments */
+.ts-comment { color: #6c7086; font-style: italic; }
+.ts-comment.ts-documentation { color: #6c7086; font-style: italic; font-weight: bold; }
+.ts-comment.ts-todo { color: #f9e2af; font-weight: bold; }
+.ts-comment.ts-note { color: #89b4fa; font-weight: bold; }
+.ts-comment.ts-warning { color: #fab387; font-weight: bold; }
+.ts-comment.ts-error { color: #f38ba8; font-weight: bold; }
+
+/* Types */
+.ts-type { color: #f9e2af; font-weight: bold; }
+.ts-type.ts-builtin { color: #fab387; font-weight: bold; }
+.ts-type.ts-definition { color: #f9e2af; }
+
+/* Constants */
+.ts-constant { color: #fab387; }
+.ts-constant.ts-builtin { color: #fab387; font-weight: bold; }
+.ts-constant.ts-macro { color: #fab387; font-style: italic; }
+
+/* Booleans */
+.ts-boolean { color: #fab387; font-weight: bold; }
+
+/* Variables */
+.ts-variable { color: #cdd6f4; }
+.ts-variable.ts-builtin { color: #f38ba8; font-style: italic; }
+.ts-variable.ts-member { color: #89dceb; }
+.ts-variable.ts-parameter { color: #f38ba8; }
+.ts-variable.ts-parameter.builtin { color: #f38ba8; }
+
+/* Properties and fields */
+.ts-property { color: #89dceb; }
+
+/* Attributes and decorators */
+.ts-attribute { color: #f9e2af; }
+.ts-attribute.ts-builtin { color: #f9e2af; font-style: italic; }
+
+/* Labels */
+.ts-label { color: #89dceb; font-style: italic; }
+
+/* Operators */
+.ts-operator { color: #89dceb; }
+
+/* Punctuation */
+.ts-punctuation.ts-bracket { color: #9399b2; }
+.ts-punctuation.ts-delimiter { color: #9399b2; }
+.ts-punctuation.ts-special { color: #f5c2e7; }
+
+/* HTML tags */
+.ts-tag { color: #f38ba8; }
+.ts-tag.ts-attribute { color: #89dceb; }
+.ts-tag.ts-builtin { color: #f38ba8; }
+.ts-tag.ts-delimiter { color: #9399b2; }
+.ts-tag.ts-error { color: #f38ba8; text-decoration: wavy underline; text-decoration-color: #f38ba8; }
+
+/* Constructors */
+.ts-constructor { color: #f9e2af; font-weight: bold; }
+
+/* Embedded content */
+.ts-embedded { color: #a6e3a1; font-style: italic; }
+
+/* Escape sequences */
+.ts-escape { color: #f5c2e7; }
+
+/* Modules and namespaces */
+.ts-module { color: #89b4fa; font-style: italic; }
+.ts-module.ts-builtin { color: #89b4fa; }
+.ts-namespace { color: #89b4fa; }
+
+/* Markdown markup */
+.ts-markup.ts-heading { color: #cba6f7; font-weight: bold; }
+.ts-markup.ts-heading.ts-1 { color: #f38ba8; font-weight: bold; }
+.ts-markup.ts-heading.ts-2 { color: #fab387; font-weight: bold; }
+.ts-markup.ts-heading.ts-3 { color: #f9e2af; font-weight: bold; }
+.ts-markup.ts-heading.ts-4 { color: #a6e3a1; font-weight: bold; }
+.ts-markup.ts-heading.ts-5 { color: #89b4fa; font-weight: bold; }
+.ts-markup.ts-heading.ts-6 { color: #89dceb; font-weight: bold; }
+.ts-markup.ts-italic { font-style: italic; }
+.ts-markup.ts-strong { font-weight: bold; }
+.ts-markup.ts-strikethrough { text-decoration: line-through; }
+.ts-markup.ts-underline { text-decoration: underline; }
+.ts-markup.ts-link { color: #89b4fa; text-decoration: underline; }
+.ts-markup.ts-link.ts-label { color: #89dceb; }
+.ts-markup.ts-link.ts-url { color: #89b4fa; text-decoration: underline; }
+.ts-markup.ts-list { color: #f5c2e7; }
+.ts-markup.ts-list.ts-checked { color: #a6e3a1; }
+.ts-markup.ts-list.ts-unchecked { color: #9399b2; }
+.ts-markup.ts-quote { color: #6c7086; font-style: italic; }
+.ts-markup.ts-raw { color: #a6e3a1; }
+.ts-markup.ts-raw.ts-block { color: #a6e3a1; background: #232336; display: inline-block; width: 90%; }
+.ts-markup.ts-raw.ts-block:empty::before { content: '\00a0'; }
+
+/* CSS-specific at-rules */
+.ts-charset { color: #6c7086; font-style: italic; }
+.ts-import { color: #f5c2e7; }
+.ts-keyframes { color: #f5c2e7; }
+.ts-media { color: #f5c2e7; }
+.ts-namespace { color: #89b4fa; }
+.ts-supports { color: #f5c2e7; }
+
+/* @interface */
+.ts-interface { color: #f9e2af; font-weight: bold; }
+
+/* Diff: added/removed lines */
+.ts-diff.ts-plus { color: #a6e3a1; background: rgba(166, 227, 161, 0.15); }
+.ts-diff.ts-plus > .ts-punctuation.ts-special { color: #a6e3a1; }
+.ts-diff.ts-minus { color: #f38ba8; background: rgba(243, 139, 168, 0.15); }
+.ts-diff.ts-minus > .ts-punctuation.ts-special { color: #f38ba8; }
+
+/* Line numbers */
+pre code {
+    counter-reset: line;
+}
+.ts-line::before {
+    counter-increment: line;
+    content: attr(data-ln);
+    display: inline-block;
+    width: 3ch;
+    margin-right: 1em;
+    padding-right: 1em;
+    color: #6c7086;
+    border-right: 1px solid #6c708699;
+    text-align: right;
+    user-select: none;
+}

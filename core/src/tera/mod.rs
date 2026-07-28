@@ -1,5 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use std::collections::HashMap;
+use std::sync::{LazyLock, RwLock};
+
 use miette::{miette, Result};
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use tera::value::Key;
@@ -169,6 +172,16 @@ impl Filter<&Value, TeraResult<Value>> for FilterByAttribute {
 }
 
 struct SliceFilter;
+
+static FINGERPRINT_MAP: LazyLock<RwLock<HashMap<String, String>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub(crate) fn set_fingerprint_map(map: HashMap<String, String>) {
+    if let Ok(mut guard) = FINGERPRINT_MAP.write() {
+        *guard = map;
+    }
+}
+
 impl Filter<&Value, TeraResult<Value>> for SliceFilter {
     fn call(&self, val: &Value, kwargs: Kwargs, _: &State) -> TeraResult<Value> {
         let arr = val
@@ -248,6 +261,19 @@ pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> Result<Te
     tera.register_filter("json_encode", tera_contrib::json::json_encode);
     tera.register_filter("urlencode", tera_contrib::urlencode::urlencode);
     tera.register_filter("urlencode_strict", tera_contrib::urlencode::urlencode_strict);
+
+    // Register fingerprint filter (reads from global map populated at build time)
+    tera.register_filter("fingerprint", |val: &Value, _kwargs: Kwargs, _state: &State| -> TeraResult<Value> {
+        let path = val.as_str().ok_or_else(|| Error::message("fingerprint requires a string path"))?;
+        let (prefix, lookup) = if let Some(stripped) = path.strip_prefix('/') {
+            ("/", stripped)
+        } else {
+            ("", path)
+        };
+        let map = FINGERPRINT_MAP.read().unwrap_or_else(|e| e.into_inner());
+        Ok(map.get(lookup)
+            .map_or_else(|| Value::from(path.to_string()), |v| Value::from(format!("{prefix}{v}"))))
+    });
 
     // Collect all template files from theme + user dirs into one batch.
     // load_from_glob replaces previous glob results, so we use

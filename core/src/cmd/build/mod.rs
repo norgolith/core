@@ -567,6 +567,132 @@ pub fn build(minify: bool) -> Result<()> {
     let mut cache = BuildCache::open(&root_dir)?;
     timings.cache_open_ms = t.elapsed().as_millis();
 
+    // Assets (run before content for fingerprinting)
+    let fingerprint_enabled = site_config
+        .assets
+        .as_ref()
+        .map(|a| a.fingerprint)
+        .unwrap_or(false);
+
+    let t = Instant::now();
+    let public_assets_dir = paths.public.join("assets");
+    let mut asset_count = 0usize;
+    let mut fingerprint_map = std::collections::HashMap::new();
+    if paths.theme_assets.exists() {
+        let (count, map) = copy_assets(&paths.theme_assets, &public_assets_dir, minify, fingerprint_enabled)?;
+        asset_count += count;
+        for (k, v) in map {
+            fingerprint_map.insert(format!("assets/{}", k), format!("assets/{}", v));
+        }
+    }
+    {
+        let (count, map) = copy_assets(&paths.assets, &public_assets_dir, minify, fingerprint_enabled)?;
+        asset_count += count;
+        for (k, v) in map {
+            fingerprint_map.insert(format!("assets/{}", k), format!("assets/{}", v));
+        }
+    }
+    timings.assets_ms = t.elapsed().as_millis();
+    mp.println(format!(
+        "  {} {}  {:<12}  {}",
+        "•".green(),
+        format!("{:<12}", "Assets").bold(),
+        format!("{} files", asset_count),
+        shared::get_elapsed_time(t).dimmed()
+    )).ok();
+
+    // Populate fingerprint map for templates
+    crate::tera::set_fingerprint_map(fingerprint_map.clone());
+
+    if fingerprint_enabled && !fingerprint_map.is_empty() {
+        // Scan templates for | fingerprint usage
+        let mut fingerprint_used = false;
+        let mut template_dirs = vec![paths.templates.clone()];
+        if paths.theme_templates.exists() {
+            template_dirs.push(paths.theme_templates.clone());
+        }
+        for dir in &template_dirs {
+            for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+                if !entry.path().is_file() {
+                    continue;
+                }
+                if let Ok(content) = std::fs::read_to_string(entry.path())
+                    && content.contains("| fingerprint")
+                {
+                    fingerprint_used = true;
+                    break;
+                }
+            }
+            if fingerprint_used {
+                break;
+            }
+        }
+
+        if !fingerprint_used {
+            // Find which templates reference these assets
+            let mut asset_pairs: Vec<(String, Vec<String>)> = fingerprint_map
+                .keys()
+                .map(|k| (k.clone(), Vec::new()))
+                .collect();
+            for dir in &template_dirs {
+                for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+                    if !entry.path().is_file() {
+                        continue;
+                    }
+                    let Some(name) = entry.file_name().to_str() else {
+                        continue;
+                    };
+                    let Ok(content) = std::fs::read_to_string(entry.path()) else {
+                        continue;
+                    };
+                    for (asset_key, refs) in &mut asset_pairs {
+                        let prefixed = format!("/{}", asset_key);
+                        if content.contains(asset_key.as_str()) || content.contains(prefixed.as_str()) {
+                            refs.push(name.to_string());
+                        }
+                    }
+                }
+            }
+
+            let mut warning = String::from(
+                "Asset fingerprinting enabled, no fingerprint filter found in templates\n\
+                 Assets renamed, original paths 404. Templates referencing them:\n",
+            );
+            for (asset, refs) in &asset_pairs {
+                if refs.is_empty() {
+                    continue;
+                }
+                warning.push_str(&format!("\n  {}\n", asset));
+                for r in refs {
+                    warning.push_str(&format!("    └ {}\n", r));
+                }
+            }
+            warning.push_str(
+                "\nAdd fingerprint filter to each link, e.g.:\n\
+                <link href=\"{{ \"/assets/css/styles.min.css\" | fingerprint }}\">\n",
+            );
+            eprintln!("{:?}", miette!(
+                severity = miette::Severity::Warning,
+                "{warning}"
+            ));
+        }
+    } else if !fingerprint_enabled {
+        let has_opted_out = site_config.assets.is_some();
+        if !has_opted_out {
+            // TODO(v1.5): remove this warning. Default changes to true so the
+            // opt-out silence below already covers the explicit false case.
+            eprintln!("{:?}", miette!(
+                severity = miette::Severity::Warning,
+                "Asset fingerprinting is disabled\n\
+                 Enable for automatic cache-busting via content hashes\n\
+                 \n\
+                 Add to norgolith.toml:\n  [assets]\n  fingerprint = true\n\
+                 \n\
+                 Default will change to true in v1.5.0"
+            ));
+        }
+    }
+
     // Build content
     let t = Instant::now();
     let ctx = BuildContext {
@@ -705,23 +831,6 @@ pub fn build(minify: bool) -> Result<()> {
             shared::get_elapsed_time(t).dimmed()
         )).ok();
     }
-
-    // Assets
-    let t = Instant::now();
-    let public_assets_dir = paths.public.join("assets");
-    let mut asset_count = 0usize;
-    if paths.theme_assets.exists() {
-        asset_count += copy_assets(&paths.theme_assets, &public_assets_dir, minify)?;
-    }
-    asset_count += copy_assets(&paths.assets, &public_assets_dir, minify)?;
-    timings.assets_ms = t.elapsed().as_millis();
-    mp.println(format!(
-        "  {} {}  {:<12}  {}",
-        "•".green(),
-        format!("{:<12}", "Assets").bold(),
-        format!("{} files", asset_count),
-        shared::get_elapsed_time(t).dimmed()
-    )).ok();
 
     // Error pages
     let t = Instant::now();

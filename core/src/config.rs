@@ -51,6 +51,17 @@ pub enum RobotsPreset {
     BlockAll,
 }
 
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AssetConfig {
+    #[serde(default = "default_false")]
+    pub fingerprint: bool,
+}
+
+fn default_false() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CollectionConfig {
     pub name: String,
@@ -112,6 +123,8 @@ pub struct SiteConfig {
     pub robots: Option<SiteConfigRobots>,
     #[serde(default, rename = "plugins")]
     pub plugins: Option<HashMap<String, toml::Value>>,
+    #[serde(default)]
+    pub assets: Option<AssetConfig>,
 }
 
 impl Default for SiteConfig {
@@ -130,6 +143,7 @@ impl Default for SiteConfig {
             seo: default_seo(),
             robots: default_robots(),
             plugins: None,
+            assets: None,
         }
     }
 }

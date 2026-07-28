@@ -133,6 +133,19 @@ Norgolith uses a `norgolith.toml` file to manage site-wide settings, content sch
      - `ttl`: Sets the {https://www.rssboard.org/rss-specification#ltttlgtSubelementOfLtchannelgt}[ttl] value. `60` by default.
      - `image`: Sets the image used as the RSS feed favicon. `"/assets/favicon.png"` by default.
 
+** Assets
+   Norgolith can automatically fingerprint (content-hash) CSS and JS filenames for cache busting.
+
+**** Options
+     - `fingerprint`: Enable content-hashed filenames. `false` by default (will change to `true` in v1.5). When enabled, every CSS/JS asset gets a `.{hash8}` suffix and templates must use the `| fingerprint` filter:
+     @code toml
+     [assets]
+     fingerprint = true
+     @end
+     @code tera
+     <link rel="stylesheet" href="{{ "/assets/css/style.css" | fingerprint }}">
+     @end
+
 ** Plugin Configuration
    Plugins can receive per-plugin configuration via `[plugins.<name>]` sections in `norgolith.toml`. The config is passed to hooks as a JSON value in `ctx.config`.
 
