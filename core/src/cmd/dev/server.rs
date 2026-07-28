@@ -8,6 +8,9 @@ use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, error, info, instrument, warn};
+
+/// Result of converting a single page: (html, raw, Option<(path, content, metadata)>)
+type ConversionResult = Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>;
 use walkdir::WalkDir;
 
 use crate::cmd::build::progress::{make_bar, make_spinner};
@@ -149,7 +152,7 @@ pub fn render_all_pages(
 
     let cache_ref: &crate::cache::BuildCache = &*cache;
 
-    let results: Vec<Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>> = entries
+    let results: Vec<ConversionResult> = entries
         .par_iter()
         .map(|path| {
             let rel_path = match path.strip_prefix(&ctx.paths.content) {
