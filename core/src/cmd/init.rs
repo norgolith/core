@@ -85,12 +85,9 @@ async fn create_index_norg(root: &str) -> Result<()> {
     Ok(())
 }
 
-/// Create basic HTML templates
-#[instrument(level = "debug", skip(root))]
 async fn create_html_templates(root: &str) -> Result<()> {
     debug!("Creating HTML templates");
 
-    // TODO: add 'head.html', 'footer.html' for more granular content?
     let templates = HashMap::from([
         ("base", include_str!("../resources/templates/base.html")),
         (
@@ -110,7 +107,6 @@ async fn create_html_templates(root: &str) -> Result<()> {
     ]);
 
     let templates_dir = PathBuf::from(root).join("templates");
-    debug!(templates_dir = %templates_dir.display(), "Creating templates directory");
 
     for (&name, &contents) in templates.iter() {
         let template_path = templates_dir.join(name.to_owned() + ".html");
@@ -118,6 +114,18 @@ async fn create_html_templates(root: &str) -> Result<()> {
             .await
             .map_err(|e| miette!("Failed to write template {}: {}", name, e))?;
     }
+
+    let partials_dir = templates_dir.join("partials");
+    fs::create_dir_all(&partials_dir)
+        .await
+        .map_err(|e| miette!("Failed to create partials directory: {}", e))?;
+    let partial_path = partials_dir.join("seo_head.html");
+    fs::write(
+        &partial_path,
+        include_str!("../resources/templates/partials/seo_head.html"),
+    )
+    .await
+    .map_err(|e| miette!("Failed to write partials/seo_head.html: {}", e))?;
 
     info!("Created HTML templates");
     Ok(())
