@@ -123,6 +123,12 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
    {% endif %}
    @end
 
+   - `fingerprint`: Returns the fingerprinted (content-hashed) path for cache busting. Works with or without leading `/`.
+   @code tera
+   <link rel="stylesheet" href="{{ "/assets/css/styles.min.css" | fingerprint }}" />
+   <script src="{{ "assets/js/bundle.js" | fingerprint }}"></script>
+   @end
+
 ** Advanced Templating Techniques
 *** Loops and Conditionals
     Tera supports loops and conditionals for dynamic content.

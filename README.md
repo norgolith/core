@@ -39,7 +39,7 @@ validation with Norg-to-HTML conversion to build static sites from Norg content.
 | Syntax highlighting  | Built-in (Chroma)                 | Built-in            | Via plugin (tree-sitter)      |
 | Image processing     | Yes                               | Yes                 | Planned                       |
 | Asset bundling       | Yes                               | No                  | Planned                       |
-| Asset fingerprinting | Yes                               | No                  | Planned                       |
+| Asset fingerprinting | Yes                               | No                  | Yes (blake3)                  |
 | Configuration        | TOML / YAML / JSON                | TOML                | TOML                          |
 | Multilingual         | Yes                               | Yes                 | No                            |
 | Shortcodes           | Built-in                          | No                  | Tera v2 `component()`         |

@@ -78,7 +78,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.28.1/tabler-icons.min.css">
 
   {# Styling and favicon #}
-  <link rel="stylesheet" href="/assets/css/styles.min.css" />
+  <link rel="stylesheet" href="{{ "/assets/css/styles.min.css" | fingerprint }}" />
+  <link rel="stylesheet" href="{{ "/assets/css/tree-sitter-theme.css" | fingerprint }}" />
   {% if config.extra?.favicon_path is string %}
   <link rel="icon" href={{ config.extra.favicon_path }} />
   {% else %}
