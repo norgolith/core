@@ -6,6 +6,11 @@ use rayon::prelude::*;
 use colored::Colorize;
 use miette::{IntoDiagnostic, Result, WrapErr, miette};
 use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
+use oxc_allocator::Allocator;
+use oxc_codegen::{Codegen, CodegenOptions};
+use oxc_minifier::{Minifier, MinifierOptions};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 use tracing::{instrument, warn};
 use walkdir::WalkDir;
 
@@ -44,23 +49,25 @@ pub(super) fn minify_html_content(mut rendered: String) -> Result<String> {
 
 #[instrument(skip(src_path, dest_path))]
 fn minify_js_asset(src_path: &Path, dest_path: &Path) -> Result<()> {
-    let content = std::fs::read(src_path).into_diagnostic().wrap_err("Failed to read JS asset")?;
-    let mut minified = Vec::new();
-    let session = minify_js::Session::new();
-    minify_js::minify(
-        &session,
-        minify_js::TopLevelMode::Global,
-        &content,
-        &mut minified,
-    )
-    .map_err(|e| {
-        miette!(
-            "{}: {}",
-            format!("JS minification failed for {}", src_path.display()).bold(),
-            e
-        )
-    })?;
-    std::fs::write(dest_path, minified)
+    let source = std::fs::read_to_string(src_path)
+        .into_diagnostic().wrap_err("Failed to read JS asset")?;
+
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, &source, SourceType::mjs()).parse();
+
+    if !ret.diagnostics.is_empty() {
+        for diag in &ret.diagnostics {
+            warn!("JS parse warning for {}: {:?}", src_path.display(), diag);
+        }
+    }
+
+    let mut program = ret.program;
+    Minifier::new(MinifierOptions::default()).minify(&allocator, &mut program);
+
+    let output = Codegen::new()
+        .with_options(CodegenOptions::minify())
+        .build(&program);
+    std::fs::write(dest_path, output.code.as_bytes())
         .into_diagnostic().wrap_err_with(|| format!("Failed to write minified JS to {}", dest_path.display()))?;
     Ok(())
 }
