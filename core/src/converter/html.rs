@@ -344,9 +344,8 @@ impl NorgToHtml for NorgAST {
                 let mut weak = VecDeque::<CarryOverTag>::new();
                 let heading_title = paragraph_to_string(title, strong, &mut weak, root_url);
 
-                // Regex to remove possible links from heading title ids
-                let re = inline_re();
-                let heading_id = re.replace(&heading_title.replace(" ", "-"), "").to_string();
+                // Slugify heading title to generate sanitized heading ID
+                let heading_id = slug::slugify(&heading_title);
 
                 let tag = match level {
                     1..=6 => format!("h{}", level),

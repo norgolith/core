@@ -2154,6 +2154,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "slug",
  "spinoff",
  "tar",
  "tempfile",

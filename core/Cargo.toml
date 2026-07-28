@@ -65,6 +65,7 @@ tar = "0.4.46"
 flate2 = "1.1.9"
 norgolith-plugin-sdk = { path = "../sdk" }
 indicatif = "0.18.6"
+slug = "0.1.6"
 
 [dev-dependencies]
 serial_test = "3.2.0"

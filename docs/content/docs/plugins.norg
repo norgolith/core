@@ -432,7 +432,7 @@ declaration only. Plugins can open network connections regardless of this settin
 - Check the build output for per-plugin timing information
 - Consider whether your plugin needs to run on every page
 
-*** ABI mismatch
+*** Error: "ABI mismatch"
 
 The plugin was compiled against a different ABI version. Rebuild the plugin from source with the
 current Norgolith SDK.
