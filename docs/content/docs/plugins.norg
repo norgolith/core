@@ -302,7 +302,7 @@ Level mapping: `0`=trace, `1`=debug, `2`=info, `3`=warn, `4`=error.
 
 ** CLI Commands
 
-*** lith plugin new \<name\>
+*** lith plugin new name
 
 Create a new plugin project with the basic structure.
 
@@ -310,7 +310,7 @@ Create a new plugin project with the basic structure.
 lith plugin new my-plugin
 @end
 
-*** lith plugin install \<source\>
+*** lith plugin install source
 
 Build and install a plugin from a local path, git repository, or crates.io package.
 
@@ -344,6 +344,22 @@ lith plugin install norgolith-plugin-my-plugin@0.1.0
 
 If no version is specified, the latest stable version is installed.
 
+*** Updating a plugin
+
+To update a plugin, re-run the same install command. Install is idempotent and overwrites the
+existing shared library with the latest build.
+
+@code bash
+# local source
+lith plugin install ./plugins/my-plugin
+
+# crates.io
+lith plugin install norgolith-plugin-my-plugin
+
+# git
+lith plugin install --git https://github.com/user/my-plugin
+@end
+
 *** lith plugin list
 
 Show all installed plugins with their name, version, hooks, priority, and status.
@@ -352,7 +368,7 @@ Show all installed plugins with their name, version, hooks, priority, and status
 lith plugin list
 @end
 
-*** lith plugin uninstall \<name\>
+*** lith plugin uninstall name
 
 Remove an installed plugin.
 
@@ -416,12 +432,12 @@ declaration only. Plugins can open network connections regardless of this settin
 - Check the build output for per-plugin timing information
 - Consider whether your plugin needs to run on every page
 
-*** Error: "ABI mismatch"
+*** ABI mismatch
 
 The plugin was compiled against a different ABI version. Rebuild the plugin from source with the
 current Norgolith SDK.
 
-*** Error: "Version mismatch"
+*** Version mismatch
 
 The plugin requires a different Norgolith version. Check the `norgolith` field in `plugin.toml` and
 update it if needed, or install a compatible version of the plugin.
