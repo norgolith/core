@@ -3,6 +3,9 @@ language = 'en-us'
 title = 'Norgolith'
 author = 'NTBBloodbath'
 
+[assets]
+fingerprint = true
+
 # Code blocks highlighting
 [highlighter]
 enable = true
