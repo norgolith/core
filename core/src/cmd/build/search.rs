@@ -71,14 +71,24 @@ fn strip_html(html: &str) -> String {
     while let Some((_, c)) = chars.next() {
         if in_script {
             if c == '<' {
-                loop { match chars.next() { Some((_, '>')) | None => break, _ => {} } }
+                loop {
+                    match chars.next() {
+                        Some((_, '>')) | None => break,
+                        _ => {}
+                    }
+                }
                 in_script = false;
             }
             continue;
         }
         if in_style {
             if c == '<' {
-                loop { match chars.next() { Some((_, '>')) | None => break, _ => {} } }
+                loop {
+                    match chars.next() {
+                        Some((_, '>')) | None => break,
+                        _ => {}
+                    }
+                }
                 in_style = false;
             }
             continue;

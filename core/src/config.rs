@@ -51,7 +51,6 @@ pub enum RobotsPreset {
     BlockAll,
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AssetConfig {
     #[serde(default = "default_false")]
@@ -164,7 +163,8 @@ impl SiteConfig {
         }
         if self.author.is_empty() {
             errors.push(
-                "'author' must not be empty — set 'author = \"Your Name\"' in norgolith.toml".into(),
+                "'author' must not be empty — set 'author = \"Your Name\"' in norgolith.toml"
+                    .into(),
             );
         }
         if self.language.is_empty() {

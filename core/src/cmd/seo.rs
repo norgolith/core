@@ -204,11 +204,16 @@ pub fn generate_robots_txt(
         match std::fs::read_to_string(custom_path) {
             Ok(content) => buf.push_str(&content),
             Err(e) => {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Verify the path in norgolith.toml [seo.robots.custom]. Falling back to permissive robots.txt",
-                    "Failed to read custom robots file '{}': {}", custom_path, e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Verify the path in norgolith.toml [seo.robots.custom]. Falling back to permissive robots.txt",
+                        "Failed to read custom robots file '{}': {}",
+                        custom_path,
+                        e
+                    )
+                );
                 // Fallback to a permissive robots.txt
                 buf.push_str(ROBOTS_ALLOW_ALL);
             }

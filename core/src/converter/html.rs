@@ -10,12 +10,12 @@ use std::collections::VecDeque;
 use std::sync::OnceLock;
 
 use html_escape::encode_text_minimal_to_string;
+use miette::{Severity, miette};
 use regex::Regex;
 use rust_norg::{
     CarryoverTag, DelimitingModifier, LinkTarget, NestableDetachedModifier, NorgAST, NorgASTFlat,
     ParagraphSegment, ParagraphSegmentToken, parse_tree,
 };
-use miette::{Severity, miette};
 use tracing::{error, info};
 
 /// CarryOver
@@ -512,10 +512,8 @@ impl NorgToHtml for NorgAST {
                             // markers let shortcode::process find and render
                             // Tera component calls inside embed islands before minify.
                             // Markers are consumed before minify runs. It's safe.
-                            verbatim_tag = format!(
-                                "<!--lith:embed-->{}<!--/lith:embed-->",
-                                content
-                            );
+                            verbatim_tag =
+                                format!("<!--lith:embed-->{}<!--/lith:embed-->", content);
                         }
                     }
                     // TODO: support other verbatim ranged tags like '@math'

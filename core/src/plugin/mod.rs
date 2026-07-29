@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use colored::Colorize;
-use miette::{Severity, Result, bail, miette};
+use miette::{Result, Severity, bail, miette};
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
 pub use manifest::{Capabilities, FilesystemAccess, HookConfig, PluginManifest};
@@ -89,11 +89,15 @@ impl PluginManager {
         let entries = match std::fs::read_dir(&plugins_dir) {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Check directory permissions",
-                    "Failed to read plugins directory: {}", e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Check directory permissions",
+                        "Failed to read plugins directory: {}",
+                        e
+                    )
+                );
                 return manager;
             }
         };
@@ -108,13 +112,16 @@ impl PluginManager {
                     manager.plugins.push(instance);
                 }
                 Err(e) => {
-                    eprintln!("{:?}", miette!(
-                        severity = Severity::Warning,
-                        help = "Check plugin.toml, reinstall or contact plugin maintainer",
-                        "Plugin '{}' skipped: {}",
-                        dir.file_name().and_then(|n| n.to_str()).unwrap_or("?"),
-                        e
-                    ));
+                    eprintln!(
+                        "{:?}",
+                        miette!(
+                            severity = Severity::Warning,
+                            help = "Check plugin.toml, reinstall or contact plugin maintainer",
+                            "Plugin '{}' skipped: {}",
+                            dir.file_name().and_then(|n| n.to_str()).unwrap_or("?"),
+                            e
+                        )
+                    );
                 }
             }
         }
@@ -211,15 +218,18 @@ impl PluginManager {
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        eprintln!("{:?}", miette!(
-                            severity = miette::Severity::Warning,
-                            help = "Check the plugin output or contact plugin maintainer",
-                            "{} plugin '{}' on {}: {}",
-                            "Plugin error:".red().bold(),
-                            p.name.bold(),
-                            rel_path.display(),
-                            e
-                        ));
+                        eprintln!(
+                            "{:?}",
+                            miette!(
+                                severity = miette::Severity::Warning,
+                                help = "Check the plugin output or contact plugin maintainer",
+                                "{} plugin '{}' on {}: {}",
+                                "Plugin error:".red().bold(),
+                                p.name.bold(),
+                                rel_path.display(),
+                                e
+                            )
+                        );
                     }
                 }
             }
@@ -257,15 +267,18 @@ impl PluginManager {
                     Ok(Some(new_html)) => current = new_html,
                     Ok(None) => {}
                     Err(e) => {
-                        eprintln!("{:?}", miette!(
-                            severity = miette::Severity::Warning,
-                            help = "Check the plugin output or contact plugin maintainer",
-                            "{} plugin '{}' on {}: {}",
-                            "Plugin error:".red().bold(),
-                            p.name.bold(),
-                            rel_path.display(),
-                            e
-                        ));
+                        eprintln!(
+                            "{:?}",
+                            miette!(
+                                severity = miette::Severity::Warning,
+                                help = "Check the plugin output or contact plugin maintainer",
+                                "{} plugin '{}' on {}: {}",
+                                "Plugin error:".red().bold(),
+                                p.name.bold(),
+                                rel_path.display(),
+                                e
+                            )
+                        );
                     }
                 }
             }
@@ -349,8 +362,12 @@ fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
     manifest.validate_abi()?;
     manifest.validate_semver()?;
 
-    let lib_path = find_library(dir, &manifest.plugin.name)
-        .ok_or_else(|| miette::miette!("Could not find compiled plugin library in {}", dir.display()))?;
+    let lib_path = find_library(dir, &manifest.plugin.name).ok_or_else(|| {
+        miette::miette!(
+            "Could not find compiled plugin library in {}",
+            dir.display()
+        )
+    })?;
 
     // SAFETY: we validate ABI before loading, and the init function is the only symbol we look up
     let lib = unsafe { libloading::Library::new(&lib_path) }
@@ -374,23 +391,33 @@ fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
 
     // Validate that the returned ABI matches what the manifest claims
     if info.abi_version != manifest.plugin.abi {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Check plugin.toml, reinstall or contact plugin maintainer",
-            "Plugin '{}' ABI mismatch: manifest declares v{}, library returned v{}",
-            manifest.plugin.name, manifest.plugin.abi, info.abi_version
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "Check plugin.toml, reinstall or contact plugin maintainer",
+                "Plugin '{}' ABI mismatch: manifest declares v{}, library returned v{}",
+                manifest.plugin.name,
+                manifest.plugin.abi,
+                info.abi_version
+            )
+        );
     }
 
     // Validate hook mask matches manifest declarations
     let declared_mask = manifest.hooks.to_mask();
     if hook_mask != declared_mask {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Check plugin.toml, reinstall or contact plugin maintainer",
-            "Plugin '{}' hook mismatch: manifest {:#x}, library {:#x}",
-            manifest.plugin.name, declared_mask, hook_mask
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "Check plugin.toml, reinstall or contact plugin maintainer",
+                "Plugin '{}' hook mismatch: manifest {:#x}, library {:#x}",
+                manifest.plugin.name,
+                declared_mask,
+                hook_mask
+            )
+        );
     }
 
     let plugin_hooks = PluginHooks {

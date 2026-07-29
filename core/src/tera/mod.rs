@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::sync::{LazyLock, RwLock};
 
-use miette::{miette, Result};
-use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+use miette::{Result, miette};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use tera::value::Key;
 use tera::{Error, Filter, Function, Kwargs, State, Tera, TeraResult, Value};
 use walkdir::WalkDir;
@@ -136,7 +136,9 @@ pub(crate) struct GenerateToc;
 impl Function<TeraResult<Value>> for GenerateToc {
     fn call(&self, kwargs: Kwargs, _state: &State) -> TeraResult<Value> {
         let toc = kwargs.must_get::<Value>("toc")?;
-        let list_type = kwargs.get::<String>("list_type")?.unwrap_or_else(|| "ol".into());
+        let list_type = kwargs
+            .get::<String>("list_type")?
+            .unwrap_or_else(|| "ol".into());
 
         let nodes = parse_toc(&toc)?;
         let html = generate_nested_html(&nodes, &list_type);
@@ -198,11 +200,7 @@ impl Filter<&Value, TeraResult<Value>> for SliceFilter {
 // Tera engine construction
 
 /// Collect template files from a directory with the given extension.
-fn collect_template_files(
-    files: &mut Vec<(PathBuf, Option<String>)>,
-    dir: &Path,
-    ext: &str,
-) {
+fn collect_template_files(files: &mut Vec<(PathBuf, Option<String>)>, dir: &Path, ext: &str) {
     if !dir.exists() {
         return;
     }
@@ -249,31 +247,47 @@ pub(crate) fn init(templates_dir: &str, theme_templates_dir: &Path) -> Result<Te
     tera.register_filter("striptags", tera_contrib::regex::striptags);
     tera.register_filter("spaceless", tera_contrib::regex::spaceless);
     tera.register_test("matching", tera_contrib::regex::Matching::default());
-    tera.register_filter("regex_replace", tera_contrib::regex::RegexReplace::default());
+    tera.register_filter(
+        "regex_replace",
+        tera_contrib::regex::RegexReplace::default(),
+    );
 
     // Shim filters for v1 compatibility (removed in Tera v2)
     tera.register_filter("filter", FilterByAttribute);
     tera.register_filter("slice", SliceFilter);
 
     tera.register_filter("slug", tera_contrib::slug::slug);
-    tera.register_filter("filesize_format", tera_contrib::filesize_format::filesize_format);
+    tera.register_filter(
+        "filesize_format",
+        tera_contrib::filesize_format::filesize_format,
+    );
     tera.register_filter("format", tera_contrib::format::format);
     tera.register_filter("json_encode", tera_contrib::json::json_encode);
     tera.register_filter("urlencode", tera_contrib::urlencode::urlencode);
-    tera.register_filter("urlencode_strict", tera_contrib::urlencode::urlencode_strict);
+    tera.register_filter(
+        "urlencode_strict",
+        tera_contrib::urlencode::urlencode_strict,
+    );
 
     // Register fingerprint filter (reads from global map populated at build time)
-    tera.register_filter("fingerprint", |val: &Value, _kwargs: Kwargs, _state: &State| -> TeraResult<Value> {
-        let path = val.as_str().ok_or_else(|| Error::message("fingerprint requires a string path"))?;
-        let (prefix, lookup) = if let Some(stripped) = path.strip_prefix('/') {
-            ("/", stripped)
-        } else {
-            ("", path)
-        };
-        let map = FINGERPRINT_MAP.read().unwrap_or_else(|e| e.into_inner());
-        Ok(map.get(lookup)
-            .map_or_else(|| Value::from(path.to_string()), |v| Value::from(format!("{prefix}{v}"))))
-    });
+    tera.register_filter(
+        "fingerprint",
+        |val: &Value, _kwargs: Kwargs, _state: &State| -> TeraResult<Value> {
+            let path = val
+                .as_str()
+                .ok_or_else(|| Error::message("fingerprint requires a string path"))?;
+            let (prefix, lookup) = if let Some(stripped) = path.strip_prefix('/') {
+                ("/", stripped)
+            } else {
+                ("", path)
+            };
+            let map = FINGERPRINT_MAP.read().unwrap_or_else(|e| e.into_inner());
+            Ok(map.get(lookup).map_or_else(
+                || Value::from(path.to_string()),
+                |v| Value::from(format!("{prefix}{v}")),
+            ))
+        },
+    );
 
     // Collect all template files from theme + user dirs into one batch.
     // load_from_glob replaces previous glob results, so we use

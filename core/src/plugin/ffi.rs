@@ -44,9 +44,14 @@ pub type FreeStringFn = extern "C" fn(*mut c_char);
 /// compatible with libc malloc (true for the default system allocator). Plugins compiled with
 /// jemalloc or mimalloc will cause UB. This is an acceptable trade-off for MVP; a future version
 /// can add a `plugin_free` callback to let each plugin provide its own deallocator
-pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration, plugin_name: &str) -> Result<Option<String>> {
-    let c_input =
-        CString::new(input).map_err(|e| miette::miette!("Failed to prepare plugin input data: {}", e))?;
+pub fn call_hook_safe(
+    f: PluginFn,
+    input: &str,
+    timeout: Duration,
+    plugin_name: &str,
+) -> Result<Option<String>> {
+    let c_input = CString::new(input)
+        .map_err(|e| miette::miette!("Failed to prepare plugin input data: {}", e))?;
 
     let (tx, rx) = mpsc::channel();
 
@@ -76,7 +81,11 @@ pub fn call_hook_safe(f: PluginFn, input: &str, timeout: Duration, plugin_name: 
                     None => "unknown panic".to_string(),
                 },
             };
-            Err(miette::miette!("Plugin '{}' panicked: {}", plugin_name, msg))
+            Err(miette::miette!(
+                "Plugin '{}' panicked: {}",
+                plugin_name,
+                msg
+            ))
         }
         Err(_timeout) => Err(miette::miette!(
             "Plugin '{}' hook timed out after {}ms",

@@ -18,11 +18,14 @@ use tracing_subscriber::{FmtSubscriber, filter::EnvFilter, fmt::time::ChronoLoca
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     set_hook(Box::new(|_| {
-        Box::new(MietteHandlerOpts::new()
-            .unicode(true)
-            .context_lines(3)
-            .build())
-    })).ok();
+        Box::new(
+            MietteHandlerOpts::new()
+                .unicode(true)
+                .context_lines(3)
+                .build(),
+        )
+    }))
+    .ok();
 
     // XXX: junk to test the conversion tool, remove later
     //let norg_doc = tokio::fs::read_to_string("/home/amartin/notes/languages/elixir.norg").await?;
@@ -31,10 +34,10 @@ async fn main() -> Result<(), Report> {
     //println!("HTML code:\n{}", norg_html);
 
     let logging_timer = ChronoLocal::new(String::from("%I:%M %p %F"));
-    let logging_env =
-        EnvFilter::try_from_env("LITH_LOG")
-            .or_else(|_| EnvFilter::try_new("info"))
-            .into_diagnostic().wrap_err("Failed to configure logging")?;
+    let logging_env = EnvFilter::try_from_env("LITH_LOG")
+        .or_else(|_| EnvFilter::try_new("info"))
+        .into_diagnostic()
+        .wrap_err("Failed to configure logging")?;
     let subscriber = FmtSubscriber::builder()
         .with_target(false)
         .with_file(false)
@@ -43,7 +46,9 @@ async fn main() -> Result<(), Report> {
         .with_timer(logging_timer)
         .with_env_filter(logging_env)
         .finish();
-    tracing::subscriber::set_global_default(subscriber).into_diagnostic().wrap_err("Failed to initialize tracing subscriber")?;
+    tracing::subscriber::set_global_default(subscriber)
+        .into_diagnostic()
+        .wrap_err("Failed to initialize tracing subscriber")?;
 
     cli::start().await?;
 

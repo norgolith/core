@@ -19,14 +19,9 @@ pub enum ValidationError {
         actual: String,
     },
     #[diagnostic(help("Review the field constraints in your schema"))]
-    ConstraintViolation {
-        field: String,
-        message: String,
-    },
+    ConstraintViolation { field: String, message: String },
     #[diagnostic(help("Fix the rule condition or the metadata values"))]
-    RuleConditionFailed {
-        message: String,
-    },
+    RuleConditionFailed { message: String },
 }
 
 impl std::error::Error for ValidationError {}
@@ -62,7 +57,6 @@ impl std::fmt::Display for ValidationError {
         }
     }
 }
-
 
 #[derive(Debug, Diagnostic)]
 #[diagnostic(help("Fix the listed metadata field(s) and rebuild"))]
@@ -295,11 +289,15 @@ impl ValidationRule {
                     }
                 }
                 None => {
-                    eprintln!("{:?}", miette!(
-                        severity = Severity::Warning,
-                        help = "Check the 'conditional_on' field in content schema definition",
-                        "Missing condition field '{}'", field
-                    ));
+                    eprintln!(
+                        "{:?}",
+                        miette!(
+                            severity = Severity::Warning,
+                            help = "Check the 'conditional_on' field in content schema definition",
+                            "Missing condition field '{}'",
+                            field
+                        )
+                    );
                     Ok(false)
                 }
             })

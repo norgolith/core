@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use miette::{IntoDiagnostic, Result, Severity, WrapErr, miette};
 use futures_util::Stream;
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, miette};
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 use tokio::runtime::Handle;
@@ -103,11 +103,15 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
     if actions.reload_config {
         match state.reload_config().await {
             Ok(_) => {}
-            Err(e) => eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "Check norgolith.toml syntax, fix errors, and save again",
-                "Config reload failed: {}", e
-            )),
+            Err(e) => eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "Check norgolith.toml syntax, fix errors, and save again",
+                    "Config reload failed: {}",
+                    e
+                )
+            ),
         }
         state.rebuild_rendered_pages().await;
         return;
@@ -117,11 +121,15 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
     if actions.reload_assets
         && let Err(e) = state.send_reload()
     {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "The live reload WebSocket may have disconnected; refresh the page manually",
-            "Asset reload signal error: {}", e
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "The live reload WebSocket may have disconnected; refresh the page manually",
+                "Asset reload signal error: {}",
+                e
+            )
+        );
     }
 
     // Handle template reloads
@@ -133,11 +141,15 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
                     error!("Template reload signal error: {}", e);
                 }
             }
-            Err(e) => eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "Check template syntax and fix errors before the next save",
-                "Template reload failed: {}", e
-            )),
+            Err(e) => eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "Check template syntax and fix errors before the next save",
+                    "Template reload failed: {}",
+                    e
+                )
+            ),
         }
     }
 
@@ -152,11 +164,15 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
                 let mut posts_lock = state.posts.write().await;
                 *posts_lock = new_posts;
             }
-            Err(e) => eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "Fix the metadata issues and save the file again",
-                "Failed to update pages metadata: {}", e
-            )),
+            Err(e) => eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "Fix the metadata issues and save the file again",
+                    "Failed to update pages metadata: {}",
+                    e
+                )
+            ),
         }
 
         state.rebuild_rendered_pages().await;
@@ -259,17 +275,37 @@ pub(super) async fn setup_file_watcher(
                 }
             });
         },
-    ).into_diagnostic().wrap_err("Failed to create file watcher")?;
+    )
+    .into_diagnostic()
+    .wrap_err("Failed to create file watcher")?;
 
-    debouncer.watch(&state.paths.config_file, RecursiveMode::NonRecursive).into_diagnostic().wrap_err("Failed to watch config file")?;
-    debouncer.watch(&state.paths.templates, RecursiveMode::Recursive).into_diagnostic().wrap_err("Failed to watch templates directory")?;
-    debouncer.watch(&state.paths.content, RecursiveMode::Recursive).into_diagnostic().wrap_err("Failed to watch content directory")?;
-    debouncer.watch(&state.paths.assets, RecursiveMode::Recursive).into_diagnostic().wrap_err("Failed to watch assets directory")?;
+    debouncer
+        .watch(&state.paths.config_file, RecursiveMode::NonRecursive)
+        .into_diagnostic()
+        .wrap_err("Failed to watch config file")?;
+    debouncer
+        .watch(&state.paths.templates, RecursiveMode::Recursive)
+        .into_diagnostic()
+        .wrap_err("Failed to watch templates directory")?;
+    debouncer
+        .watch(&state.paths.content, RecursiveMode::Recursive)
+        .into_diagnostic()
+        .wrap_err("Failed to watch content directory")?;
+    debouncer
+        .watch(&state.paths.assets, RecursiveMode::Recursive)
+        .into_diagnostic()
+        .wrap_err("Failed to watch assets directory")?;
     if state.paths.theme_assets.exists() {
-        debouncer.watch(&state.paths.theme_assets, RecursiveMode::Recursive).into_diagnostic().wrap_err("Failed to watch theme assets directory")?;
+        debouncer
+            .watch(&state.paths.theme_assets, RecursiveMode::Recursive)
+            .into_diagnostic()
+            .wrap_err("Failed to watch theme assets directory")?;
     }
     if state.paths.theme_templates.exists() {
-        debouncer.watch(&state.paths.theme_templates, RecursiveMode::Recursive).into_diagnostic().wrap_err("Failed to watch theme templates directory")?;
+        debouncer
+            .watch(&state.paths.theme_templates, RecursiveMode::Recursive)
+            .into_diagnostic()
+            .wrap_err("Failed to watch theme templates directory")?;
     }
 
     Ok((debouncer, ReceiverStream::new(debouncer_rx)))

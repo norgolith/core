@@ -6,10 +6,10 @@ use std::net::{IpAddr, Ipv4Addr, TcpListener as StdTcpListener};
 use std::sync::Arc;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use futures_util::StreamExt;
 use hyper::Server;
 use hyper::service::{make_service_fn, service_fn};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tracing::{debug, info, instrument};
@@ -60,12 +60,15 @@ pub async fn dev(
         let listener = match TcpListener::bind(format!("127.0.0.1:{}", live_reload_port)).await {
             Ok(l) => l,
             Err(_) => {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Stop the other process using :35729 or ignore this warning",
-                    "LiveReload disabled: port {} already in use",
-                    live_reload_port
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Stop the other process using :35729 or ignore this warning",
+                        "LiveReload disabled: port {} already in use",
+                        live_reload_port
+                    )
+                );
                 return;
             }
         };
@@ -95,7 +98,10 @@ pub async fn dev(
             }))
         }
     });
-    listener.set_nonblocking(true).into_diagnostic().wrap_err("Failed to set listener to non-blocking")?;
+    listener
+        .set_nonblocking(true)
+        .into_diagnostic()
+        .wrap_err("Failed to set listener to non-blocking")?;
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
     tokio::spawn(async move {
         use tokio::io::AsyncReadExt;
@@ -112,7 +118,9 @@ pub async fn dev(
         }
     });
 
-    let server = Server::from_tcp(listener).into_diagnostic().wrap_err("Failed to create HTTP server")?
+    let server = Server::from_tcp(listener)
+        .into_diagnostic()
+        .wrap_err("Failed to create HTTP server")?
         .serve(make_svc)
         .with_graceful_shutdown(async {
             let _ = shutdown_rx.await;
@@ -154,18 +162,25 @@ pub async fn dev(
             Ok(()) => {
                 info!("Opening the development server page using your browser ...");
             }
-            Err(e) => eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "Install a web browser or set BROWSER environment variable",
-                "{}: {}",
-                "Could not open the development server page".bold(),
-                e
-            )),
+            Err(e) => eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "Install a web browser or set BROWSER environment variable",
+                    "{}: {}",
+                    "Could not open the development server page".bold(),
+                    e
+                )
+            ),
         };
     }
 
     if let Err(e) = server.await {
-        bail!("{}: {}", "Development server stopped unexpectedly".bold(), e);
+        bail!(
+            "{}: {}",
+            "Development server stopped unexpectedly".bold(),
+            e
+        );
     }
 
     println!("\n{} Development server stopped.", "→".cyan().bold());

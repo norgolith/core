@@ -5,9 +5,9 @@ use std::{
 
 use chrono::{Local, SecondsFormat};
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use indoc::formatdoc;
 use inquire::{Select, Text};
+use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use regex::Regex;
 use titlecase::titlecase;
 use tracing::{debug, info, instrument, warn};
@@ -67,7 +67,9 @@ fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
 #[instrument(level = "debug", skip(path, title))]
 async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
     debug!("Creating new norg document: {}", path.display());
-    let re = Regex::new(r",\s*").into_diagnostic().wrap_err("Failed to compile regex")?;
+    let re = Regex::new(r",\s*")
+        .into_diagnostic()
+        .wrap_err("Failed to compile regex")?;
     let creation_date = Local::now().to_rfc3339_opts(SecondsFormat::Secs, false);
 
     // Prompt norg file metadata
@@ -142,14 +144,17 @@ async fn ensure_directory_exists(path: &Path) -> Result<()> {
         debug!("Creating directory: {}", parent.display());
         tokio::fs::create_dir_all(parent)
             .await
-            .into_diagnostic().wrap_err_with(|| format!("Failed to create directory: {}", parent.display()))?;
+            .into_diagnostic()
+            .wrap_err_with(|| format!("Failed to create directory: {}", parent.display()))?;
     }
     Ok(())
 }
 
 /// Handle file opening with system editor
 async fn open_file_editor(path: &Path) -> Result<()> {
-    open::that(path).into_diagnostic().wrap_err_with(|| format!("Failed to open file: {}", path.display()))?;
+    open::that(path)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("Failed to open file: {}", path.display()))?;
     info!("Opened file in editor: {}", path.display());
     Ok(())
 }
@@ -197,7 +202,12 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
     })?;
     let site_root = config_file
         .parent()
-        .ok_or_else(|| miette!("Config file has no parent directory: {}", config_file.display()))?
+        .ok_or_else(|| {
+            miette!(
+                "Config file has no parent directory: {}",
+                config_file.display()
+            )
+        })?
         .to_path_buf();
 
     // "post" kind: resolve the target collection and delegate to Content creation
@@ -206,8 +216,8 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
         let config_content = tokio::fs::read_to_string(&config_file)
             .await
             .map_err(|e| miette!("Failed to read config: {}", e))?;
-        let site_config: config::SiteConfig =
-            toml::from_str(&config_content).map_err(|e| miette!("Failed to parse config: {}", e))?;
+        let site_config: config::SiteConfig = toml::from_str(&config_content)
+            .map_err(|e| miette!("Failed to parse config: {}", e))?;
         let col = resolve_collection(&site_config.collections, collection)?;
         resolved_kind = "norg".to_string();
         resolved_name = format!("{}/{}", col.dir, name);
@@ -245,18 +255,28 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
     if is_content {
         let title = generate_content_title(&site_root, &target_path);
         create_norg_document(&target_path, &title).await?;
-        println!("{} Created Norg document at {}", "✓".green(), target_path.display());
+        println!(
+            "{} Created Norg document at {}",
+            "✓".green(),
+            target_path.display()
+        );
     } else {
         debug!("Creating empty asset file: {}", target_path.display());
         tokio::fs::File::create(&target_path)
             .await
-            .into_diagnostic().wrap_err_with(|| format!("Failed to create file: {}", target_path.display()))?;
+            .into_diagnostic()
+            .wrap_err_with(|| format!("Failed to create file: {}", target_path.display()))?;
         let label = match resolved_kind.to_lowercase().as_str() {
             "js" => "JS file",
             "css" => "CSS file",
             _ => "asset",
         };
-        println!("{} Created {} at {}", "✓".green(), label, target_path.display());
+        println!(
+            "{} Created {} at {}",
+            "✓".green(),
+            label,
+            target_path.display()
+        );
     }
 
     // Open file if requested

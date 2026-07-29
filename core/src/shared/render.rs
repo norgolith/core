@@ -1,7 +1,5 @@
-
-
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use colored::Colorize;
@@ -120,9 +118,8 @@ pub fn render_category_index(
         ctx
     };
 
-    tera.render("categories.html", &context).map_err(|e| {
-        miette!("Failed to render categories index: {e}")
-    })
+    tera.render("categories.html", &context)
+        .map_err(|e| miette!("Failed to render categories index: {e}"))
 }
 
 pub fn render_category_page(
@@ -142,7 +139,6 @@ pub fn render_category_page(
         );
         ctx
     };
-    tera.render("category.html", &context).map_err(|e| {
-        miette!("Failed to render category page: {e}")
-    })
+    tera.render("category.html", &context)
+        .map_err(|e| miette!("Failed to render category page: {e}"))
 }

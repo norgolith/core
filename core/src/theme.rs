@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use git2::{Repository, build::CheckoutBuilder};
+use indicatif::ProgressBar;
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
-use indicatif::ProgressBar;
 use tempfile::tempdir;
 use tokio::fs;
 use tracing::{debug, error, instrument};
@@ -65,7 +65,9 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     debug!("Finding compatible version");
     let versions = tokio::task::block_in_place(|| -> Result<Vec<Version>> {
         Ok(repo
-            .tag_names(None).into_diagnostic().wrap_err("Failed to list git tags")?
+            .tag_names(None)
+            .into_diagnostic()
+            .wrap_err("Failed to list git tags")?
             .iter()
             .flatten()
             .filter_map(|t| Version::parse(t).ok())
@@ -75,7 +77,9 @@ async fn get_version(repo: &Repository, requirement: Option<String>) -> Result<V
     let mut versions = versions;
 
     if let Some(req) = requirement {
-        let version_req = VersionReq::parse(&req).into_diagnostic().wrap_err("Failed to parse version requirement")?;
+        let version_req = VersionReq::parse(&req)
+            .into_diagnostic()
+            .wrap_err("Failed to parse version requirement")?;
         versions.retain(|v| version_req.matches(v));
     }
 
@@ -91,25 +95,34 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
     debug!(%version, "Checking out version");
     let tag_name = version.to_string();
     tokio::task::block_in_place(|| -> Result<()> {
-        let (object, reference) = repo.revparse_ext(&tag_name).map_err(|e| {
-            error!(error = %e, "Failed to parse version reference");
-            e
-        }).into_diagnostic().wrap_err("Failed to parse version tag")?;
+        let (object, reference) = repo
+            .revparse_ext(&tag_name)
+            .map_err(|e| {
+                error!(error = %e, "Failed to parse version reference");
+                e
+            })
+            .into_diagnostic()
+            .wrap_err("Failed to parse version tag")?;
 
         repo.checkout_tree(&object, Some(CheckoutBuilder::new().force()))
             .map_err(|e| {
                 error!(error = %e, "Failed to checkout tree");
                 e
-            }).into_diagnostic().wrap_err("Failed to checkout version tree")?;
+            })
+            .into_diagnostic()
+            .wrap_err("Failed to checkout version tree")?;
 
         if let Some(reference) = reference {
             let ref_name = reference
                 .name()
                 .ok_or_else(|| miette!("Invalid reference name"))?;
-            repo.set_head(ref_name).map_err(|e| {
-                error!(error = %e, "Failed to set HEAD");
-                e
-            }).into_diagnostic().wrap_err("Failed to set repository HEAD")?;
+            repo.set_head(ref_name)
+                .map_err(|e| {
+                    error!(error = %e, "Failed to set HEAD");
+                    e
+                })
+                .into_diagnostic()
+                .wrap_err("Failed to set repository HEAD")?;
         }
 
         Ok(())
@@ -119,7 +132,16 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
 #[instrument(skip(src, dest, sp))]
 async fn backup_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result<()> {
     // If the theme directory is empty then early return
-    if fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source dir")?.next_entry().await.into_diagnostic().wrap_err("Failed to check theme source dir entries")?.is_none() {
+    if fs::read_dir(src)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to read theme source dir")?
+        .next_entry()
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to check theme source dir entries")?
+        .is_none()
+    {
         debug!("Source directory is empty, skipping backup");
         return Ok(());
     }
@@ -128,9 +150,15 @@ async fn backup_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result
     // than just the last one before pulling/updating a theme
     if dest.exists() {
         debug!(backup_path = %dest.display(), "Removing existing backup");
-        tokio::fs::remove_dir_all(dest).await.into_diagnostic().wrap_err("Failed to remove existing backup")?;
+        tokio::fs::remove_dir_all(dest)
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to remove existing backup")?;
     }
-    tokio::fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create backup directory")?;
+    tokio::fs::create_dir_all(dest)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to create backup directory")?;
 
     sp.set_message("Backing up existing theme files...");
     debug!(src = %src.display(), dest = %dest.display(), "Copying directory");
@@ -147,13 +175,27 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result<(
     // Clean existing theme directory
     if dest.exists() {
         debug!(dest = %dest.display(), "Cleaning existing theme directory");
-        fs::remove_dir_all(dest).await.into_diagnostic().wrap_err("Failed to remove existing theme dir")?;
+        fs::remove_dir_all(dest)
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to remove existing theme dir")?;
     }
-    fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create theme directory")?;
+    fs::create_dir_all(dest)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to create theme directory")?;
 
     sp.set_message("Copying theme files...");
-    let mut entries = fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source")?;
-    while let Some(entry) = entries.next_entry().await.into_diagnostic().wrap_err("Failed to read theme entry")? {
+    let mut entries = fs::read_dir(src)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to read theme source")?;
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to read theme entry")?
+    {
         let file_name = entry.file_name();
         let file_name_str = file_name.to_string_lossy().into_owned();
 
@@ -162,7 +204,10 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result<(
             copy_dir_all(entry.path(), dest.join(file_name)).await?;
         } else if allowed_files.contains(&file_name_str.as_ref()) {
             debug!(file = %file_name_str, "Copying file");
-            fs::copy(entry.path(), dest.join(file_name)).await.into_diagnostic().wrap_err("Failed to copy theme file")?;
+            fs::copy(entry.path(), dest.join(file_name))
+                .await
+                .into_diagnostic()
+                .wrap_err("Failed to copy theme file")?;
         } else {
             debug!(file = %file_name_str, "Skipping disallowed file/directory");
         }
@@ -235,7 +280,10 @@ pub fn check_theme_version(theme_toml_path: &Path) {
         return;
     };
     let Ok(min_ver) = Version::parse(&min_version_str) else {
-        debug!("min_version '{}' is not valid semver, skipping", min_version_str);
+        debug!(
+            "min_version '{}' is not valid semver, skipping",
+            min_version_str
+        );
         return;
     };
 
@@ -247,14 +295,22 @@ pub fn check_theme_version(theme_toml_path: &Path) {
     };
 
     if lith_ver < min_ver {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Update via 'cargo install --git https://github.com/norgolith/core' or using your preferred package manager",
-            "Theme '{}' requires norgolith >= {} (current: {})",
-            metadata.name, min_version_str, lith_clean
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "Update via 'cargo install --git https://github.com/norgolith/core' or using your preferred package manager",
+                "Theme '{}' requires norgolith >= {} (current: {})",
+                metadata.name,
+                min_version_str,
+                lith_clean
+            )
+        );
     } else {
-        debug!("min_version {} satisfied by lith {}", min_version_str, lith_clean);
+        debug!(
+            "min_version {} satisfied by lith {}",
+            min_version_str, lith_clean
+        );
     }
 }
 
@@ -263,13 +319,16 @@ impl ThemeManager {
     pub async fn pull(&mut self, sp: &ProgressBar) -> Result<Self> {
         debug!("Starting theme pull operation");
         let repo_url = resolve_repo_shorthand(&self.repo).await?;
-        let temp_dir = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
+        let temp_dir = tempdir()
+            .into_diagnostic()
+            .wrap_err("Failed to create temporary directory")?;
         debug!(temp_dir = %temp_dir.path().display(), "Created temporary directory");
 
         // Clone repository
         debug!(url = %repo_url, "Cloning theme directory");
         let repo = Repository::clone(&repo_url, temp_dir.path())
-            .into_diagnostic().wrap_err("Failed to clone theme repository")?;
+            .into_diagnostic()
+            .wrap_err("Failed to clone theme repository")?;
 
         // Get the version tag
         let version = if self.version.to_string() == "0.0.0" {
@@ -320,13 +379,16 @@ impl ThemeManager {
     pub async fn update(&mut self, sp: &ProgressBar) -> Result<Self> {
         debug!("Starting theme update operation");
         let repo_url = resolve_repo_shorthand(&self.repo).await?;
-        let temp_dir = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
+        let temp_dir = tempdir()
+            .into_diagnostic()
+            .wrap_err("Failed to create temporary directory")?;
         debug!(temp_dir = %temp_dir.path().display(), "Created temporary directory");
 
         // Clone repository
         debug!(url = %repo_url, "Cloning theme repository for update");
         let repo = Repository::clone(&repo_url, temp_dir.path())
-            .into_diagnostic().wrap_err("Failed to clone theme repository")?;
+            .into_diagnostic()
+            .wrap_err("Failed to clone theme repository")?;
 
         // Calculate version requirement
         let version_req = if self.pin {
@@ -398,9 +460,15 @@ impl ThemeManager {
 
         sp.set_message("Writing theme metadata file...");
         debug!(path = %metadata_path.display(), "Writing metadata file");
-        fs::write(metadata_path, toml::to_string_pretty(&metadata).into_diagnostic().wrap_err("Failed to serialize theme metadata")?)
-            .await
-            .into_diagnostic().wrap_err("Failed to write metadata file")?;
+        fs::write(
+            metadata_path,
+            toml::to_string_pretty(&metadata)
+                .into_diagnostic()
+                .wrap_err("Failed to serialize theme metadata")?,
+        )
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to write metadata file")?;
         debug!("Metadata written successfully");
 
         Ok(())

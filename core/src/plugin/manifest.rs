@@ -115,9 +115,10 @@ impl PluginManifest {
     pub fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| miette!("Failed to read {}: {}", path.display(), e))?;
-        let manifest: PluginManifest = toml::from_str(&content)
-            .map_err(|e| miette!("Failed to parse {}: {}", path.display(), e)
-                .with_source_code(NamedSource::new(path.display().to_string(), content)))?;
+        let manifest: PluginManifest = toml::from_str(&content).map_err(|e| {
+            miette!("Failed to parse {}: {}", path.display(), e)
+                .with_source_code(NamedSource::new(path.display().to_string(), content))
+        })?;
         Ok(manifest)
     }
 

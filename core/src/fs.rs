@@ -44,7 +44,9 @@ pub fn find_in_previous_dirs(
 #[instrument]
 pub fn find_config_file() -> Result<Option<PathBuf>> {
     // Try to find a 'norgolith.toml' file in the current working directory and its parents
-    let mut current_dir = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
+    let mut current_dir = std::env::current_dir()
+        .into_diagnostic()
+        .wrap_err("Failed to determine current directory")?;
     debug!("Starting search for config file 'norgolith.toml'");
 
     let found_site_root = find_in_previous_dirs("file", "norgolith.toml", &mut current_dir)?;
@@ -63,11 +65,26 @@ pub async fn copy_dir_all(src: impl AsRef<Path>, dest: impl AsRef<Path>) -> Resu
     let dest = dest.as_ref();
 
     debug!("Creating destination directory: {}", dest.display());
-    create_dir_all(&dest).await.into_diagnostic().wrap_err("Failed to create destination directory")?;
+    create_dir_all(&dest)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to create destination directory")?;
 
-    let mut entries = read_dir(&src).await.into_diagnostic().wrap_err("Failed to read source directory")?;
-    while let Some(entry) = entries.next_entry().await.into_diagnostic().wrap_err("Failed to read directory entry")? {
-        let file_type = entry.file_type().await.into_diagnostic().wrap_err("Failed to determine file type")?;
+    let mut entries = read_dir(&src)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to read source directory")?;
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to read directory entry")?
+    {
+        let file_type = entry
+            .file_type()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to determine file type")?;
         if file_type.is_dir() {
             debug!(
                 "Copying directory from {} to {}",
@@ -81,7 +98,10 @@ pub async fn copy_dir_all(src: impl AsRef<Path>, dest: impl AsRef<Path>) -> Resu
                 entry.path().display(),
                 dest.display()
             );
-            copy(entry.path(), dest.join(entry.file_name())).await.into_diagnostic().wrap_err("Failed to copy file")?;
+            copy(entry.path(), dest.join(entry.file_name()))
+                .await
+                .into_diagnostic()
+                .wrap_err("Failed to copy file")?;
         }
     }
 
@@ -97,10 +117,14 @@ mod tests {
 
     #[test]
     fn test_find_file_in_current_directory() -> Result<()> {
-        let dir = tempdir().into_diagnostic().wrap_err("Failed to create temp dir for test")?;
+        let dir = tempdir()
+            .into_diagnostic()
+            .wrap_err("Failed to create temp dir for test")?;
         let test_file = "test_file_1.txt";
         let test_file_path = dir.path().join(test_file);
-        std::fs::File::create(&test_file_path).into_diagnostic().wrap_err("Failed to create test file")?;
+        std::fs::File::create(&test_file_path)
+            .into_diagnostic()
+            .wrap_err("Failed to create test file")?;
 
         let result = find_in_previous_dirs("file", test_file, &mut dir.path().to_path_buf());
         assert!(result.is_ok());
@@ -111,13 +135,19 @@ mod tests {
 
     #[test]
     fn test_find_file_from_child_directory() -> Result<()> {
-        let dir = tempdir().into_diagnostic().wrap_err("Failed to create temp dir for test")?;
+        let dir = tempdir()
+            .into_diagnostic()
+            .wrap_err("Failed to create temp dir for test")?;
         let test_file_name = "test_file_2.txt";
         let test_file = dir.path().join(test_file_name);
         let test_directory = dir.path().join("parent_dir");
 
-        std::fs::create_dir(&test_directory).into_diagnostic().wrap_err("Failed to create test directory")?;
-        std::fs::File::create(&test_file).into_diagnostic().wrap_err("Failed to create test file")?;
+        std::fs::create_dir(&test_directory)
+            .into_diagnostic()
+            .wrap_err("Failed to create test directory")?;
+        std::fs::File::create(&test_file)
+            .into_diagnostic()
+            .wrap_err("Failed to create test file")?;
 
         let result = find_in_previous_dirs("file", test_file_name, &mut test_directory.clone());
         assert!(result.is_ok());
@@ -128,7 +158,9 @@ mod tests {
 
     #[test]
     fn test_find_file_not_found() -> Result<()> {
-        let dir = tempdir().into_diagnostic().wrap_err("Failed to create temp dir for test")?;
+        let dir = tempdir()
+            .into_diagnostic()
+            .wrap_err("Failed to create temp dir for test")?;
         let test_file = "non_existent_file.txt";
 
         let result = find_in_previous_dirs("file", test_file, &mut dir.path().to_path_buf());
@@ -140,11 +172,15 @@ mod tests {
 
     #[test]
     fn test_find_dir_in_current_dir() -> Result<()> {
-        let dir = tempdir().into_diagnostic().wrap_err("Failed to create temp dir for test")?;
+        let dir = tempdir()
+            .into_diagnostic()
+            .wrap_err("Failed to create temp dir for test")?;
         let test_directory_name = "parent_dir2";
         let test_directory = dir.path().join(test_directory_name);
 
-        std::fs::create_dir(&test_directory).into_diagnostic().wrap_err("Failed to create test directory")?;
+        std::fs::create_dir(&test_directory)
+            .into_diagnostic()
+            .wrap_err("Failed to create test directory")?;
 
         let result =
             find_in_previous_dirs("dir", test_directory_name, &mut dir.path().to_path_buf());

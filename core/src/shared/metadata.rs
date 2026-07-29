@@ -55,7 +55,11 @@ fn normalize_categories(metadata: &mut toml::Value) {
 /// Full metadata + HTML conversion from pre-read content.
 ///
 /// This is the inner function that does the actual work. It does NOT read from disk.
-pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &str) -> Result<toml::Value> {
+pub fn load_metadata_from_content(
+    content: &str,
+    rel_path: &Path,
+    routes_url: &str,
+) -> Result<toml::Value> {
     let (html, toc) = converter::html::convert(content, routes_url)
         .map_err(|e| miette!("Failed to convert {}: {}", rel_path.display(), e))?;
     let mut metadata = converter::meta::convert(content, Some(converter::html::toc_to_toml(&toc)))
@@ -66,7 +70,10 @@ pub fn load_metadata_from_content(content: &str, rel_path: &Path, routes_url: &s
     if let toml::Value::Table(ref mut table) = metadata {
         table.insert("raw".to_string(), toml::Value::String(html.to_string()));
         table.insert("permalink".to_string(), toml::Value::String(permalink));
-        table.insert("rel_path".to_string(), toml::Value::String(rel_path.to_string_lossy().to_string()));
+        table.insert(
+            "rel_path".to_string(),
+            toml::Value::String(rel_path.to_string_lossy().to_string()),
+        );
     }
     Ok(metadata)
 }
@@ -194,8 +201,9 @@ pub fn collect_all_posts_metadata(
     let mut posts: Vec<toml::Value> = entries
         .into_par_iter()
         .map(|(path, rel_path)| -> Result<toml::Value> {
-            let content = std::fs::read_to_string(&path)
-                .map_err(|_| miette!("Failed to read {}: {}", rel_path.display(), path.display()))?;
+            let content = std::fs::read_to_string(&path).map_err(|_| {
+                miette!("Failed to read {}: {}", rel_path.display(), path.display())
+            })?;
             load_metadata_from_content(&content, &rel_path, routes_url)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -210,8 +218,9 @@ pub fn collect_all_posts_metadata(
             .and_then(|v| v.as_str())
             .unwrap_or_default();
 
-        let parse_date = |s: &str| {
-            chrono::DateTime::parse_from_rfc3339(s)
+        let parse_date =
+            |s: &str| {
+                chrono::DateTime::parse_from_rfc3339(s)
                 .unwrap_or_else(|_| {
                     eprintln!("{:?}", miette!(
                         severity = Severity::Warning,
@@ -222,7 +231,7 @@ pub fn collect_all_posts_metadata(
                     chrono::DateTime::from_timestamp(0, 0).unwrap().into()
                 })
                 .with_timezone(&chrono::Utc)
-        };
+            };
 
         parse_date(b_date).cmp(&parse_date(a_date))
     });

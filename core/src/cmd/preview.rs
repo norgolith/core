@@ -4,12 +4,12 @@ use std::{
 };
 
 use colored::Colorize as _;
-use miette::{Result, Severity, bail, miette};
 use hyper::{
     Body, Request, Response, Server, StatusCode,
     header::CONTENT_TYPE,
     service::{make_service_fn, service_fn},
 };
+use miette::{Result, Severity, bail, miette};
 use tracing::{debug, info};
 
 use crate::fs;
@@ -32,11 +32,14 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         .header(CONTENT_TYPE, mime_type.as_ref())
         .body(Body::from(content))
         .unwrap_or_else(|e| {
-            eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "This is likely a transient issue; try reloading the page",
-                "Failed to build response: {e}"
-            ));
+            eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "This is likely a transient issue; try reloading the page",
+                    "Failed to build response: {e}"
+                )
+            );
             Response::new(Body::from(""))
         }))
 }
@@ -50,21 +53,27 @@ fn handle_not_found() -> Response<Body> {
         {
             return resp;
         }
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Ensure the template renders without errors",
-            "Failed to build 404 response with custom page"
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "Ensure the template renders without errors",
+                "Failed to build 404 response with custom page"
+            )
+        );
     }
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("not found"))
         .unwrap_or_else(|e| {
-            eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "This is likely a transient issue; try reloading the page",
-                "Failed to build 404 response: {e}"
-            ));
+            eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "This is likely a transient issue; try reloading the page",
+                    "Failed to build 404 response: {e}"
+                )
+            );
             Response::new(Body::from("not found"))
         })
 }

@@ -1,10 +1,13 @@
-use std::{io, path::{Path, PathBuf}};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use clap::Subcommand;
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use flate2::read::GzDecoder;
 use git2::Repository;
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use serde::Deserialize;
 use tar::Archive;
 use tempfile::tempdir;
@@ -58,7 +61,9 @@ pub fn handle(subcommand: &PluginCommands) -> Result<()> {
 }
 
 fn list_plugins() -> Result<()> {
-    let cwd = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
+    let cwd = std::env::current_dir()
+        .into_diagnostic()
+        .wrap_err("Failed to determine current directory")?;
     let mgr = plugin::PluginManager::load(&cwd);
 
     if mgr.is_empty() {
@@ -122,7 +127,9 @@ fn list_plugins() -> Result<()> {
 fn new_plugin(name: &str) -> Result<()> {
     validate_plugin_name(name)?;
 
-    let cwd = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
+    let cwd = std::env::current_dir()
+        .into_diagnostic()
+        .wrap_err("Failed to determine current directory")?;
     let plugins_dir = cwd.join("plugins").join(name);
 
     if plugins_dir.exists() {
@@ -133,7 +140,9 @@ fn new_plugin(name: &str) -> Result<()> {
         );
     }
 
-    std::fs::create_dir_all(plugins_dir.join("src")).into_diagnostic().wrap_err("Failed to create plugin source directory")?;
+    std::fs::create_dir_all(plugins_dir.join("src"))
+        .into_diagnostic()
+        .wrap_err("Failed to create plugin source directory")?;
 
     // NOTE: I still need to handle the case where the plugin requires a dev norgolith version, e.g. (>=0.4.0-COMMIT_HASH)
     // For now, just use the current version of norgolith from Cargo.toml. I'll need to figure out if semver crate can
@@ -161,7 +170,9 @@ timeout_ms = 10000
 priority = 100
 "#
     );
-    std::fs::write(plugins_dir.join("plugin.toml"), manifest).into_diagnostic().wrap_err("Failed to write plugin.toml")?;
+    std::fs::write(plugins_dir.join("plugin.toml"), manifest)
+        .into_diagnostic()
+        .wrap_err("Failed to write plugin.toml")?;
 
     // Cargo.toml
     let cargo_toml = format!(
@@ -177,7 +188,9 @@ crate-type = ["cdylib"]
 norgolith-plugin-sdk = "0.1"
 "#
     );
-    std::fs::write(plugins_dir.join("Cargo.toml"), cargo_toml).into_diagnostic().wrap_err("Failed to write Cargo.toml")?;
+    std::fs::write(plugins_dir.join("Cargo.toml"), cargo_toml)
+        .into_diagnostic()
+        .wrap_err("Failed to write Cargo.toml")?;
 
     // src/lib.rs
     let lib_rs = format!(
@@ -194,7 +207,9 @@ register_plugin!("{name}")
     .register();
 "#
     );
-    std::fs::write(plugins_dir.join("src").join("lib.rs"), lib_rs).into_diagnostic().wrap_err("Failed to write plugin source file")?;
+    std::fs::write(plugins_dir.join("src").join("lib.rs"), lib_rs)
+        .into_diagnostic()
+        .wrap_err("Failed to write plugin source file")?;
 
     println!(
         "Plugin '{}' created at {}",
@@ -234,11 +249,15 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !stderr.trim().is_empty() {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "If you are not the plugin maintainer, you can ignore these warnings",
-            "Cargo build warnings:\n{}", stderr.trim()
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "If you are not the plugin maintainer, you can ignore these warnings",
+                "Cargo build warnings:\n{}",
+                stderr.trim()
+            )
+        );
     }
     println!("{} Built plugin", "✓".green());
     Ok(())
@@ -269,12 +288,25 @@ fn find_built_library(source_dir: &Path, name: &str) -> Result<PathBuf> {
 }
 
 fn install_to_plugins(lib_path: &Path, manifest_path: &Path, name: &str) -> Result<()> {
-    let cwd = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
+    let cwd = std::env::current_dir()
+        .into_diagnostic()
+        .wrap_err("Failed to determine current directory")?;
     let dest_dir = cwd.join("plugins").join(name);
-    std::fs::create_dir_all(&dest_dir).into_diagnostic().wrap_err("Failed to create plugin install directory")?;
-    let filename = lib_path.file_name().ok_or_else(|| miette!("Plugin library path has no filename: {}", lib_path.display()))?;
-    std::fs::copy(lib_path, dest_dir.join(filename)).into_diagnostic().wrap_err("Failed to copy plugin library")?;
-    std::fs::copy(manifest_path, dest_dir.join("plugin.toml")).into_diagnostic().wrap_err("Failed to copy plugin manifest")?;
+    std::fs::create_dir_all(&dest_dir)
+        .into_diagnostic()
+        .wrap_err("Failed to create plugin install directory")?;
+    let filename = lib_path.file_name().ok_or_else(|| {
+        miette!(
+            "Plugin library path has no filename: {}",
+            lib_path.display()
+        )
+    })?;
+    std::fs::copy(lib_path, dest_dir.join(filename))
+        .into_diagnostic()
+        .wrap_err("Failed to copy plugin library")?;
+    std::fs::copy(manifest_path, dest_dir.join("plugin.toml"))
+        .into_diagnostic()
+        .wrap_err("Failed to copy plugin manifest")?;
     Ok(())
 }
 
@@ -295,7 +327,9 @@ fn install(source: &str, git: bool, tag: Option<&str>, branch: Option<&str>) -> 
 }
 
 fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Result<()> {
-    let tmp = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory for cloning")?;
+    let tmp = tempdir()
+        .into_diagnostic()
+        .wrap_err("Failed to create temporary directory for cloning")?;
     let clone_path = tmp.path();
 
     let pb = ProgressBar::new_spinner();
@@ -308,13 +342,35 @@ fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Resul
 
     // Checkout tag or branch if specified
     if let Some(tag_name) = tag {
-        let repo = Repository::open(clone_path).into_diagnostic().wrap_err("Failed to open cloned repository")?;
-        let obj = repo.revparse_single(tag_name).into_diagnostic().wrap_err("Failed to resolve tag reference")?;
-        repo.checkout_tree(&obj, None).into_diagnostic().wrap_err("Failed to checkout tag")?;
+        let repo = Repository::open(clone_path)
+            .into_diagnostic()
+            .wrap_err("Failed to open cloned repository")?;
+        let obj = repo
+            .revparse_single(tag_name)
+            .into_diagnostic()
+            .wrap_err("Failed to resolve tag reference")?;
+        repo.checkout_tree(&obj, None)
+            .into_diagnostic()
+            .wrap_err("Failed to checkout tag")?;
     } else if let Some(branch_name) = branch {
-        let repo = Repository::open(clone_path).into_diagnostic().wrap_err("Failed to open cloned repository")?;
-        let reference = repo.find_branch(branch_name, git2::BranchType::Local).into_diagnostic().wrap_err("Failed to find branch")?;
-        repo.checkout_tree(reference.get().peel_to_tree().into_diagnostic().wrap_err("Failed to resolve branch tree")?.as_object(), None).into_diagnostic().wrap_err("Failed to checkout branch")?;
+        let repo = Repository::open(clone_path)
+            .into_diagnostic()
+            .wrap_err("Failed to open cloned repository")?;
+        let reference = repo
+            .find_branch(branch_name, git2::BranchType::Local)
+            .into_diagnostic()
+            .wrap_err("Failed to find branch")?;
+        repo.checkout_tree(
+            reference
+                .get()
+                .peel_to_tree()
+                .into_diagnostic()
+                .wrap_err("Failed to resolve branch tree")?
+                .as_object(),
+            None,
+        )
+        .into_diagnostic()
+        .wrap_err("Failed to checkout branch")?;
     }
 
     let manifest_path = clone_path.join("plugin.toml");
@@ -401,7 +457,9 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
         }
     };
 
-    let tmp = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
+    let tmp = tempdir()
+        .into_diagnostic()
+        .wrap_err("Failed to create temporary directory")?;
     let dl_path = tmp.path().join("plugin.crate");
 
     let pb = ProgressBar::new_spinner();
@@ -421,10 +479,14 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
         .body_mut()
         .read_to_vec()
         .map_err(|e| miette::miette!("Failed to read response: {}", e))?;
-    std::fs::write(&dl_path, &body).into_diagnostic().wrap_err("Failed to write downloaded crate to disk")?;
+    std::fs::write(&dl_path, &body)
+        .into_diagnostic()
+        .wrap_err("Failed to write downloaded crate to disk")?;
 
     pb.set_message("Extracting crate...");
-    let tar_gz = std::fs::File::open(&dl_path).into_diagnostic().wrap_err("Failed to open downloaded crate file")?;
+    let tar_gz = std::fs::File::open(&dl_path)
+        .into_diagnostic()
+        .wrap_err("Failed to open downloaded crate file")?;
     let decoder = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(decoder);
     archive
@@ -482,18 +544,21 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-
 fn uninstall_plugin(name: &str) -> Result<()> {
     validate_plugin_name(name)?;
 
-    let cwd = std::env::current_dir().into_diagnostic().wrap_err("Failed to determine current directory")?;
+    let cwd = std::env::current_dir()
+        .into_diagnostic()
+        .wrap_err("Failed to determine current directory")?;
     let plugin_dir = cwd.join("plugins").join(name);
 
     if !plugin_dir.is_dir() {
         bail!("Plugin '{}' is not installed", name);
     }
 
-    std::fs::remove_dir_all(&plugin_dir).into_diagnostic().wrap_err("Failed to remove plugin directory")?;
+    std::fs::remove_dir_all(&plugin_dir)
+        .into_diagnostic()
+        .wrap_err("Failed to remove plugin directory")?;
     println!("Plugin '{}' uninstalled", name.bold());
     Ok(())
 }
@@ -510,5 +575,3 @@ fn validate_plugin_name(name: &str) -> Result<()> {
     }
     Ok(())
 }
-
-

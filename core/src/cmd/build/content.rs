@@ -37,23 +37,30 @@ pub(super) fn generate_xml_feeds(
         if (template_name.contains("rss") && template_name.ends_with(".xml"))
             && let Err(e) = Channel::read_from(rendered.as_bytes())
         {
-            eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "Check the XML template for correct RSS structure. File written anyway.",
-                "'{}' does not validate as RSS ({}); written as-is",
-                template_name, e
-            ));
+            eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "Check the XML template for correct RSS structure. File written anyway.",
+                    "'{}' does not validate as RSS ({}); written as-is",
+                    template_name,
+                    e
+                )
+            );
         }
 
         let output_path = public_dir.join(template_name);
         if let Some(parent) = output_path.parent() {
-            std::fs::create_dir_all(parent).into_diagnostic().wrap_err(format!(
-                "Failed to create output directory for '{}'",
-                template_name
-            ))?;
+            std::fs::create_dir_all(parent)
+                .into_diagnostic()
+                .wrap_err(format!(
+                    "Failed to create output directory for '{}'",
+                    template_name
+                ))?;
         }
         std::fs::write(&output_path, &rendered)
-            .into_diagnostic().wrap_err(format!("Failed to write '{}'", output_path.display()))?;
+            .into_diagnostic()
+            .wrap_err(format!("Failed to write '{}'", output_path.display()))?;
     }
 
     Ok((count, xml_templates))
@@ -75,8 +82,12 @@ pub(super) fn build_category_pages(
 
     let content = shared::render_category_index(tera, posts, config, collections)?;
 
-    std::fs::create_dir_all(&categories_dir).into_diagnostic().wrap_err("Failed to create categories directory")?;
-    std::fs::write(categories_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write categories index")?;
+    std::fs::create_dir_all(&categories_dir)
+        .into_diagnostic()
+        .wrap_err("Failed to create categories directory")?;
+    std::fs::write(categories_dir.join("index.html"), content)
+        .into_diagnostic()
+        .wrap_err("Failed to write categories index")?;
 
     categories
         .par_iter()
@@ -97,9 +108,13 @@ pub(super) fn build_category_pages(
             let content = shared::render_category_page(tera, category, &cat_posts, config)?;
 
             let cat_dir = categories_dir.join(category);
-            std::fs::create_dir_all(&cat_dir).into_diagnostic().wrap_err("Failed to create category directory")?;
+            std::fs::create_dir_all(&cat_dir)
+                .into_diagnostic()
+                .wrap_err("Failed to create category directory")?;
 
-            std::fs::write(cat_dir.join("index.html"), content).into_diagnostic().wrap_err("Failed to write category page")?;
+            std::fs::write(cat_dir.join("index.html"), content)
+                .into_diagnostic()
+                .wrap_err("Failed to write category page")?;
             Ok(())
         })
         .collect::<Result<Vec<()>>>()?;
@@ -122,7 +137,8 @@ pub(super) fn build_error_pages(
             .render(name, shared_context)
             .map_err(|e| miette!("Failed to render {}: {}", name, e))?;
         std::fs::write(public_dir.join(name), &rendered)
-            .into_diagnostic().wrap_err(format!("Failed to write {}", name))?;
+            .into_diagnostic()
+            .wrap_err(format!("Failed to write {}", name))?;
         count += 1;
     }
     Ok(count)

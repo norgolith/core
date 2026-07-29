@@ -6,8 +6,8 @@ mod timings;
 
 use std::{
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
     sync::OnceLock,
+    sync::atomic::{AtomicUsize, Ordering},
     time::Instant,
 };
 
@@ -19,9 +19,9 @@ use tracing::{debug, instrument};
 use walkdir::WalkDir;
 
 use super::seo;
-use progress::{make_bar, make_spinner};
 use crate::shared::{BuildContext, SitePaths};
-use crate::{cache::BuildCache, config, fs, plugin, shortcode, shared, theme};
+use crate::{cache::BuildCache, config, fs, plugin, shared, shortcode, theme};
+use progress::{make_bar, make_spinner};
 
 use assets::copy_assets;
 use content::{build_category_pages, build_error_pages, generate_xml_feeds};
@@ -41,7 +41,8 @@ pub(super) struct PageTimings {
 }
 
 pub(super) type CacheInsert = (PathBuf, String, serde_json::Value, Option<String>);
-pub(super) type BuildResult = Result<Option<(PathBuf, String, String, Option<CacheInsert>, PageTimings)>>;
+pub(super) type BuildResult =
+    Result<Option<(PathBuf, String, String, Option<CacheInsert>, PageTimings)>>;
 
 fn href_root_re() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
@@ -52,11 +53,14 @@ fn href_root_re() -> &'static regex::Regex {
 fn prepare_build_directory(public_dir: &Path) -> Result<()> {
     debug!(path = %public_dir.display(), "Preparing build directory");
     if public_dir.exists() {
-        for entry in std::fs::read_dir(public_dir).into_diagnostic().wrap_err(format!(
-            "{}: {}",
-            "Failed to read existing public directory".bold(),
-            public_dir.display()
-        ))? {
+        for entry in std::fs::read_dir(public_dir)
+            .into_diagnostic()
+            .wrap_err(format!(
+                "{}: {}",
+                "Failed to read existing public directory".bold(),
+                public_dir.display()
+            ))?
+        {
             let entry = entry.into_diagnostic().wrap_err(format!(
                 "{}: {}",
                 "Failed to iterate existing public directory".bold(),
@@ -77,26 +81,32 @@ fn prepare_build_directory(public_dir: &Path) -> Result<()> {
             ))?;
 
             if metadata.is_dir() {
-                std::fs::remove_dir_all(&path).into_diagnostic().wrap_err(format!(
-                    "{}: {}",
-                    "Failed to remove existing public directory entry".bold(),
-                    path.display()
-                ))?;
+                std::fs::remove_dir_all(&path)
+                    .into_diagnostic()
+                    .wrap_err(format!(
+                        "{}: {}",
+                        "Failed to remove existing public directory entry".bold(),
+                        path.display()
+                    ))?;
             } else {
-                std::fs::remove_file(&path).into_diagnostic().wrap_err(format!(
-                    "{}: {}",
-                    "Failed to remove existing public file entry".bold(),
-                    path.display()
-                ))?;
+                std::fs::remove_file(&path)
+                    .into_diagnostic()
+                    .wrap_err(format!(
+                        "{}: {}",
+                        "Failed to remove existing public file entry".bold(),
+                        path.display()
+                    ))?;
             }
         }
     } else {
         debug!(path = %public_dir.display(), "Creating public directory");
-        std::fs::create_dir_all(public_dir).into_diagnostic().wrap_err(format!(
-            "{}: {}",
-            "Failed to create public directory".bold(),
-            public_dir.display()
-        ))?;
+        std::fs::create_dir_all(public_dir)
+            .into_diagnostic()
+            .wrap_err(format!(
+                "{}: {}",
+                "Failed to create public directory".bold(),
+                public_dir.display()
+            ))?;
     }
 
     debug!("Build directory prepared successfully");
@@ -127,7 +137,11 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
 
     let mut dirs = std::collections::HashSet::new();
     for entry in entries {
-        let rel_path = entry.path().strip_prefix(&paths.content).into_diagnostic().wrap_err("Failed to resolve content path")?;
+        let rel_path = entry
+            .path()
+            .strip_prefix(&paths.content)
+            .into_diagnostic()
+            .wrap_err("Failed to resolve content path")?;
         if let Ok(public_path) = determine_public_path(&paths.public, rel_path)
             && let Some(parent) = public_path.parent()
         {
@@ -135,7 +149,9 @@ fn precreate_output_dirs(paths: &SitePaths) -> Result<()> {
         }
     }
     for dir in &dirs {
-        std::fs::create_dir_all(dir).into_diagnostic().wrap_err("Failed to create output directory")?;
+        std::fs::create_dir_all(dir)
+            .into_diagnostic()
+            .wrap_err("Failed to create output directory")?;
     }
     Ok(())
 }
@@ -147,11 +163,13 @@ fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
     {
         return Ok(false);
     }
-    std::fs::write(public_path, rendered).into_diagnostic().wrap_err(format!(
-        "{}: {}",
-        "Failed to write to public path".bold(),
-        public_path.display()
-    ))?;
+    std::fs::write(public_path, rendered)
+        .into_diagnostic()
+        .wrap_err(format!(
+            "{}: {}",
+            "Failed to write to public path".bold(),
+            public_path.display()
+        ))?;
     Ok(true)
 }
 
@@ -170,11 +188,15 @@ fn build_contents(
         .filter_map(|e| match e {
             Ok(e) => Some(e),
             Err(e) => {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Check directory permissions",
-                    "WalkDir error: {}", e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Check directory permissions",
+                        "WalkDir error: {}",
+                        e
+                    )
+                );
                 None
             }
         })
@@ -229,11 +251,15 @@ fn build_contents(
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Fix the reported file and run the build again",
-                    "{:#}", e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Fix the reported file and run the build again",
+                        "{:#}",
+                        e
+                    )
+                );
                 page_errors.push(e);
             }
         }
@@ -281,17 +307,21 @@ fn build_content_entry(
 ) -> BuildResult {
     let rel_path = path
         .strip_prefix(&ctx.paths.content)
-        .into_diagnostic().wrap_err("Failed to strip prefix")?;
+        .into_diagnostic()
+        .wrap_err("Failed to strip prefix")?;
 
     let t = Instant::now();
     let Ok(content) = std::fs::read_to_string(path) else {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "The file was listed in a collection but could not be read",
-            "{} {}",
-            "Norg file not found for".bold(),
-            rel_path.display()
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "The file was listed in a collection but could not be read",
+                "{} {}",
+                "Norg file not found for".bold(),
+                rel_path.display()
+            )
+        );
         return Ok(None);
     };
     let file_ms = t.elapsed().as_micros();
@@ -305,21 +335,15 @@ fn build_content_entry(
     if let Some(schema) = &ctx.site_config.content_schema
         && !rel_path.starts_with(&ctx.site_config.categories_dir)
     {
-        shared::validate_content_metadata(
-            &ctx.paths.content,
-            path,
-            &metadata,
-            schema,
-            false,
-        )?;
+        shared::validate_content_metadata(&ctx.paths.content, path, &metadata, schema, false)?;
     }
     let schema_ms = t.elapsed().as_micros();
 
     let t = Instant::now();
     let is_draft = match metadata.get("draft") {
-        Some(val) => val.as_bool().ok_or_else(|| {
-            miette!("'draft' field must be a boolean for '{}'", path.display())
-        })?,
+        Some(val) => val
+            .as_bool()
+            .ok_or_else(|| miette!("'draft' field must be a boolean for '{}'", path.display()))?,
         None => false,
     };
     if is_draft {
@@ -341,12 +365,18 @@ fn build_content_entry(
                 if let Some(html) = cache.get_rendered(&cache_key) {
                     let load_ms = t.elapsed().as_micros();
                     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
-                    let permalink = md.get("permalink")
+                    let permalink = md
+                        .get("permalink")
                         .and_then(|v| v.as_str())
                         .unwrap_or("/")
                         .to_string();
                     let pt = PageTimings {
-                        file_ms, meta_ms, schema_ms, draft_ms, cache_get_ms, load_ms,
+                        file_ms,
+                        meta_ms,
+                        schema_ms,
+                        draft_ms,
+                        cache_get_ms,
+                        load_ms,
                         ..Default::default()
                     };
                     return Ok(Some((public_path, html, permalink, None, pt)));
@@ -360,13 +390,31 @@ fn build_content_entry(
                     &ctx.site_config.root_url,
                 )?;
                 let cache_val = serde_json::to_value(&md).unwrap_or_default();
-                (md, Some((cache_key.clone(), content.clone(), cache_val, None::<String>)), false)
+                (
+                    md,
+                    Some((
+                        cache_key.clone(),
+                        content.clone(),
+                        cache_val,
+                        None::<String>,
+                    )),
+                    false,
+                )
             }
         }
     } else {
         let md = shared::load_metadata_from_content(&content, rel_path, &ctx.site_config.root_url)?;
         let cache_val = serde_json::to_value(&md).unwrap_or_default();
-        (md, Some((cache_key.clone(), content.clone(), cache_val, None::<String>)), false)
+        (
+            md,
+            Some((
+                cache_key.clone(),
+                content.clone(),
+                cache_val,
+                None::<String>,
+            )),
+            false,
+        )
     };
     let load_ms = t.elapsed().as_micros();
 
@@ -433,7 +481,12 @@ fn build_content_entry(
 
     let cache_entry: Option<CacheInsert> = if from_cache {
         let cache_val = serde_json::to_value(&metadata).unwrap_or_default();
-        Some((cache_key, content.clone(), cache_val, Some(rendered.clone())))
+        Some((
+            cache_key,
+            content.clone(),
+            cache_val,
+            Some(rendered.clone()),
+        ))
     } else if let Some((key, content_str, metadata_val, _)) = cache_insert {
         Some((key, content_str, metadata_val, Some(rendered.clone())))
     } else {
@@ -461,13 +514,16 @@ pub fn build(minify: bool) -> Result<()> {
         } else {
             ColoredString::from("")
         }
-    )).ok();
+    ))
+    .ok();
     let build_start = Instant::now();
     let mut timings = BuildTimings::new();
 
     // Load site configuration
     let t = Instant::now();
-    let config_content = std::fs::read_to_string(&root).into_diagnostic().wrap_err("Failed to read config file")?;
+    let config_content = std::fs::read_to_string(&root)
+        .into_diagnostic()
+        .wrap_err("Failed to read config file")?;
     let config_content_for_validation = config_content.clone();
     let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
         miette!("Failed to parse site configuration: {}", e)
@@ -489,17 +545,24 @@ pub fn build(minify: bool) -> Result<()> {
 
     let root_dir = root
         .parent()
-        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .ok_or_else(|| {
+            miette!(
+                "Config file path {} has no parent directory",
+                root.display()
+            )
+        })?
         .to_path_buf();
     let paths = SitePaths::new(root_dir.clone());
 
     // Initialize Tera
     let t = Instant::now();
     debug!("Initializing template engine");
-    let templates_dir = paths
-        .templates
-        .to_str()
-        .ok_or_else(|| miette!("Templates path is not valid UTF-8: {}", paths.templates.display()))?;
+    let templates_dir = paths.templates.to_str().ok_or_else(|| {
+        miette!(
+            "Templates path is not valid UTF-8: {}",
+            paths.templates.display()
+        )
+    })?;
     let tera = crate::tera::init(templates_dir, &paths.theme_templates)?;
     timings.tera_ms = t.elapsed().as_millis();
 
@@ -507,11 +570,15 @@ pub fn build(minify: bool) -> Result<()> {
     let t = Instant::now();
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
     if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Landlock may not be supported on your system/kernel version",
-            "Plugin sandbox not applied: {}", e
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "Landlock may not be supported on your system/kernel version",
+                "Plugin sandbox not applied: {}",
+                e
+            )
+        );
     }
     timings.plugins_ms = t.elapsed().as_millis();
 
@@ -521,7 +588,8 @@ pub fn build(minify: bool) -> Result<()> {
             "•".green(),
             format!("{:<12}", "Plugins").bold(),
             plugin_mgr.len()
-        )).ok();
+        ))
+        .ok();
     }
 
     // pre_build hook
@@ -531,14 +599,17 @@ pub fn build(minify: bool) -> Result<()> {
             if let Some(f) = p.hooks.pre_build
                 && let Err(e) = plugin_mgr.call_hook(p, f, &config_json)
             {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Check the plugin output or contact plugin maintainer",
-                    "{} plugin '{}': {}",
-                    "Plugin error:".red().bold(),
-                    p.name.bold(),
-                    e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Check the plugin output or contact plugin maintainer",
+                        "{} plugin '{}': {}",
+                        "Plugin error:".red().bold(),
+                        p.name.bold(),
+                        e
+                    )
+                );
             }
         }
     }
@@ -562,9 +633,7 @@ pub fn build(minify: bool) -> Result<()> {
         &site_config.collections,
     )?
     .into_iter()
-    .filter(|post| {
-        !post.get("draft").and_then(|v| v.as_bool()).unwrap_or(false)
-    })
+    .filter(|post| !post.get("draft").and_then(|v| v.as_bool()).unwrap_or(false))
     .collect();
     timings.collect_posts_ms = t.elapsed().as_millis();
     meta_spinner.finish_and_clear();
@@ -597,14 +666,24 @@ pub fn build(minify: bool) -> Result<()> {
     let mut fingerprint_map = std::collections::HashMap::new();
     if paths.theme_assets.exists() {
         theme::check_theme_version(&root_dir.join("theme/theme.toml"));
-        let (count, map) = copy_assets(&paths.theme_assets, &public_assets_dir, minify, fingerprint_enabled)?;
+        let (count, map) = copy_assets(
+            &paths.theme_assets,
+            &public_assets_dir,
+            minify,
+            fingerprint_enabled,
+        )?;
         asset_count += count;
         for (k, v) in map {
             fingerprint_map.insert(format!("assets/{}", k), format!("assets/{}", v));
         }
     }
     {
-        let (count, map) = copy_assets(&paths.assets, &public_assets_dir, minify, fingerprint_enabled)?;
+        let (count, map) = copy_assets(
+            &paths.assets,
+            &public_assets_dir,
+            minify,
+            fingerprint_enabled,
+        )?;
         asset_count += count;
         for (k, v) in map {
             fingerprint_map.insert(format!("assets/{}", k), format!("assets/{}", v));
@@ -617,7 +696,8 @@ pub fn build(minify: bool) -> Result<()> {
         format!("{:<12}", "Assets").bold(),
         format!("{} files", asset_count),
         shared::get_elapsed_time(t).dimmed()
-    )).ok();
+    ))
+    .ok();
 
     // Populate fingerprint map for templates
     crate::tera::set_fingerprint_map(fingerprint_map.clone());
@@ -665,7 +745,9 @@ pub fn build(minify: bool) -> Result<()> {
                     };
                     for (asset_key, refs) in &mut asset_pairs {
                         let prefixed = format!("/{}", asset_key);
-                        if content.contains(asset_key.as_str()) || content.contains(prefixed.as_str()) {
+                        if content.contains(asset_key.as_str())
+                            || content.contains(prefixed.as_str())
+                        {
                             refs.push(name.to_string());
                         }
                     }
@@ -682,27 +764,33 @@ pub fn build(minify: bool) -> Result<()> {
                     assets_list.push_str(&format!("    └ {}\n", r));
                 }
             }
-            eprintln!("{:?}", miette!(
-                severity = miette::Severity::Warning,
-                help = "Add fingerprint filter to each link, e.g.:\n<link href=\"{{ \"/assets/css/styles.min.css\" | fingerprint }}\">",
-                "Asset fingerprinting enabled, no fingerprint filter found in templates\n\
+            eprintln!(
+                "{:?}",
+                miette!(
+                    severity = miette::Severity::Warning,
+                    help = "Add fingerprint filter to each link, e.g.:\n<link href=\"{{ \"/assets/css/styles.min.css\" | fingerprint }}\">",
+                    "Asset fingerprinting enabled, no fingerprint filter found in templates\n\
                  Assets renamed, original paths 404. Templates referencing them:{}",
-                assets_list
-            ));
+                    assets_list
+                )
+            );
         }
     } else if !fingerprint_enabled {
         let has_opted_out = site_config.assets.is_some();
         if !has_opted_out {
             // TODO(v1.5): remove this warning. Default changes to true so the
             // opt-out silence below already covers the explicit false case.
-            eprintln!("{:?}", miette!(
-                severity = miette::Severity::Warning,
-                help = "Add to norgolith.toml:\n  [assets]\n  fingerprint = true",
-                "Asset fingerprinting is disabled\n\
+            eprintln!(
+                "{:?}",
+                miette!(
+                    severity = miette::Severity::Warning,
+                    help = "Add to norgolith.toml:\n  [assets]\n  fingerprint = true",
+                    "Asset fingerprinting is disabled\n\
                  Enable for automatic cache-busting via content hashes\n\
                  \n\
                  Default will change to true in v1.5.0"
-            ));
+                )
+            );
         }
     }
 
@@ -734,7 +822,8 @@ pub fn build(minify: bool) -> Result<()> {
         format!("{:<12}", "Content").bold(),
         format!("{} pages", page_count),
         shared::get_elapsed_time(t).dimmed()
-    )).ok();
+    ))
+    .ok();
 
     // Category pages
     let t = Instant::now();
@@ -747,7 +836,8 @@ pub fn build(minify: bool) -> Result<()> {
             format!("{:<12}", "Categories").bold(),
             format!("{} pages", cat_count),
             shared::get_elapsed_time(t).dimmed()
-        )).ok();
+        ))
+        .ok();
     }
 
     // XML feeds
@@ -761,7 +851,8 @@ pub fn build(minify: bool) -> Result<()> {
             format!("{:<12}", "Feeds").bold(),
             format!("{} files", feed_count),
             shared::get_elapsed_time(t).dimmed()
-        )).ok();
+        ))
+        .ok();
     }
 
     // SEO generation
@@ -820,17 +911,20 @@ pub fn build(minify: bool) -> Result<()> {
 
             let xml = seo::generate_sitemap_xml(&urls, &site_config.root_url);
             let output_path = paths.public.join("sitemap.xml");
-            std::fs::write(&output_path, &xml).into_diagnostic().wrap_err("Failed to write sitemap.xml")?;
+            std::fs::write(&output_path, &xml)
+                .into_diagnostic()
+                .wrap_err("Failed to write sitemap.xml")?;
             seo_count += 1;
         }
 
         if let Some(ref robots_config) = site_config.robots
             && robots_config.enable
         {
-            let content =
-                seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
+            let content = seo::generate_robots_txt(&site_config, robots_config, sitemap_enabled);
             let output_path = paths.public.join("robots.txt");
-            std::fs::write(&output_path, &content).into_diagnostic().wrap_err("Failed to write robots.txt")?;
+            std::fs::write(&output_path, &content)
+                .into_diagnostic()
+                .wrap_err("Failed to write robots.txt")?;
             seo_count += 1;
         }
     }
@@ -842,7 +936,8 @@ pub fn build(minify: bool) -> Result<()> {
             format!("{:<12}", "SEO").bold(),
             format!("{} files", seo_count),
             shared::get_elapsed_time(t).dimmed()
-        )).ok();
+        ))
+        .ok();
     }
 
     // Error pages
@@ -856,13 +951,17 @@ pub fn build(minify: bool) -> Result<()> {
             format!("{:<12}", "Error pages").bold(),
             format!("{} files", error_page_count),
             shared::get_elapsed_time(t).dimmed()
-        )).ok();
+        ))
+        .ok();
     }
 
     // Search index
     {
         let mut search_html = std::collections::HashMap::new();
-        for entry in WalkDir::new(&paths.public).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(&paths.public)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if entry.path().extension().is_some_and(|e| e == "html") {
                 let rel = entry.path().strip_prefix(&paths.public).ok();
                 let url_path = rel
@@ -896,14 +995,17 @@ pub fn build(minify: bool) -> Result<()> {
             if let Some(f) = p.hooks.post_build
                 && let Err(e) = plugin_mgr.call_hook(p, f, &config_json)
             {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Check the plugin output or contact plugin maintainer",
-                    "{} plugin '{}': {}",
-                    "Plugin error:".red().bold(),
-                    p.name.bold(),
-                    e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Check the plugin output or contact plugin maintainer",
+                        "{} plugin '{}': {}",
+                        "Plugin error:".red().bold(),
+                        p.name.bold(),
+                        e
+                    )
+                );
             }
         }
     }
@@ -931,11 +1033,16 @@ pub fn build(minify: bool) -> Result<()> {
     // Save cache
     let t = Instant::now();
     if let Err(e) = cache.save() {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Next build will run from scratch (slower). Check disk space and permissions.",
-            "Build cache could not be saved: {}", e
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help =
+                    "Next build will run from scratch (slower). Check disk space and permissions.",
+                "Build cache could not be saved: {}",
+                e
+            )
+        );
     }
     timings.cache_save_ms = t.elapsed().as_millis();
 

@@ -5,9 +5,9 @@ use colored::Colorize;
 use comfy_table::modifiers::UTF8_SOLID_INNER_BORDERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, ContentArrangement, Table};
-use miette::{IntoDiagnostic, Result, bail, miette};
 use indoc::formatdoc;
 use inquire::Text;
+use miette::{IntoDiagnostic, Result, bail, miette};
 use tokio::fs;
 use tracing::{debug, info, instrument};
 

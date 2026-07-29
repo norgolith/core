@@ -10,13 +10,14 @@ use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, info, instrument};
 
 /// Result of converting a single page: (html, raw, Option<(path, content, metadata)>)
-type ConversionResult = Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>;
+type ConversionResult =
+    Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>;
 use walkdir::WalkDir;
 
 use crate::cmd::build::progress::{make_bar, make_spinner};
 use crate::cmd::build::search;
 use crate::shared::{BuildContext, SitePaths};
-use crate::{config, plugin, shortcode, shared};
+use crate::{config, plugin, shared, shortcode};
 
 pub(super) struct ServerState {
     pub reload_tx: Arc<broadcast::Sender<()>>,
@@ -59,10 +60,15 @@ impl ServerState {
     #[instrument(level = "debug", skip(self))]
     pub async fn reload_config(&self) -> Result<()> {
         debug!("Reloading config");
-        let config_content = tokio::fs::read_to_string(&self.paths.config_file).await.into_diagnostic().wrap_err("Failed to read config file")?;
+        let config_content = tokio::fs::read_to_string(&self.paths.config_file)
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to read config file")?;
         let new_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
-            miette!("Failed to parse site configuration: {}", e)
-                .with_source_code(NamedSource::new(self.paths.config_file.display().to_string(), config_content))
+            miette!("Failed to parse site configuration: {}", e).with_source_code(NamedSource::new(
+                self.paths.config_file.display().to_string(),
+                config_content,
+            ))
         })?;
 
         let new_posts = shared::collect_all_posts_metadata(
@@ -92,9 +98,8 @@ impl ServerState {
         let posts = self.posts.read().await.clone();
         let mut cache = self.cache.write().await;
         // NOTE(cache): fresh cache discards stale rendered_html on template rebuild
-        if let Ok(fresh) = crate::cache::BuildCache::open(
-            self.paths.config_file.parent().unwrap()
-        ) {
+        if let Ok(fresh) = crate::cache::BuildCache::open(self.paths.config_file.parent().unwrap())
+        {
             *cache = fresh;
         }
 
@@ -122,11 +127,15 @@ impl ServerState {
                 }
                 info!("Rendered pages cache rebuilt");
             }
-            Err(e) => eprintln!("{:?}", miette!(
-                severity = Severity::Warning,
-                help = "Check template and content files for errors",
-                "Failed to rebuild rendered pages: {}", e
-            )),
+            Err(e) => eprintln!(
+                "{:?}",
+                miette!(
+                    severity = Severity::Warning,
+                    help = "Check template and content files for errors",
+                    "Failed to rebuild rendered pages: {}",
+                    e
+                )
+            ),
         }
     }
 
@@ -209,9 +218,10 @@ pub fn render_all_pages(
                 return Ok(Some((url_path, body, None)));
             }
 
-            let mut metadata = if let Some(cached) = cache_ref.get(&cache_key, &content) {
-                serde_json::from_value(cached).unwrap_or_else(|_| {
-                    shared::load_metadata_from_content(&content, rel_path, routes_url)
+            let mut metadata =
+                if let Some(cached) = cache_ref.get(&cache_key, &content) {
+                    serde_json::from_value(cached).unwrap_or_else(|_| {
+                        shared::load_metadata_from_content(&content, rel_path, routes_url)
                         .unwrap_or_else(|e| {
                             eprintln!("{:?}", miette!(
                                 severity = Severity::Warning,
@@ -220,9 +230,9 @@ pub fn render_all_pages(
                             ));
                             toml::Value::Table(toml::map::Map::new())
                         })
-                })
-            } else {
-                shared::load_metadata_from_content(&content, rel_path, routes_url)
+                    })
+                } else {
+                    shared::load_metadata_from_content(&content, rel_path, routes_url)
                     .unwrap_or_else(|e| {
                         eprintln!("{:?}", miette!(
                             severity = Severity::Warning,
@@ -231,7 +241,7 @@ pub fn render_all_pages(
                         ));
                         toml::Value::Table(toml::map::Map::new())
                     })
-            };
+                };
 
             ctx.plugins
                 .run_post_convert(ctx.site_config, &mut metadata, rel_path);
@@ -310,7 +320,8 @@ pub fn render_all_pages(
             );
 
             if let Ok(body) = ctx.tera.render("category.html", &context) {
-                let body = super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
+                let body =
+                    super::handlers::rewrite_urls(body, &ctx.site_config.root_url, routes_url);
                 let url_path = format!("/{}/{}", ctx.site_config.categories_dir, category);
                 pages.insert(url_path, body);
             }
@@ -341,7 +352,10 @@ pub(super) async fn setup_server_state(
 ) -> Result<Arc<ServerState>> {
     debug!("Setting up server state");
 
-    let config_content = tokio::fs::read_to_string(&root).await.into_diagnostic().wrap_err("Failed to read config file")?;
+    let config_content = tokio::fs::read_to_string(&root)
+        .await
+        .into_diagnostic()
+        .wrap_err("Failed to read config file")?;
     debug!("Config file path: {:?}", root);
     debug!("Config content:\n{}", config_content);
     let config_content_for_validation = config_content.clone();
@@ -365,7 +379,12 @@ pub(super) async fn setup_server_state(
 
     let root_dir = root
         .parent()
-        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .ok_or_else(|| {
+            miette!(
+                "Config file path {} has no parent directory",
+                root.display()
+            )
+        })?
         .to_path_buf();
     let mut paths = SitePaths::new(root_dir.clone());
 
@@ -385,10 +404,12 @@ pub(super) async fn setup_server_state(
         paths.theme_templates = real;
     }
 
-    let templates_dir = paths
-        .templates
-        .to_str()
-        .ok_or_else(|| miette!("Templates path is not valid UTF-8: {}", paths.templates.display()))?;
+    let templates_dir = paths.templates.to_str().ok_or_else(|| {
+        miette!(
+            "Templates path is not valid UTF-8: {}",
+            paths.templates.display()
+        )
+    })?;
     let tera = crate::tera::init(templates_dir, &paths.theme_templates)?;
 
     let (reload_tx, _) = broadcast::channel(16);
@@ -410,14 +431,19 @@ pub(super) async fn setup_server_state(
             "•".green(),
             format!("{:<12}", "Plugins").bold(),
             plugin_mgr.len()
-        )).ok();
+        ))
+        .ok();
     }
     if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
-        eprintln!("{:?}", miette!(
-            severity = Severity::Warning,
-            help = "Landlock may not be supported on your system/kernel version",
-            "{}", e
-        ));
+        eprintln!(
+            "{:?}",
+            miette!(
+                severity = Severity::Warning,
+                help = "Landlock may not be supported on your system/kernel version",
+                "{}",
+                e
+            )
+        );
     }
     if plugin_mgr.has_hook(plugin::HOOK_PRE_BUILD) {
         let input = serde_json::json!({
@@ -430,14 +456,17 @@ pub(super) async fn setup_server_state(
             if let Some(f) = p.hooks.pre_build
                 && let Err(e) = plugin_mgr.call_hook(p, f, &input)
             {
-                eprintln!("{:?}", miette!(
-                    severity = Severity::Warning,
-                    help = "Check the plugin output or contact plugin maintainer",
-                    "{} plugin '{}': {}",
-                    "Plugin error:".red().bold(),
-                    p.name.bold(),
-                    e
-                ));
+                eprintln!(
+                    "{:?}",
+                    miette!(
+                        severity = Severity::Warning,
+                        help = "Check the plugin output or contact plugin maintainer",
+                        "{} plugin '{}': {}",
+                        "Plugin error:".red().bold(),
+                        p.name.bold(),
+                        e
+                    )
+                );
             }
         }
     }

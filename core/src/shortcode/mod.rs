@@ -38,7 +38,8 @@ pub fn process(html: &str, tera: &tera::Tera, context: &Context) -> Result<Strin
                 // Only render through Tera if the island contains component syntax
                 if island.contains("{{ <") || island.contains("{% <") {
                     result.push_str(
-                        &tera.render_str(island, context, false)
+                        &tera
+                            .render_str(island, context, false)
                             .map_err(|e| miette!("Failed to render shortcode: {}", e))?,
                     );
                 } else {
