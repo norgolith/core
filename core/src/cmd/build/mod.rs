@@ -1,6 +1,7 @@
 mod assets;
 mod content;
 pub mod progress;
+pub(crate) mod search;
 mod timings;
 
 use std::{
@@ -844,6 +845,36 @@ pub fn build(minify: bool) -> Result<()> {
             format!("{} files", error_page_count),
             shared::get_elapsed_time(t).dimmed()
         )).ok();
+    }
+
+    // Search index
+    {
+        let mut search_html = std::collections::HashMap::new();
+        for entry in WalkDir::new(&paths.public).into_iter().filter_map(|e| e.ok()) {
+            if entry.path().extension().is_some_and(|e| e == "html") {
+                let rel = entry.path().strip_prefix(&paths.public).ok();
+                let url_path = rel
+                    .map(|r| {
+                        let s = r.display().to_string();
+                        if s.ends_with("index.html") {
+                            format!("/{}", &s[..s.len() - 10])
+                        } else {
+                            format!("/{}", &s)
+                        }
+                    })
+                    .unwrap_or_default();
+                if let Ok(html) = std::fs::read_to_string(entry.path()) {
+                    search_html.insert(url_path, html);
+                }
+            }
+        }
+        if !search_html.is_empty() {
+            let entries = search::extract_entries(&search_html);
+            let output_path = paths.public.join("search_index.json");
+            if let Ok(json) = serde_json::to_string(&entries) {
+                let _ = std::fs::write(&output_path, &json);
+            }
+        }
     }
 
     // post_build hook

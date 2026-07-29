@@ -14,6 +14,7 @@ type ConversionResult = Result<Option<(String, String, Option<(PathBuf, String, 
 use walkdir::WalkDir;
 
 use crate::cmd::build::progress::{make_bar, make_spinner};
+use crate::cmd::build::search;
 use crate::shared::{BuildContext, SitePaths};
 use crate::{config, plugin, shortcode, shared};
 
@@ -27,6 +28,7 @@ pub(super) struct ServerState {
     pub posts: Arc<RwLock<Vec<toml::Value>>>,
     pub cache: Arc<RwLock<crate::cache::BuildCache>>,
     pub rendered_pages: Arc<RwLock<HashMap<String, String>>>,
+    pub search_entries: Arc<RwLock<Vec<search::SearchEntry>>>,
     pub plugin_mgr: Arc<plugin::PluginManager>,
 }
 
@@ -89,6 +91,12 @@ impl ServerState {
         let config = self.config.read().await.clone();
         let posts = self.posts.read().await.clone();
         let mut cache = self.cache.write().await;
+        // NOTE(cache): fresh cache discards stale rendered_html on template rebuild
+        if let Ok(fresh) = crate::cache::BuildCache::open(
+            self.paths.config_file.parent().unwrap()
+        ) {
+            *cache = fresh;
+        }
 
         match render_all_pages(
             BuildContext {
@@ -103,8 +111,15 @@ impl ServerState {
             None,
         ) {
             Ok(new_pages) => {
-                let mut pages = self.rendered_pages.write().await;
-                *pages = new_pages;
+                let entries = search::extract_entries(&new_pages);
+                {
+                    let mut pages = self.rendered_pages.write().await;
+                    *pages = new_pages;
+                }
+                {
+                    let mut search = self.search_entries.write().await;
+                    *search = entries;
+                }
                 info!("Rendered pages cache rebuilt");
             }
             Err(e) => error!("Failed to rebuild rendered pages: {}", e),
@@ -179,7 +194,7 @@ pub fn render_all_pages(
 
             let cache_key = rel_path.with_extension("");
 
-            // ponytail: skip re-render if cache has rendered HTML
+            // PERF(cache): skip re-render when rendered_html cache hit
             if let Some(cached_html) = cache_ref.get_rendered(&cache_key) {
                 let body = super::handlers::rewrite_urls(
                     cached_html,
@@ -433,6 +448,8 @@ pub(super) async fn setup_server_state(
     render_bar.finish_and_clear();
     drop(mp);
 
+    let search_entries = search::extract_entries(&rendered_pages);
+
     let tera = Arc::new(RwLock::new(tera));
 
     Ok(Arc::new(ServerState {
@@ -445,6 +462,7 @@ pub(super) async fn setup_server_state(
         posts: Arc::new(RwLock::new(posts)),
         cache: Arc::new(RwLock::new(cache)),
         rendered_pages: Arc::new(RwLock::new(rendered_pages)),
+        search_entries: Arc::new(RwLock::new(search_entries)),
         plugin_mgr: Arc::new(plugin_mgr),
     }))
 }

@@ -431,6 +431,17 @@ async fn handle_request(req: Request<Body>, state: Arc<ServerState>) -> Result<R
         }
         path if path.starts_with("/assets/") => handle_asset(path, &state.paths, &state).await,
         path if path.ends_with(".xml") => handle_xml_feed(path, &state).await,
+        "/search_index.json" => {
+            let entries = state.search_entries.read().await;
+            let json = serde_json::to_string(&*entries)
+                .into_diagnostic()
+                .wrap_err("Failed to serialize search index")?;
+            Ok(Response::builder()
+                .header(CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .into_diagnostic()
+                .wrap_err("Failed to build search index response")?)
+        }
         _ => handle_content(request_path, state).await,
     }
 }
