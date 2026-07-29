@@ -921,7 +921,11 @@ pub fn build(minify: bool) -> Result<()> {
     // Save cache
     let t = Instant::now();
     if let Err(e) = cache.save() {
-        warn!("Failed to save build cache: {}", e);
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "Next build will run from scratch (slower). Check disk space and permissions.",
+            "Build cache could not be saved: {}", e
+        ));
     }
     timings.cache_save_ms = t.elapsed().as_millis();
 
