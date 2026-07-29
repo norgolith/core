@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.3.0](https://github.com/norgolith/core/compare/norgolith-v1.2.0...norgolith-v1.3.0) (2026-07-29)
+
+
+### Features
+
+* add search index generation + dev server endpoint + docs theme UI ([895844d](https://github.com/norgolith/core/commit/895844d57e7a4e17634af00aa848beac4e3e7ec4))
+* asset fingerprinting + config flag + template warnings ([250bf88](https://github.com/norgolith/core/commit/250bf88b7895da06c3bc23f5b5902c8dbbd75b76))
+* cache rendered HTML in dev server BuildCache ([aed2895](https://github.com/norgolith/core/commit/aed28959a33868e85712279d71ad7fa041037747))
+* **cli:** polish prompt labels, help text, and error handling ([6860829](https://github.com/norgolith/core/commit/686082937e055be436c18bf4884e9d64eb7fe4ef))
+* **ux:** add init feedback and plugin build spinner ([3726e6e](https://github.com/norgolith/core/commit/3726e6e485ef9781df34746cff8e847eb2e47a6f))
+* **ux:** add spinners to plugin blocking operations ([aa22aa8](https://github.com/norgolith/core/commit/aa22aa870a956cf919db34d214fbc636aed1a610))
+* **ux:** check theme min_version at build, surface cargo warnings ([c7950ab](https://github.com/norgolith/core/commit/c7950abf051c368eb8cbd60cb87804e36e2453ee))
+* **ux:** surface invisible errors to user via miette warnings ([5f7717a](https://github.com/norgolith/core/commit/5f7717a7984c59cf6bbb47049987103bd06b66cc))
+
+
+### Bug Fixes
+
+* **converter:** sanitize heading IDs with slugify ([6d3f164](https://github.com/norgolith/core/commit/6d3f164c60d7ca4233b10fc7dc99b66eb2207c00))
+* **init:** create templates/partials/seo_head.html on lith init ([9caeb53](https://github.com/norgolith/core/commit/9caeb53f4ca932dc8d2f181f4c311e5eb66adacf))
+* **search:** scope body extraction to &lt;main&gt; element ([72fa4eb](https://github.com/norgolith/core/commit/72fa4eb77bba51ae518bc039c3650f2fbfb241d9))
+* **ux:** route init success output consistency, add closing checkmark ([e7d7212](https://github.com/norgolith/core/commit/e7d7212093d0470882fabc2b9453626cbb8c30f1))
+* **ux:** surface build cache save failure to user ([bb726c0](https://github.com/norgolith/core/commit/bb726c05b852b6303a5c0c177c2aeaf873bbe8f5))
+
+
+### Performance
+
+* **build:** cache rendered HTML for incremental rebuilds ([5d91f7b](https://github.com/norgolith/core/commit/5d91f7bfac10d3bbf6e73329b42ab92db62316a5))
+* **build:** parallelize file I/O and category pages ([54d2201](https://github.com/norgolith/core/commit/54d2201ec0119823bfc872250f8a8bc694083e5b))
+* replace minify-js with oxc_minifier for JS asset minification ([d83c357](https://github.com/norgolith/core/commit/d83c357ceec0eff9b52cb34af2cd98b3d5fa89d9))
+
+
+### Refactoring
+
+* **core:** replace spinoff with indicatif for theme spinners ([340ddac](https://github.com/norgolith/core/commit/340ddaced1c8d901108f6c67537598cc7ec1cc13))
+* **search:** trim ~15 lines of unnecessary stuff ([cd77e5f](https://github.com/norgolith/core/commit/cd77e5f9126585ae76e6e04f8ac24eca4d0e1ba5))
+* **ux:** use native miette `help` in fingerprint warnings ([52f8ba5](https://github.com/norgolith/core/commit/52f8ba58fb31aea78c0c10adbc7538125536b6af))
+
+
+### CI
+
+* **release:** regenerate lock file before locked build ([f465882](https://github.com/norgolith/core/commit/f465882a1bff2742005b8eaa60bdeba7f2a34c8f))
+
+
+### Miscellaneous
+
+* **deps:** bump inquire, toml, whoami, notify-debouncer-full, tokio-tungstenite, serial_test ([afa9cea](https://github.com/norgolith/core/commit/afa9cea2fe16c97cdc47b43a0a60c415c9b3a8fa))
+* factor complex result type into ConversionResult alias ([c40fb24](https://github.com/norgolith/core/commit/c40fb24bed7b04ac1788b955c838efaa2145847e))
+
 ## [1.2.0](https://github.com/norgolith/core/compare/norgolith-v1.1.2...norgolith-v1.2.0) (2026-07-27)
 
 
