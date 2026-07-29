@@ -41,17 +41,11 @@ fn extract_title(html: &str) -> String {
 }
 
 fn extract_description(html: &str) -> String {
-    // <meta name="description" content="...">
-    for prefix in &[
-        r#"<meta name="description" content=""#,
-        r#"<meta name='description' content='"#,
-        r#"<meta name=description content=""#,
-    ] {
-        if let Some(start) = html.find(prefix) {
-            let after = &html[start + prefix.len()..];
-            if let Some(end) = after.find(r#"""#) {
-                return unescape_html(&after[..end]);
-            }
+    let prefix = r#"<meta name="description" content=""#;
+    if let Some(start) = html.find(prefix) {
+        let after = &html[start + prefix.len()..];
+        if let Some(end) = after.find(r#"""#) {
+            return unescape_html(&after[..end]);
         }
     }
     String::new()
@@ -67,14 +61,14 @@ fn strip_html(html: &str) -> String {
     while let Some((_, c)) = chars.next() {
         if in_script {
             if c == '<' {
-                consume_until_close_tag(&mut chars);
+                loop { match chars.next() { Some((_, '>')) | None => break, _ => {} } }
                 in_script = false;
             }
             continue;
         }
         if in_style {
             if c == '<' {
-                consume_until_close_tag(&mut chars);
+                loop { match chars.next() { Some((_, '>')) | None => break, _ => {} } }
                 in_style = false;
             }
             continue;
@@ -117,21 +111,8 @@ fn strip_html(html: &str) -> String {
     cleaned.trim().to_string()
 }
 
-fn consume_until_close_tag(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) {
-    loop {
-        match chars.next() {
-            Some((_, '>')) => break,
-            None => break,
-            _ => {}
-        }
-    }
-}
-
 fn unescape_html(s: &str) -> String {
     s.replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&#x27;", "'")
 }
