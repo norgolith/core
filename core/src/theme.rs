@@ -5,7 +5,7 @@ use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
 use git2::{Repository, build::CheckoutBuilder};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
-use spinoff::Spinner;
+use indicatif::ProgressBar;
 use tempfile::tempdir;
 use tokio::fs;
 use tracing::{debug, error, instrument};
@@ -117,7 +117,7 @@ async fn checkout_version(repo: &Repository, version: &Version) -> Result<()> {
 }
 
 #[instrument(skip(src, dest, sp))]
-async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<()> {
+async fn backup_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result<()> {
     // If the theme directory is empty then early return
     if fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source dir")?.next_entry().await.into_diagnostic().wrap_err("Failed to check theme source dir entries")?.is_none() {
         debug!("Source directory is empty, skipping backup");
@@ -132,10 +132,7 @@ async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result
     }
     tokio::fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create backup directory")?;
 
-    sp.update_after_time(
-        "Backing up existing theme files...",
-        std::time::Duration::from_millis(200),
-    );
+    sp.set_message("Backing up existing theme files...");
     debug!(src = %src.display(), dest = %dest.display(), "Copying directory");
     copy_dir_all(src, dest).await?;
 
@@ -143,7 +140,7 @@ async fn backup_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result
 }
 
 #[instrument(skip(src, dest, sp))]
-async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<()> {
+async fn copy_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result<()> {
     let allowed_dirs = ["templates", "assets"];
     let allowed_files = ["README.md", "LICENSE", "theme.toml"];
 
@@ -154,10 +151,7 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
     }
     fs::create_dir_all(dest).await.into_diagnostic().wrap_err("Failed to create theme directory")?;
 
-    sp.update_after_time(
-        "Copying theme files...",
-        std::time::Duration::from_millis(200),
-    );
+    sp.set_message("Copying theme files...");
     let mut entries = fs::read_dir(src).await.into_diagnostic().wrap_err("Failed to read theme source")?;
     while let Some(entry) = entries.next_entry().await.into_diagnostic().wrap_err("Failed to read theme entry")? {
         let file_name = entry.file_name();
@@ -179,7 +173,7 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &mut Spinner) -> Result<(
 
 /// Check theme's min_version against installed norgolith version.
 /// Warns (not blocks) if norgolith version is older than min_version.
-fn check_min_version(theme_toml_path: &Path, sp: &mut Spinner) {
+fn check_min_version(theme_toml_path: &Path, sp: &ProgressBar) {
     let Ok(content) = std::fs::read_to_string(theme_toml_path) else {
         debug!("Could not read theme.toml for min_version check");
         return;
@@ -208,16 +202,14 @@ fn check_min_version(theme_toml_path: &Path, sp: &mut Spinner) {
     };
 
     if lith_ver < min_ver {
-        sp.stop_and_persist(
-            "⚠",
-            &format!(
-                "Theme requires norgolith >= {}. Current: {}. \
-                 Update via 'cargo install --git https://github.com/norgolith/core' \
-                 or 'cargo install --release --path .' from cloned repo. \
-                 See README for AUR/Nix methods.",
-                min_version_str, lith_clean
-            ),
+        let msg = format!(
+            "Theme requires norgolith >= {}. Current: {}. \
+             Update via 'cargo install --git https://github.com/norgolith/core' \
+             or 'cargo install --release --path .' from cloned repo. \
+             See README for AUR/Nix methods.",
+            min_version_str, lith_clean
         );
+        sp.suspend(|| println!("{} {}", "⚠".yellow(), msg));
     } else {
         debug!(
             "min_version {} satisfied by lith {}",
@@ -228,7 +220,7 @@ fn check_min_version(theme_toml_path: &Path, sp: &mut Spinner) {
 
 impl ThemeManager {
     #[instrument(skip(self, sp))]
-    pub async fn pull(&mut self, sp: &mut Spinner) -> Result<Self> {
+    pub async fn pull(&mut self, sp: &ProgressBar) -> Result<Self> {
         debug!("Starting theme pull operation");
         let repo_url = resolve_repo_shorthand(&self.repo).await?;
         let temp_dir = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
@@ -285,7 +277,7 @@ impl ThemeManager {
     }
 
     #[instrument(skip(self, sp))]
-    pub async fn update(&mut self, sp: &mut Spinner) -> Result<Self> {
+    pub async fn update(&mut self, sp: &ProgressBar) -> Result<Self> {
         debug!("Starting theme update operation");
         let repo_url = resolve_repo_shorthand(&self.repo).await?;
         let temp_dir = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
@@ -339,14 +331,15 @@ impl ThemeManager {
             self.write_metadata(sp)
                 .await
                 .wrap_err("Failed to update theme metadata")?;
-            sp.stop_and_persist("✓", "Theme updated successfully");
+            sp.finish_and_clear();
+            println!("{} Theme updated successfully", "✓".green());
         } else {
-            sp.stop_and_persist(
-                "✓",
-                &format!(
-                    "Theme is already up-to-date (version: {}, pinned: {})",
-                    self.version, self.pin
-                ),
+            sp.finish_and_clear();
+            println!(
+                "{} Theme is already up-to-date (version: {}, pinned: {})",
+                "✓".green(),
+                self.version,
+                self.pin
             );
         }
 
@@ -354,7 +347,7 @@ impl ThemeManager {
     }
 
     #[instrument(skip(self, sp))]
-    async fn write_metadata(&mut self, sp: &mut Spinner) -> Result<()> {
+    async fn write_metadata(&mut self, sp: &ProgressBar) -> Result<()> {
         debug!("Writing theme metadata");
         let metadata_path = self.theme_dir.join(".metadata.toml");
         let metadata = ThemeInstalledMetadata {
@@ -363,10 +356,7 @@ impl ThemeManager {
             pin: self.pin,
         };
 
-        sp.update_after_time(
-            "Writing theme metadata file...",
-            std::time::Duration::from_millis(200),
-        );
+        sp.set_message("Writing theme metadata file...");
         debug!(path = %metadata_path.display(), "Writing metadata file");
         fs::write(metadata_path, toml::to_string_pretty(&metadata).into_diagnostic().wrap_err("Failed to serialize theme metadata")?)
             .await

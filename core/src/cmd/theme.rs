@@ -6,7 +6,7 @@ use colored::Colorize;
 use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
 use indoc::formatdoc;
 use inquire::{Confirm, Select, Text, validator::Validation};
-use spinoff::{Spinner, spinners};
+use indicatif::{ProgressBar, ProgressStyle};
 use tracing::info;
 
 use crate::{
@@ -70,16 +70,16 @@ async fn pull_theme(repo: &str, version: &Option<String>, pin: bool) -> Result<(
             semver::Version::parse(version).into_diagnostic().wrap_err("No valid semantic version provided")?;
     }
 
-    let mut sp = Spinner::new(
-        spinners::Dots2,
-        format!(
-            "Pulling theme from '{}'...",
-            theme::resolve_repo_shorthand(repo).await?
-        ),
-        None,
-    );
-    theme.pull(&mut sp).await?;
-    sp.stop_and_persist("✓", "Successfully pulled theme");
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    pb.set_message(format!(
+        "Pulling theme from '{}'...",
+        theme::resolve_repo_shorthand(repo).await?
+    ));
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
+    theme.pull(&pb).await?;
+    pb.finish_and_clear();
+    println!("{} Successfully pulled theme", "✓".green());
 
     Ok(())
 }
@@ -103,8 +103,11 @@ async fn update_theme() -> Result<()> {
             theme_dir,
         };
 
-        let mut sp = Spinner::new(spinners::Dots2, "Updating theme...", None);
-        theme.update(&mut sp).await?;
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+        pb.set_message("Updating theme...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(120));
+        theme.update(&pb).await?;
     } else {
         bail!(
             "{}: there is no theme installed",
@@ -116,7 +119,10 @@ async fn update_theme() -> Result<()> {
 
 async fn rollback_theme() -> Result<()> {
     let theme_dir = find_theme_dir().await?;
-    let mut sp = Spinner::new(spinners::Dots2, "Rolling back to previous state...", None);
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    pb.set_message("Rolling back to previous state...");
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
 
     let backup_dir = theme_dir
         .parent()
@@ -124,7 +130,8 @@ async fn rollback_theme() -> Result<()> {
         .join(".theme_backup");
 
     if !backup_dir.exists() {
-        sp.stop_and_persist("✖", "No previous state backup found");
+        pb.finish_and_clear();
+        println!("{} No previous state backup found", "✖".red());
         return Ok(());
     }
 
@@ -140,7 +147,8 @@ async fn rollback_theme() -> Result<()> {
         .await
         .wrap_err("Failed to restore backup")?;
 
-    sp.stop_and_persist("✓", "Successfully restored previous theme state");
+    pb.finish_and_clear();
+    println!("{} Successfully restored previous theme state", "✓".green());
 
     Ok(())
 }
