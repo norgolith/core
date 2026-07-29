@@ -228,6 +228,7 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
             }
         })?;
     pb.finish_and_clear();
+    println!("{} Built plugin", "✓".green());
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!("Plugin cargo build failed:\n{}", stderr.trim());
@@ -289,9 +290,13 @@ fn install_from_git(url: &str, tag: Option<&str>, branch: Option<&str>) -> Resul
     let tmp = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory for cloning")?;
     let clone_path = tmp.path();
 
-    println!("{}", "Cloning repository...".dimmed());
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    pb.set_message("Cloning repository...");
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
     Repository::clone(url, clone_path)
         .map_err(|e| miette::miette!("Failed to clone {}: {}", url, e))?;
+    pb.finish_and_clear();
 
     // Checkout tag or branch if specified
     if let Some(tag_name) = tag {
@@ -369,7 +374,10 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
     let version = match version {
         Some(v) => v.to_string(),
         None => {
-            println!("{}", "Fetching crate info...".dimmed());
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+            pb.set_message("Fetching crate info...");
+            pb.enable_steady_tick(std::time::Duration::from_millis(120));
             let url = format!("https://crates.io/api/v1/crates/{}", name);
             let resp: CrateResponse = ureq::get(&url)
                 .header("User-Agent", "norgolith (https://github.com/norgolith)")
@@ -378,6 +386,7 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
                 .body_mut()
                 .read_json()
                 .map_err(|e| miette::miette!("Failed to parse crate info: {}", e))?;
+            pb.finish_and_clear();
             resp.krate
                 .max_stable_version
                 .ok_or_else(|| miette::miette!("No versions found for crate '{}'", name))?
@@ -387,7 +396,10 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
     let tmp = tempdir().into_diagnostic().wrap_err("Failed to create temporary directory")?;
     let dl_path = tmp.path().join("plugin.crate");
 
-    println!("{}", "Downloading crate...".dimmed());
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    pb.set_message("Downloading crate...");
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
     let url = format!(
         "https://crates.io/api/v1/crates/{}/{}/download",
         name, version
@@ -403,13 +415,14 @@ fn install_from_crates_io(name: &str, version: Option<&str>) -> Result<()> {
         .map_err(|e| miette::miette!("Failed to read response: {}", e))?;
     std::fs::write(&dl_path, &body).into_diagnostic().wrap_err("Failed to write downloaded crate to disk")?;
 
-    println!("{}", "Extracting crate...".dimmed());
+    pb.set_message("Extracting crate...");
     let tar_gz = std::fs::File::open(&dl_path).into_diagnostic().wrap_err("Failed to open downloaded crate file")?;
     let decoder = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(decoder);
     archive
         .unpack(tmp.path())
         .map_err(|e| miette::miette!("Failed to extract crate: {}", e))?;
+    pb.finish_and_clear();
 
     // Crate tarball extracts to <name>-<version>/ directory
     let crate_dir = tmp.path().join(format!("{}-{}", name, version));
