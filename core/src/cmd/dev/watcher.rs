@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use miette::{IntoDiagnostic, Result, WrapErr};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, miette};
 use futures_util::Stream;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
@@ -103,7 +103,11 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
     if actions.reload_config {
         match state.reload_config().await {
             Ok(_) => {}
-            Err(e) => error!("Config reload failed: {}", e),
+            Err(e) => eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Check norgolith.toml syntax, fix errors, and save again",
+                "Config reload failed: {}", e
+            )),
         }
         state.rebuild_rendered_pages().await;
         return;
@@ -113,7 +117,11 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
     if actions.reload_assets
         && let Err(e) = state.send_reload()
     {
-        error!("Asset reload error: {}", e);
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "The live reload WebSocket may have disconnected; refresh the page manually",
+            "Asset reload signal error: {}", e
+        ));
     }
 
     // Handle template reloads
@@ -125,7 +133,11 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
                     error!("Template reload signal error: {}", e);
                 }
             }
-            Err(e) => error!("Template reload failed: {}", e),
+            Err(e) => eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Check template syntax and fix errors before the next save",
+                "Template reload failed: {}", e
+            )),
         }
     }
 
@@ -140,7 +152,11 @@ async fn execute_actions(actions: FileActions, state: Arc<ServerState>) {
                 let mut posts_lock = state.posts.write().await;
                 *posts_lock = new_posts;
             }
-            Err(e) => error!("Failed to update pages metadata: {}", e),
+            Err(e) => eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Fix the metadata issues and save the file again",
+                "Failed to update pages metadata: {}", e
+            )),
         }
 
         state.rebuild_rendered_pages().await;

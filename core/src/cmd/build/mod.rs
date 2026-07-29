@@ -15,7 +15,7 @@ use colored::{ColoredString, Colorize};
 use indicatif::MultiProgress;
 use miette::{IntoDiagnostic, NamedSource, Result, Severity, WrapErr, bail, miette};
 use tera::Context;
-use tracing::{debug, error, instrument, warn};
+use tracing::{debug, instrument};
 use walkdir::WalkDir;
 
 use super::seo;
@@ -170,7 +170,11 @@ fn build_contents(
         .filter_map(|e| match e {
             Ok(e) => Some(e),
             Err(e) => {
-                warn!("WalkDir error: {}", e);
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check directory permissions",
+                    "WalkDir error: {}", e
+                ));
                 None
             }
         })
@@ -281,11 +285,13 @@ fn build_content_entry(
 
     let t = Instant::now();
     let Ok(content) = std::fs::read_to_string(path) else {
-        error!(
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "The file was listed in a collection but could not be read",
             "{} {}",
             "Norg file not found for".bold(),
             rel_path.display()
-        );
+        ));
         return Ok(None);
     };
     let file_ms = t.elapsed().as_micros();
@@ -525,12 +531,14 @@ pub fn build(minify: bool) -> Result<()> {
             if let Some(f) = p.hooks.pre_build
                 && let Err(e) = plugin_mgr.call_hook(p, f, &config_json)
             {
-                error!(
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check the plugin output or contact plugin maintainer",
                     "{} plugin '{}': {}",
                     "Plugin error:".red().bold(),
                     p.name.bold(),
                     e
-                );
+                ));
             }
         }
     }
@@ -888,12 +896,14 @@ pub fn build(minify: bool) -> Result<()> {
             if let Some(f) = p.hooks.post_build
                 && let Err(e) = plugin_mgr.call_hook(p, f, &config_json)
             {
-                error!(
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check the plugin output or contact plugin maintainer",
                     "{} plugin '{}': {}",
                     "Plugin error:".red().bold(),
                     p.name.bold(),
                     e
-                );
+                ));
             }
         }
     }

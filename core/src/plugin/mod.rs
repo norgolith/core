@@ -18,7 +18,7 @@ pub use norgolith_plugin_sdk::{
     CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
 
-use tracing::{debug, error};
+use tracing::debug;
 
 /// Hooks a plugin can implement. Each is an optional C ABI function pointer
 pub struct PluginHooks {
@@ -211,13 +211,15 @@ impl PluginManager {
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        error!(
+                        eprintln!("{:?}", miette!(
+                            severity = miette::Severity::Warning,
+                            help = "Check the plugin output or contact plugin maintainer",
                             "{} plugin '{}' on {}: {}",
                             "Plugin error:".red().bold(),
                             p.name.bold(),
                             rel_path.display(),
                             e
-                        );
+                        ));
                     }
                 }
             }
@@ -255,13 +257,15 @@ impl PluginManager {
                     Ok(Some(new_html)) => current = new_html,
                     Ok(None) => {}
                     Err(e) => {
-                        error!(
+                        eprintln!("{:?}", miette!(
+                            severity = miette::Severity::Warning,
+                            help = "Check the plugin output or contact plugin maintainer",
                             "{} plugin '{}' on {}: {}",
                             "Plugin error:".red().bold(),
                             p.name.bold(),
                             rel_path.display(),
                             e
-                        );
+                        ));
                     }
                 }
             }

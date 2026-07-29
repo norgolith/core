@@ -15,7 +15,8 @@ use rust_norg::{
     CarryoverTag, DelimitingModifier, LinkTarget, NestableDetachedModifier, NorgAST, NorgASTFlat,
     ParagraphSegment, ParagraphSegmentToken, parse_tree,
 };
-use tracing::{error, info, warn};
+use miette::{Severity, miette};
+use tracing::{error, info};
 
 /// CarryOver
 #[derive(Clone, Debug)]
@@ -173,7 +174,11 @@ fn paragraph_to_string(
                 paragraph.push_str("</a>");
             } else if link_name.is_empty() {
                 paragraph.push_str("></a>");
-                warn!("Generated link with no description, make sure all of your Norg links contain a description");
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Add a description in square brackets after the link target, e.g. [target](description)",
+                    "Generated link with no description. Add alt text to your Norg links for accessibility."
+                ));
             } else {
                 paragraph.push('>');
                 paragraph.push_str(&link_name);

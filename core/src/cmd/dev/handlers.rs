@@ -10,7 +10,7 @@ use hyper::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use hyper::{Body, Request, Response, StatusCode, header::CONTENT_TYPE};
 use tokio::net::TcpStream;
 use tokio::sync::broadcast;
-use tracing::{debug, error, instrument, warn};
+use tracing::{debug, error, instrument};
 
 use crate::shared;
 

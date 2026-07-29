@@ -1,9 +1,8 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use miette::{Result, miette};
+use miette::{Result, Severity, miette};
 use rayon::prelude::*;
-use tracing::warn;
 use walkdir::WalkDir;
 
 use crate::config::CollectionConfig;
@@ -166,7 +165,11 @@ pub fn collect_all_posts_metadata(
         .filter_map(|e| match e {
             Ok(e) => Some(e),
             Err(e) => {
-                warn!("WalkDir error: {}", e);
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check directory permissions and ensure all content directories are readable",
+                    "WalkDir error: {}", e
+                ));
                 None
             }
         })
@@ -210,10 +213,12 @@ pub fn collect_all_posts_metadata(
         let parse_date = |s: &str| {
             chrono::DateTime::parse_from_rfc3339(s)
                 .unwrap_or_else(|_| {
-                    warn!(
+                    eprintln!("{:?}", miette!(
+                        severity = Severity::Warning,
+                        help = "Use RFC 3339 format for dates, e.g. 2024-01-15T12:00:00Z",
                         "Post has invalid 'created' date '{}', defaulting to epoch for sort",
                         s
-                    );
+                    ));
                     chrono::DateTime::from_timestamp(0, 0).unwrap().into()
                 })
                 .with_timezone(&chrono::Utc)

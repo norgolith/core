@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use miette::{IntoDiagnostic, Result, WrapErr, miette};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, miette};
 use rayon::prelude::*;
 use rss::Channel;
 use tera::{Context, Tera};
-use tracing::{instrument, warn};
+use tracing::instrument;
 
 use crate::{config, shared};
 
@@ -37,12 +37,12 @@ pub(super) fn generate_xml_feeds(
         if (template_name.contains("rss") && template_name.ends_with(".xml"))
             && let Err(e) = Channel::read_from(rendered.as_bytes())
         {
-            warn!(
-                template = %template_name,
+            eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Check the XML template for correct RSS structure. File written anyway.",
                 "'{}' does not validate as RSS ({}); written as-is",
-                template_name,
-                e
-            );
+                template_name, e
+            ));
         }
 
         let output_path = public_dir.join(template_name);

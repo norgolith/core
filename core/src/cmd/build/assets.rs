@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, miette};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, miette};
 use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
 use oxc_allocator::Allocator;
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_minifier::{Minifier, MinifierOptions};
 use oxc_parser::Parser;
 use oxc_span::SourceType;
-use tracing::{instrument, warn};
+use tracing::instrument;
 use walkdir::WalkDir;
 
 
@@ -57,7 +57,11 @@ fn minify_js_asset(src_path: &Path) -> Result<String> {
 
     if !ret.diagnostics.is_empty() {
         for diag in &ret.diagnostics {
-            warn!("JS parse warning for {}: {:?}", src_path.display(), diag);
+            eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "This may cause minification issues or runtime errors",
+                "JS parse warning for {}: {:?}", src_path.display(), diag
+            ));
         }
     }
 
@@ -115,7 +119,11 @@ pub(super) fn copy_assets(
         .filter_map(|e| match e {
             Ok(e) => Some(e),
             Err(e) => {
-                warn!("WalkDir error: {}", e);
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check directory permissions",
+                    "WalkDir error: {}", e
+                ));
                 None
             }
         })
@@ -125,10 +133,12 @@ pub(super) fn copy_assets(
     let mut file_ops = Vec::new();
     for entry in &entries {
         let Some(rel_path) = entry.path().strip_prefix(assets_dir).ok() else {
-            warn!(
+            eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Assets should be placed in the site's assets directory (default: 'assets/')",
                 "Skipping asset outside assets directory: {}",
                 entry.path().display()
-            );
+            ));
             continue;
         };
         if entry.path().is_dir() {

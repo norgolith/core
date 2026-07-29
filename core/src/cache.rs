@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use miette::{Result, miette};
+use miette::{Result, miette, Severity};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use tracing::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CacheEntry {
@@ -64,7 +64,11 @@ impl BuildCache {
             entries.clear();
             if cache_dir.exists() {
                 std::fs::remove_dir_all(&cache_dir).unwrap_or_else(|e| {
-                    warn!("Failed to clear stale cache directory: {}", e);
+                    eprintln!("{:?}", miette!(
+                        severity = Severity::Warning,
+                        help = "This is non-critical; stale cache will be cleaned on next build",
+                        "Failed to clear stale cache directory: {}", e
+                    ));
                 });
             }
         }
@@ -162,10 +166,11 @@ impl BuildCache {
             let json = serde_json::to_string_pretty(entry)
                 .map_err(|e| miette!("{}: {}", format!("Failed to encode cache entry for '{}'", rel_path.display()).bold(), e))?;
             std::fs::write(&cache_path, json).unwrap_or_else(|e| {
-                warn!(
-                    path = %cache_path.display(),
-                    "Failed to write cache entry: {}", e
-                );
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "This entry will be rebuilt from scratch on next build",
+                    "Failed to write cache entry '{}': {}", cache_path.display(), e
+                ));
             });
         }
 

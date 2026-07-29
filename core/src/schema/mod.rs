@@ -1,9 +1,8 @@
 use colored::Colorize;
-use miette::Diagnostic;
+use miette::{Diagnostic, Severity, miette};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
-use tracing::warn;
 
 mod validator;
 
@@ -296,7 +295,11 @@ impl ValidationRule {
                     }
                 }
                 None => {
-                    warn!("Missing condition field '{}'", field);
+                    eprintln!("{:?}", miette!(
+                        severity = Severity::Warning,
+                        help = "Check the 'conditional_on' field in content schema definition",
+                        "Missing condition field '{}'", field
+                    ));
                     Ok(false)
                 }
             })

@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar};
-use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, miette};
+use miette::{IntoDiagnostic, NamedSource, Result, Severity, WrapErr, miette};
 use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument};
 
 /// Result of converting a single page: (html, raw, Option<(path, content, metadata)>)
 type ConversionResult = Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>;
@@ -122,7 +122,11 @@ impl ServerState {
                 }
                 info!("Rendered pages cache rebuilt");
             }
-            Err(e) => error!("Failed to rebuild rendered pages: {}", e),
+            Err(e) => eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Check template and content files for errors",
+                "Failed to rebuild rendered pages: {}", e
+            )),
         }
     }
 
@@ -209,14 +213,22 @@ pub fn render_all_pages(
                 serde_json::from_value(cached).unwrap_or_else(|_| {
                     shared::load_metadata_from_content(&content, rel_path, routes_url)
                         .unwrap_or_else(|e| {
-                            error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                            eprintln!("{:?}", miette!(
+                                severity = Severity::Warning,
+                                help = "Check the file's @document-meta section for valid metadata",
+                                "Failed to load metadata for {}: {}", rel_path.display(), e
+                            ));
                             toml::Value::Table(toml::map::Map::new())
                         })
                 })
             } else {
                 shared::load_metadata_from_content(&content, rel_path, routes_url)
                     .unwrap_or_else(|e| {
-                        error!("Failed to load metadata for {}: {}", rel_path.display(), e);
+                        eprintln!("{:?}", miette!(
+                            severity = Severity::Warning,
+                            help = "Check the file's @document-meta section for valid metadata",
+                            "Failed to load metadata for {}: {}", rel_path.display(), e
+                        ));
                         toml::Value::Table(toml::map::Map::new())
                     })
             };
@@ -401,7 +413,11 @@ pub(super) async fn setup_server_state(
         )).ok();
     }
     if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
-        warn!("{}", e);
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "Landlock may not be supported on your system/kernel version",
+            "{}", e
+        ));
     }
     if plugin_mgr.has_hook(plugin::HOOK_PRE_BUILD) {
         let input = serde_json::json!({
@@ -414,12 +430,14 @@ pub(super) async fn setup_server_state(
             if let Some(f) = p.hooks.pre_build
                 && let Err(e) = plugin_mgr.call_hook(p, f, &input)
             {
-                error!(
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check the plugin output or contact plugin maintainer",
                     "{} plugin '{}': {}",
                     "Plugin error:".red().bold(),
                     p.name.bold(),
                     e
-                );
+                ));
             }
         }
     }

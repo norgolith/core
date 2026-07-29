@@ -1,7 +1,6 @@
 use std::path::Path;
 
-use miette::Result;
-use tracing::warn;
+use miette::{Result, Severity, miette};
 
 /// Apply Landlock filesystem restrictions to the current process
 ///
@@ -30,10 +29,11 @@ pub fn apply_landlock(site_dir: &Path) -> Result<()> {
     #[cfg(all(target_os = "linux", feature = "sandbox-linux"))]
     {
         if !landlock_available() {
-            warn!(
-                "Landlock unavailable (kernel too old?). \
-                 Plugins running without filesystem confinement."
-            );
+            eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Upgrade kernel to 5.13+ or run on a system with Landlock support",
+                "Landlock unavailable. Plugins running without filesystem confinement."
+            ));
             return Ok(());
         }
 
@@ -69,18 +69,21 @@ pub fn apply_landlock(site_dir: &Path) -> Result<()> {
         match ruleset.restrict_self() {
             Ok(status) => {
                 if status.ruleset != RulesetStatus::FullyEnforced {
-                    warn!(
-                        "Landlock partially enforced (kernel feature gap). \
-                         Some restrictions may not apply."
-                    );
+                    eprintln!("{:?}", miette!(
+                        severity = Severity::Warning,
+                        help = "Upgrade to kernel 6.3+ for full Landlock ABI v2 support",
+                        "Landlock partially enforced. Some restrictions may not apply."
+                    ));
                 }
             }
             Err(e) => {
-                warn!(
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Plugins will run without filesystem sandbox. Check kernel support.",
                     "Failed to apply Landlock restrictions: {}. \
                      Plugins running without filesystem confinement.",
                     e
-                );
+                ));
             }
         }
 

@@ -12,7 +12,7 @@ use hyper::Server;
 use hyper::service::{make_service_fn, service_fn};
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, instrument};
 
 use crate::fs;
 use crate::shared;
@@ -154,11 +154,13 @@ pub async fn dev(
             Ok(()) => {
                 info!("Opening the development server page using your browser ...");
             }
-            Err(e) => warn!(
+            Err(e) => eprintln!("{:?}", miette!(
+                severity = Severity::Warning,
+                help = "Install a web browser or set BROWSER environment variable",
                 "{}: {}",
                 "Could not open the development server page".bold(),
                 e
-            ),
+            )),
         };
     }
 
