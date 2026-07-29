@@ -663,26 +663,22 @@ pub fn build(minify: bool) -> Result<()> {
                 }
             }
 
-            let mut warning = String::from(
-                "Asset fingerprinting enabled, no fingerprint filter found in templates\n\
-                 Assets renamed, original paths 404. Templates referencing them:\n",
-            );
+            let mut assets_list = String::new();
             for (asset, refs) in &asset_pairs {
                 if refs.is_empty() {
                     continue;
                 }
-                warning.push_str(&format!("\n  {}\n", asset));
+                assets_list.push_str(&format!("\n  {}\n", asset));
                 for r in refs {
-                    warning.push_str(&format!("    └ {}\n", r));
+                    assets_list.push_str(&format!("    └ {}\n", r));
                 }
             }
-            warning.push_str(
-                "\nAdd fingerprint filter to each link, e.g.:\n\
-                <link href=\"{{ \"/assets/css/styles.min.css\" | fingerprint }}\">\n",
-            );
             eprintln!("{:?}", miette!(
                 severity = miette::Severity::Warning,
-                "{warning}"
+                help = "Add fingerprint filter to each link, e.g.:\n<link href=\"{{ \"/assets/css/styles.min.css\" | fingerprint }}\">",
+                "Asset fingerprinting enabled, no fingerprint filter found in templates\n\
+                 Assets renamed, original paths 404. Templates referencing them:{}",
+                assets_list
             ));
         }
     } else if !fingerprint_enabled {
@@ -692,10 +688,9 @@ pub fn build(minify: bool) -> Result<()> {
             // opt-out silence below already covers the explicit false case.
             eprintln!("{:?}", miette!(
                 severity = miette::Severity::Warning,
+                help = "Add to norgolith.toml:\n  [assets]\n  fingerprint = true",
                 "Asset fingerprinting is disabled\n\
                  Enable for automatic cache-busting via content hashes\n\
-                 \n\
-                 Add to norgolith.toml:\n  [assets]\n  fingerprint = true\n\
                  \n\
                  Default will change to true in v1.5.0"
             ));
