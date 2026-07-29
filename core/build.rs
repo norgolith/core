@@ -26,7 +26,10 @@ fn get_version() -> String {
         && output.status.success()
     {
         let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        return tag.strip_prefix('v').unwrap_or(&tag).to_string();
+        return tag.strip_prefix("norgolith-v")
+            .or_else(|| tag.strip_prefix('v'))
+            .unwrap_or(&tag)
+            .to_string();
     }
 
     // Not at a tag, append commit hash
