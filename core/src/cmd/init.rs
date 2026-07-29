@@ -238,6 +238,7 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
         };
 
         // Create site structure
+        println!("{} Initializing site...", "→".cyan().bold());
         create_directories(name).await?;
         create_config(name, &root_url, &language, &title).await?;
         create_index_norg(name).await?;

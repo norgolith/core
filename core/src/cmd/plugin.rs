@@ -9,6 +9,8 @@ use serde::Deserialize;
 use tar::Archive;
 use tempfile::tempdir;
 
+use indicatif::{ProgressBar, ProgressStyle};
+
 use crate::plugin::{self, CORE_ABI_VERSION, PluginManifest};
 
 #[derive(Subcommand, Clone)]
@@ -209,7 +211,10 @@ register_plugin!("{name}")
 }
 
 fn build_plugin(source_dir: &Path) -> Result<()> {
-    println!("{}", "Building plugin...".dimmed());
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    pb.set_message("Building plugin...");
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
     let output = std::process::Command::new("cargo")
         .arg("build")
         .arg("--release")
@@ -222,6 +227,7 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
                 miette::miette!("Failed to run cargo: {e}")
             }
         })?;
+    pb.finish_and_clear();
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!("Plugin cargo build failed:\n{}", stderr.trim());
