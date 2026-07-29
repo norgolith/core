@@ -1,0 +1,116 @@
+@document.meta
+title: Search Index
+description: Norgolith search index generation and theme integration
+authors: [
+  NTBBloodbath
+]
+categories: [
+  docs
+]
+created: 2026-07-28T22:00:00-04:00
+updated: 2026-07-28T22:00:00-04:00
+draft: false
+layout: docs
+version: 1.1.1
+@end
+
+Norgolith generates a `search_index.json` file at build time, and serves it as
+a dynamically updated endpoint during development. This powers the
+documentation site's client-side search without external services.
+
+** How It Works
+   - *Production build* (`lith build`): walks all generated HTML files in
+     `public/`, extracts title, description, and body text, then writes
+     `public/search_index.json`.
+   - *Development server* (`lith serve`): same extraction from in-memory
+     rendered pages, served on demand at `GET /search_index.json`.
+   - The index is regenerated on every rebuild. No configuration needed.
+
+** Index Structure
+   Each entry in the index contains:
+
+   - `title`: Page `<title>` content
+   - `permalink`: Canonical URL path
+   - `description`: Meta description content
+   - `body`: Full visible text, HTML stripped
+
+   The `body` field includes all visible text with HTML tags, script content,
+   and style blocks removed. Whitespace is collapsed to a single space and
+   trimmed.
+
+** Theme Integration
+   The docs theme provides a working reference implementation. To add search
+   to your own theme:
+
+   *** 1. Load Fuse.js
+       The docs theme uses Fuse.js v7.5 for client-side fuzzy search. Load it
+       as an ES module:
+
+       @code html
+       <script type="module">
+       import Fuse from 'https://cdn.jsdelivr.net/npm/fuse.js@7.5.0/dist/fuse.mjs';
+       window.Fuse = Fuse;
+       </script>
+       @end
+
+   *** 2. Fetch the index and initialize Fuse
+       Recommended configuration:
+
+       @code javascript
+       const fuse = new Fuse(data, {
+         keys: [
+           { name: "title", weight: 3 },
+           { name: "description", weight: 1.5 },
+           { name: "body", weight: 0.5 },
+         ],
+         threshold: 0.4,
+         distance: 200,
+         minMatchCharLength: 2,
+         includeScore: true,
+       });
+       @end
+
+       Recommended options:
+       - `keys` with weights 3/1.5/0.5: prioritize title over body
+       - `threshold`: 0.4 balances precision and recall
+       - `distance`: 200 allows matches across longer text
+       - `minMatchCharLength`: 2 filters single-character noise
+       - `includeScore`: true enables sorting by relevance
+
+   *** 3. Render results
+       Each result item provides:
+
+       - `r.item.permalink` — link target
+       - `r.item.title` — page title
+       - `r.item.description` — meta description
+       - `r.item.body` — full body text (useful for snippets)
+
+       Example result dropdown:
+
+       @code html
+       <template x-for="r in results" :key="r.item.permalink">
+         <a :href="r.item.permalink">
+           <div x-text="r.item.title"></div>
+           <div x-text="r.item.description"></div>
+         </a>
+       </template>
+       @end
+
+       Limit results to 10 with `results.slice(0, 10)`.
+
+   *** 4. Mobile considerations
+       Hide the search input on small screens and show a search icon instead.
+       On tap, open a full-screen overlay with the same input and results.
+       Share a single Fuse instance between desktop and mobile views to avoid
+       fetching the index twice.
+
+** Customization
+   The search index is automatically generated and has no configuration
+   options. To modify behavior:
+
+   - *Client-side filtering*: adjust Fuse.js options (`threshold`, `keys`) in
+     your theme's JavaScript.
+   - *Post-processing*: filter or transform the `search_index.json` array
+     before passing it to Fuse.
+   - *Mobile layout*: customize the overlay transition and styling in your
+     theme's CSS.
