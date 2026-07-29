@@ -21,13 +21,23 @@ pub fn extract_entries(pages: &HashMap<String, String>) -> Vec<SearchEntry> {
 fn extract_entry(permalink: &str, html: &str) -> SearchEntry {
     let title = extract_title(html);
     let description = extract_description(html);
-    let body = strip_html(html);
+    let body = strip_html(extract_main(html));
     SearchEntry {
         title,
         permalink: permalink.to_string(),
         description,
         body,
     }
+}
+
+fn extract_main(html: &str) -> &str {
+    if let Some(start) = html.find("<main") {
+        let after = &html[start..];
+        if let Some(end) = after.find("</main>") {
+            return &after[..end + 7];
+        }
+    }
+    html
 }
 
 fn extract_title(html: &str) -> String {
