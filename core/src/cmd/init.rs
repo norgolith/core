@@ -283,7 +283,8 @@ pub async fn init(name: &str, prompt: bool) -> Result<()> {
             structure_table,
             "https://ntbbloodbath.github.io/norgolith".blue()
         );
-        info!("{}", init_message);
+        println!("{}", init_message);
+        println!("{} Initialized site", "✓".green().bold());
     }
 
     Ok(())
