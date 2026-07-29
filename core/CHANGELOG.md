@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.1](https://github.com/norgolith/core/compare/norgolith-v1.3.0...norgolith-v1.3.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **build:** strip norgolith- prefix from git tag version ([39db1d7](https://github.com/norgolith/core/commit/39db1d73549adbf1cd52077d72710580d9989289))
+* **logging:** migrate user-facing warn!/error! tracing calls to eprintln!(miette!) ([1982316](https://github.com/norgolith/core/commit/1982316328272c1f33a2551ad41da0a04d2c2a2c))
+
+
+### Miscellaneous
+
+* format code ([88f713b](https://github.com/norgolith/core/commit/88f713ba1ae6c9ba5be5448e1e3b948a897b2361))
+* make clippy happy ([95a5d36](https://github.com/norgolith/core/commit/95a5d366857155cbd61ccaedd804ac76f3f55934))
+* regenerate lockfile ([95a5d36](https://github.com/norgolith/core/commit/95a5d366857155cbd61ccaedd804ac76f3f55934))
+
 ## [1.3.0](https://github.com/norgolith/core/compare/norgolith-v1.2.0...norgolith-v1.3.0) (2026-07-29)
 
 
