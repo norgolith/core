@@ -45,7 +45,7 @@ validation with Norg-to-HTML conversion to build static sites from Norg content.
 | Shortcodes           | Built-in                          | No                  | Tera v2 `component()`         |
 | Custom output        | JSON, RSS, etc                    | RSS, Atom           | RSS, Atom                     |
 | Theme system         | Yes                               | Yes                 | Yes                           |
-| Built-in search      | No                                | Yes                 | Via plugin                    |
+| Built-in search      | No                                | Yes                 | Yes                           |
 | Build                | Parallel (pages)                  | Parallel            | Parallel + incremental        |
 
 </details>

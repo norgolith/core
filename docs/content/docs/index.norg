@@ -42,6 +42,8 @@ Transform your Norg content into high-performance websites with /opt-in/ validat
    - {:/docs/getting-started:}[Quick Start]
    - {:/docs/configuration:}[Configuration Reference]
    - {:/docs/commands:}[Commands Reference]
+   - {:/docs/plugins:}[Plugins]
+   - {:/docs/search:}[Search-index]
    - {:/docs/templating:}[Templating]
    - {:/docs/templating-migration:}[Tera v2 Migration Guide]
    - {:/docs/content-schemas:}[Content Schemas]
