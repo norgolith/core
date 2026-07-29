@@ -6,13 +6,13 @@ use std::net::{IpAddr, Ipv4Addr, TcpListener as StdTcpListener};
 use std::sync::Arc;
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use futures_util::StreamExt;
 use hyper::Server;
 use hyper::service::{make_service_fn, service_fn};
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 use crate::fs;
 use crate::shared;
@@ -59,11 +59,13 @@ pub async fn dev(
     tokio::spawn(async move {
         let listener = match TcpListener::bind(format!("127.0.0.1:{}", live_reload_port)).await {
             Ok(l) => l,
-            Err(e) => {
-                error!(
-                    "LiveReload disabled: failed to bind port {}: {}",
-                    live_reload_port, e
-                );
+            Err(_) => {
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Stop the other process using :35729 or ignore this warning",
+                    "LiveReload disabled: port {} already in use",
+                    live_reload_port
+                ));
                 return;
             }
         };

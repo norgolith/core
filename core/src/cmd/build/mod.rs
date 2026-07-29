@@ -13,7 +13,7 @@ use std::{
 
 use colored::{ColoredString, Colorize};
 use indicatif::MultiProgress;
-use miette::{IntoDiagnostic, NamedSource, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, NamedSource, Result, Severity, WrapErr, bail, miette};
 use tera::Context;
 use tracing::{debug, error, instrument, warn};
 use walkdir::WalkDir;
@@ -225,14 +225,18 @@ fn build_contents(
             }
             Ok(None) => {}
             Err(e) => {
-                error!("{:#}", e);
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Fix the reported file and run the build again",
+                    "{:#}", e
+                ));
                 page_errors.push(e);
             }
         }
     }
     if !page_errors.is_empty() {
         let count = page_errors.len();
-        bail!("{} page(s) failed to build (see errors above)", count);
+        bail!("{} page(s) failed to build", count);
     }
 
     let write_start = Instant::now();
@@ -497,7 +501,11 @@ pub fn build(minify: bool) -> Result<()> {
     let t = Instant::now();
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
     if let Err(e) = plugin::sandbox::apply_landlock(&root_dir) {
-        warn!("{}", e);
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "Landlock may not be supported on your system/kernel version",
+            "Plugin sandbox not applied: {}", e
+        ));
     }
     timings.plugins_ms = t.elapsed().as_millis();
 

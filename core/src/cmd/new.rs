@@ -245,12 +245,18 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
     if is_content {
         let title = generate_content_title(&site_root, &target_path);
         create_norg_document(&target_path, &title).await?;
+        println!("{} Created Norg document at {}", "✓".green(), target_path.display());
     } else {
         debug!("Creating empty asset file: {}", target_path.display());
         tokio::fs::File::create(&target_path)
             .await
             .into_diagnostic().wrap_err_with(|| format!("Failed to create file: {}", target_path.display()))?;
-        info!("Created asset file: {}", target_path.display());
+        let label = match resolved_kind.to_lowercase().as_str() {
+            "js" => "JS file",
+            "css" => "CSS file",
+            _ => "asset",
+        };
+        println!("{} Created {} at {}", "✓".green(), label, target_path.display());
     }
 
     // Open file if requested

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use colored::Colorize;
-use miette::{Result, bail};
+use miette::{Severity, Result, bail, miette};
 
 pub use ffi::{FreeStringFn, PluginFn, PluginInfo};
 pub use manifest::{Capabilities, FilesystemAccess, HookConfig, PluginManifest};
@@ -18,7 +18,7 @@ pub use norgolith_plugin_sdk::{
     CORE_ABI_VERSION, HOOK_POST_BUILD, HOOK_POST_CONVERT, HOOK_POST_RENDER, HOOK_PRE_BUILD,
 };
 
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error};
 
 /// Hooks a plugin can implement. Each is an optional C ABI function pointer
 pub struct PluginHooks {
@@ -89,7 +89,11 @@ impl PluginManager {
         let entries = match std::fs::read_dir(&plugins_dir) {
             Ok(e) => e,
             Err(e) => {
-                warn!("Failed to read plugins directory: {}", e);
+                eprintln!("{:?}", miette!(
+                    severity = Severity::Warning,
+                    help = "Check directory permissions",
+                    "Failed to read plugins directory: {}", e
+                ));
                 return manager;
             }
         };
@@ -104,11 +108,13 @@ impl PluginManager {
                     manager.plugins.push(instance);
                 }
                 Err(e) => {
-                    warn!(
+                    eprintln!("{:?}", miette!(
+                        severity = Severity::Warning,
+                        help = "Check plugin.toml, reinstall or contact plugin maintainer",
                         "Plugin '{}' skipped: {}",
                         dir.file_name().and_then(|n| n.to_str()).unwrap_or("?"),
                         e
-                    );
+                    ));
                 }
             }
         }
@@ -364,19 +370,23 @@ fn load_plugin(dir: &Path) -> miette::Result<PluginInstance> {
 
     // Validate that the returned ABI matches what the manifest claims
     if info.abi_version != manifest.plugin.abi {
-        warn!(
-            "Plugin '{}' returned abi={} but manifest declares abi={}",
-            manifest.plugin.name, info.abi_version, manifest.plugin.abi
-        );
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "Check plugin.toml, reinstall or contact plugin maintainer",
+            "Plugin '{}' ABI mismatch: manifest declares v{}, library returned v{}",
+            manifest.plugin.name, manifest.plugin.abi, info.abi_version
+        ));
     }
 
     // Validate hook mask matches manifest declarations
     let declared_mask = manifest.hooks.to_mask();
     if hook_mask != declared_mask {
-        warn!(
-            "Plugin '{}' hook mask mismatch: manifest declares {:#x}, plugin returned {:#x}",
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "Check plugin.toml, reinstall or contact plugin maintainer",
+            "Plugin '{}' hook mismatch: manifest {:#x}, library {:#x}",
             manifest.plugin.name, declared_mask, hook_mask
-        );
+        ));
     }
 
     let plugin_hooks = PluginHooks {
