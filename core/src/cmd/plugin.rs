@@ -2,7 +2,7 @@ use std::{io, path::{Path, PathBuf}};
 
 use clap::Subcommand;
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use flate2::read::GzDecoder;
 use git2::Repository;
 use serde::Deserialize;
@@ -228,11 +228,19 @@ fn build_plugin(source_dir: &Path) -> Result<()> {
             }
         })?;
     pb.finish_and_clear();
-    println!("{} Built plugin", "✓".green());
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!("Plugin cargo build failed:\n{}", stderr.trim());
     }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.trim().is_empty() {
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "If you are not the plugin maintainer, you can ignore these warnings",
+            "Cargo build warnings:\n{}", stderr.trim()
+        ));
+    }
+    println!("{} Built plugin", "✓".green());
     Ok(())
 }
 

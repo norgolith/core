@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use miette::{IntoDiagnostic, Result, WrapErr, bail, miette};
+use miette::{IntoDiagnostic, Result, Severity, WrapErr, bail, miette};
 use git2::{Repository, build::CheckoutBuilder};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -173,6 +173,7 @@ async fn copy_theme_files(src: &Path, dest: &Path, sp: &ProgressBar) -> Result<(
 
 /// Check theme's min_version against installed norgolith version.
 /// Warns (not blocks) if norgolith version is older than min_version.
+/// Uses spinner suspend for inline warnings during pull/update.
 fn check_min_version(theme_toml_path: &Path, sp: &ProgressBar) {
     let Ok(content) = std::fs::read_to_string(theme_toml_path) else {
         debug!("Could not read theme.toml for min_version check");
@@ -215,6 +216,45 @@ fn check_min_version(theme_toml_path: &Path, sp: &ProgressBar) {
             "min_version {} satisfied by lith {}",
             min_version_str, lith_clean
         );
+    }
+}
+
+/// Check theme's min_version against installed norgolith version at build time.
+/// Prints miette Warning to stderr if norgolith is older than min_version.
+pub fn check_theme_version(theme_toml_path: &Path) {
+    let Ok(content) = std::fs::read_to_string(theme_toml_path) else {
+        debug!("Could not read theme.toml for min_version check");
+        return;
+    };
+    let Ok(metadata) = toml::from_str::<ThemeMetadata>(&content) else {
+        debug!("Could not parse theme.toml for min_version check");
+        return;
+    };
+    let Some(min_version_str) = metadata.min_version else {
+        debug!("No min_version in theme.toml, skipping check");
+        return;
+    };
+    let Ok(min_ver) = Version::parse(&min_version_str) else {
+        debug!("min_version '{}' is not valid semver, skipping", min_version_str);
+        return;
+    };
+
+    let lith_raw = option_env!("LITH_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+    let lith_clean = lith_raw.split('+').next().unwrap_or(lith_raw);
+    let Ok(lith_ver) = Version::parse(lith_clean) else {
+        debug!("Could not parse lith version '{}'", lith_clean);
+        return;
+    };
+
+    if lith_ver < min_ver {
+        eprintln!("{:?}", miette!(
+            severity = Severity::Warning,
+            help = "Update via 'cargo install --git https://github.com/norgolith/core' or using your preferred package manager",
+            "Theme '{}' requires norgolith >= {} (current: {})",
+            metadata.name, min_version_str, lith_clean
+        ));
+    } else {
+        debug!("min_version {} satisfied by lith {}", min_version_str, lith_clean);
     }
 }
 

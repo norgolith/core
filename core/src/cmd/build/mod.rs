@@ -21,7 +21,7 @@ use walkdir::WalkDir;
 use super::seo;
 use progress::{make_bar, make_spinner};
 use crate::shared::{BuildContext, SitePaths};
-use crate::{cache::BuildCache, config, fs, plugin, shortcode, shared};
+use crate::{cache::BuildCache, config, fs, plugin, shortcode, shared, theme};
 
 use assets::copy_assets;
 use content::{build_category_pages, build_error_pages, generate_xml_feeds};
@@ -588,6 +588,7 @@ pub fn build(minify: bool) -> Result<()> {
     let mut asset_count = 0usize;
     let mut fingerprint_map = std::collections::HashMap::new();
     if paths.theme_assets.exists() {
+        theme::check_theme_version(&root_dir.join("theme/theme.toml"));
         let (count, map) = copy_assets(&paths.theme_assets, &public_assets_dir, minify, fingerprint_enabled)?;
         asset_count += count;
         for (k, v) in map {
