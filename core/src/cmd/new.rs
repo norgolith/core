@@ -67,18 +67,18 @@ fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
 #[instrument(level = "debug", skip(path, title))]
 async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
     debug!("Creating new norg document: {}", path.display());
-    let re = Regex::new(r"[,\s+?]+").into_diagnostic().wrap_err("Failed to compile regex")?;
+    let re = Regex::new(r",\s*").into_diagnostic().wrap_err("Failed to compile regex")?;
     let creation_date = Local::now().to_rfc3339_opts(SecondsFormat::Secs, false);
 
     // Prompt norg file metadata
     let title = Text::new("Title:")
         .with_default(title)
-        .with_help_message("Document title")
+        .with_help_message("Page headline, also used in RSS and listings")
         .prompt()
         .map_err(|e| miette!("Failed to get document title: {}", e))?;
     let description = Text::new("Description:")
         .with_default("")
-        .with_help_message("Document description")
+        .with_help_message("Short summary for listings and RSS feeds")
         .prompt()
         .map_err(|e| miette!("Failed to get document description: {}", e))?;
     let authors = Text::new("Author(s):")

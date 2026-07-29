@@ -172,7 +172,7 @@ async fn init_theme() -> Result<()> {
     let description = Text::new("Description:")
         .with_help_message("Short description of your theme")
         .prompt().into_diagnostic().wrap_err("Failed to read theme description")?;
-    let version = Text::new("Version:")
+    let version = Text::new("Theme version:")
         .with_default("0.1.0")
         .with_validator(|v: &str| match semver::Version::parse(v) {
             Ok(_) => Ok(Validation::Valid),
@@ -193,7 +193,6 @@ async fn init_theme() -> Result<()> {
             "Other",
         ],
     )
-    // .with_starting_cursor(0)
     .with_help_message("Choose a license for your theme")
     .prompt().into_diagnostic().wrap_err("Failed to read theme license")?;
 
@@ -210,8 +209,9 @@ async fn init_theme() -> Result<()> {
                 )),
             }
         })
-        .prompt()
-        .ok()
+        .prompt_skippable()
+        .into_diagnostic()
+        .wrap_err("Failed to read minimum Norgolith version")?
         .filter(|s| !s.is_empty());
 
     let repository = Text::new("Repository URL (optional):")
