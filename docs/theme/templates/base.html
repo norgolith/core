@@ -18,6 +18,10 @@
   {% endif %}
 
   {# AlpineJS #}
+  <script type="module">
+    import Fuse from 'https://cdn.jsdelivr.net/npm/fuse.js@7.5.0/dist/fuse.min.mjs';
+    window.Fuse = Fuse;
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script>
@@ -65,6 +69,41 @@
                   document.documentElement.classList.toggle("dark", this.current === "dark");
                   localStorage.setItem("theme", this.current);
               }
+          }));
+
+          Alpine.data("search", () => ({
+              open: false,
+              query: "",
+              results: [],
+              fuse: null,
+              showMobileSearch: false,
+
+              init() {
+                  fetch("/search_index.json")
+                      .then(r => r.json())
+                      .then(data => {
+                          this.fuse = new Fuse(data, {
+                              keys: [
+                                  { name: "title", weight: 3 },
+                                  { name: "description", weight: 1.5 },
+                                  { name: "body", weight: 0.5 },
+                              ],
+                              threshold: 0.4,
+                              distance: 200,
+                              minMatchCharLength: 2,
+                              includeScore: true,
+                              useTokenSearch: true,
+                          });
+                      });
+              },
+
+              search() {
+                  if (!this.query.trim() || !this.fuse) {
+                      this.results = [];
+                      return;
+                  }
+                  this.results = this.fuse.search(this.query).slice(0, 10);
+              },
           }));
       });
   </script>
