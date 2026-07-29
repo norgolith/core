@@ -82,7 +82,7 @@ async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
         .prompt()
         .map_err(|e| miette!("Failed to get document description: {}", e))?;
     let authors = Text::new("Author(s):")
-        .with_default(username().as_str())
+        .with_default(username().into_diagnostic()?.as_str())
         .with_help_message("Document authors separated by comma")
         .with_placeholder("e.g. NTBBloodbath, Vhyrro")
         .prompt()

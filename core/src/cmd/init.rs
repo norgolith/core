@@ -5,7 +5,7 @@ use colored::Colorize;
 use comfy_table::modifiers::UTF8_SOLID_INNER_BORDERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, ContentArrangement, Table};
-use miette::{Result, bail, miette};
+use miette::{IntoDiagnostic, Result, bail, miette};
 use indoc::formatdoc;
 use inquire::Text;
 use tokio::fs;
@@ -17,6 +17,8 @@ async fn create_config(root: &str, root_url: &str, language: &str, title: &str) 
     debug!("Creating site configuration");
     let config_path = PathBuf::from(root).join("norgolith.toml");
     debug!(config_path = %config_path.display(), "Writing config file");
+
+    let author = whoami::username().into_diagnostic()?;
 
     let site_config = formatdoc!(
         r#"
@@ -48,7 +50,7 @@ async fn create_config(root: &str, root_url: &str, language: &str, title: &str) 
         root_url, // this is the default port
         language,
         title,
-        whoami::username()
+        author,
     );
 
     fs::write(config_path, site_config)
@@ -72,7 +74,7 @@ async fn create_index_norg(root: &str) -> Result<()> {
         "{}",
         format_args!(
             include_str!("../resources/content/index.norg"),
-            username = whoami::username(),
+            username = whoami::username().expect("failed to get username"),
             created_at = creation_date,
             updated_at = creation_date
         )
