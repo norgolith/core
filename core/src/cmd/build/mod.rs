@@ -863,7 +863,7 @@ pub fn build(minify: bool) -> Result<()> {
                         if s.ends_with("index.html") {
                             format!("/{}", &s[..s.len() - 10])
                         } else {
-                            format!("/{}", &s)
+                            format!("/{}", s)
                         }
                     })
                     .unwrap_or_default();
