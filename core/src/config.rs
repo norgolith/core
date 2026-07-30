@@ -173,6 +173,10 @@ impl SiteConfig {
             );
         }
 
+        if let Some(schema) = &self.content_schema {
+            errors.extend(schema.validate_config());
+        }
+
         errors
     }
 }
