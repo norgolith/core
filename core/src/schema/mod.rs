@@ -135,7 +135,7 @@ impl ContentSchema {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FieldDefinition {
     String {
         max_length: Option<usize>,
