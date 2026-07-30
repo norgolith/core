@@ -254,6 +254,14 @@ impl FieldDefinition {
                 }
                 Ok(())
             }
+            (FieldDefinition::Object { schema }, toml::Value::Table(table)) => {
+                for (key, def) in schema {
+                    if let Some(val) = table.get(key) {
+                        def.validate(val, &format!("{}.{}", field_name, key))?;
+                    }
+                }
+                Ok(())
+            }
             _ => Err(ValidationError::TypeMismatch {
                 field: field_name.to_string(),
                 expected: self.type_name(),
