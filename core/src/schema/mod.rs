@@ -132,6 +132,20 @@ impl ContentSchema {
             acc
         })
     }
+
+    /// Validates config consistency: required fields must have matching field definitions
+    pub fn validate_config(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+        for field in &self.required {
+            if !self.fields.contains_key(field) {
+                errors.push(format!(
+                    "Required field '{}' has no matching [content_schema.fields.{}] section",
+                    field, field
+                ));
+            }
+        }
+        errors
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
