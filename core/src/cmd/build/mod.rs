@@ -251,15 +251,7 @@ fn build_contents(
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!(
-                    "{:?}",
-                    miette!(
-                        severity = Severity::Warning,
-                        help = "Fix the reported file and run the build again",
-                        "{:#}",
-                        e
-                    )
-                );
+                eprintln!("{:?}", e);
                 page_errors.push(e);
             }
         }
