@@ -13,10 +13,14 @@ pub enum ValidationError {
     #[diagnostic(
         code("norgolith::schema::missing_field"),
         url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-missing-field"),
-        help("Add the missing field '{}' to your content metadata", .0),
+        help("Add the missing field '{}' to your content metadata", field),
         severity(Error)
     )]
-    MissingField(String),
+    MissingField {
+        field: String,
+        #[label("missing field '{}'", field)]
+        span: Option<miette::SourceSpan>,
+    },
     #[diagnostic(
         code("norgolith::schema::type_mismatch"),
         url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-type-mismatch"),
@@ -56,7 +60,9 @@ impl std::error::Error for ValidationError {}
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingField(field) => write!(f, "{} '{}'", "Missing field".bold(), field.bold()),
+            Self::MissingField { field, .. } => {
+                write!(f, "{} '{}'", "Missing field".bold(), field.bold())
+            }
             Self::TypeMismatch {
                 field,
                 expected,
