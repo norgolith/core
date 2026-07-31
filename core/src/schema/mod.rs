@@ -862,4 +862,222 @@ mod tests {
             Err(ValidationError::RuleConditionFailed { .. })
         ));
     }
+
+    // FieldDefinition::Object
+
+    fn flat_object_schema() -> FieldDefinition {
+        FieldDefinition::Object {
+            schema: HashMap::from([
+                (
+                    "name".into(),
+                    FieldDefinition::String {
+                        min_length: None,
+                        max_length: None,
+                        pattern: None,
+                    },
+                ),
+                (
+                    "email".into(),
+                    FieldDefinition::String {
+                        min_length: None,
+                        max_length: None,
+                        pattern: None,
+                    },
+                ),
+            ]),
+        }
+    }
+
+    #[test]
+    fn object_valid_flat() {
+        let table = toml::Value::Table(
+            [("name".into(), toml::Value::String("Alice".into())),
+                ("email".into(), toml::Value::String("alice@example.com".into())),
+            ].into_iter().collect(),
+        );
+        assert!(flat_object_schema().validate(&table, "author").is_ok());
+    }
+
+    #[test]
+    fn object_partial_fields_ok() {
+        let table = toml::Value::Table(
+            [("name".into(), toml::Value::String("Alice".into()))]
+                .into_iter()
+                .collect(),
+        );
+        assert!(flat_object_schema().validate(&table, "author").is_ok());
+    }
+
+    #[test]
+    fn object_empty_ok() {
+        let table = toml::Value::Table(toml::map::Map::new());
+        assert!(flat_object_schema().validate(&table, "author").is_ok());
+    }
+
+    #[test]
+    fn object_child_type_mismatch() {
+        let table = toml::Value::Table(
+            [("name".into(), toml::Value::Integer(42))]
+                .into_iter()
+                .collect(),
+        );
+        let err = flat_object_schema()
+            .validate(&table, "author")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    #[test]
+    fn object_wrong_type_errors() {
+        let err = flat_object_schema()
+            .validate(&toml::Value::String("not an object".into()), "author")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    // FieldDefinition::Integer
+
+    #[test]
+    fn integer_valid() {
+        let def = FieldDefinition::Integer {
+            min: None,
+            max: None,
+        };
+        assert!(def.validate(&toml::Value::Integer(42), "count").is_ok());
+    }
+
+    #[test]
+    fn integer_within_range_ok() {
+        let def = FieldDefinition::Integer {
+            min: Some(1),
+            max: Some(100),
+        };
+        assert!(def.validate(&toml::Value::Integer(50), "count").is_ok());
+    }
+
+    #[test]
+    fn integer_below_min() {
+        let def = FieldDefinition::Integer {
+            min: Some(10),
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::Integer(5), "count")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn integer_above_max() {
+        let def = FieldDefinition::Integer {
+            min: None,
+            max: Some(10),
+        };
+        let err = def
+            .validate(&toml::Value::Integer(42), "count")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn integer_wrong_type_errors() {
+        let def = FieldDefinition::Integer {
+            min: None,
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::String("42".into()), "count")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    // FieldDefinition::Float
+
+    #[test]
+    fn float_valid() {
+        let def = FieldDefinition::Float {
+            min: None,
+            max: None,
+        };
+        assert!(def.validate(&toml::Value::Float(3.14), "pi").is_ok());
+    }
+
+    #[test]
+    fn float_within_range_ok() {
+        let def = FieldDefinition::Float {
+            min: Some(0.0),
+            max: Some(1.0),
+        };
+        assert!(def.validate(&toml::Value::Float(0.5), "pct").is_ok());
+    }
+
+    #[test]
+    fn float_below_min() {
+        let def = FieldDefinition::Float {
+            min: Some(0.0),
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::Float(-1.0), "pct")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn float_above_max() {
+        let def = FieldDefinition::Float {
+            min: None,
+            max: Some(1.0),
+        };
+        let err = def
+            .validate(&toml::Value::Float(42.0), "pct")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn float_wrong_type_errors() {
+        let def = FieldDefinition::Float {
+            min: None,
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::String("3.14".into()), "pi")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    // ContentSchema serde round-trip
+
+    #[test]
+    fn content_schema_toml_roundtrip() {
+        let toml_str = r#"
+required = ["title", "author"]
+
+[fields.title]
+type = "string"
+max_length = 120
+
+[fields.count]
+type = "integer"
+min = 0
+
+[fields.ratio]
+type = "float"
+min = 0.0
+max = 1.0
+
+[fields.draft]
+type = "boolean"
+
+[fields.author]
+type = "object"
+schema = { name = { type = "string" }, email = { type = "string" } }
+"#;
+        let schema: ContentSchema = toml::from_str(toml_str).unwrap();
+        let restored: ContentSchema = toml::from_str(&toml::to_string(&schema).unwrap()).unwrap();
+
+        assert_eq!(schema.required, restored.required);
+        assert_eq!(schema.fields.len(), restored.fields.len());
+    }
 }
