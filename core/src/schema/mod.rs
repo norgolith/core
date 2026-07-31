@@ -2,7 +2,7 @@ use colored::Colorize;
 use miette::{Diagnostic, Severity, miette};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 mod validator;
 
@@ -12,12 +12,14 @@ pub use validator::validate_metadata;
 pub enum ValidationError {
     #[diagnostic(
         code("norgolith::schema::missing_field"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-missing-field"),
         help("Add the missing field '{}' to your content metadata", .0),
         severity(Error)
     )]
     MissingField(String),
     #[diagnostic(
         code("norgolith::schema::type_mismatch"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-type-mismatch"),
         help("Change field '{}' to expected type {}", field, expected),
         severity(Error)
     )]
@@ -25,15 +27,24 @@ pub enum ValidationError {
         field: String,
         expected: String,
         actual: String,
+        #[label("expected {}, got {}", expected, actual)]
+        span: Option<miette::SourceSpan>,
     },
     #[diagnostic(
         code("norgolith::schema::constraint_violation"),
-        help("Review the field constraints: {}", message),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-constraint-violation"),
+        help("{}", message),
         severity(Error)
     )]
-    ConstraintViolation { field: String, message: String },
+    ConstraintViolation {
+        field: String,
+        message: String,
+        #[label("{}", message)]
+        span: Option<miette::SourceSpan>,
+    },
     #[diagnostic(
         code("norgolith::schema::rule_condition"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-rule-condition"),
         help("{}", message),
         severity(Warning)
     )]
@@ -50,6 +61,7 @@ impl std::fmt::Display for ValidationError {
                 field,
                 expected,
                 actual,
+                ..
             } => write!(
                 f,
                 "{} '{}': expected {}, got {}",
@@ -58,7 +70,7 @@ impl std::fmt::Display for ValidationError {
                 expected.bold(),
                 actual.bold()
             ),
-            Self::ConstraintViolation { field, message } => {
+            Self::ConstraintViolation { field, message, .. } => {
                 write!(
                     f,
                     "{} '{}': {}",
@@ -209,6 +221,7 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Below minimum length {}", min),
+                        span: None,
                     });
                 }
                 if let Some(max) = max_length
@@ -217,6 +230,7 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds max length {}", max),
+                        span: None,
                     });
                 }
                 if let Some(pattern) = pattern {
@@ -226,6 +240,7 @@ impl FieldDefinition {
                             return Err(ValidationError::ConstraintViolation {
                                 field: field_name.to_string(),
                                 message: format!("Invalid regex pattern: {}", pattern),
+                                span: None,
                             });
                         }
                     };
@@ -233,6 +248,7 @@ impl FieldDefinition {
                         return Err(ValidationError::ConstraintViolation {
                             field: field_name.to_string(),
                             message: format!("No pattern matching {}", pattern),
+                            span: None,
                         });
                     }
                 }
@@ -243,12 +259,14 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Below minimum value {}", min),
+                        span: None,
                     });
                 }
                 if let Some(max) = max && *n > *max {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds maximum value {}", max),
+                        span: None,
                     });
                 }
                 Ok(())
@@ -258,12 +276,14 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Below minimum value {}", min),
+                        span: None,
                     });
                 }
                 if let Some(max) = max && *n > *max {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds maximum value {}", max),
+                        span: None,
                     });
                 }
                 Ok(())
@@ -283,6 +303,7 @@ impl FieldDefinition {
                             return Err(ValidationError::ConstraintViolation {
                                 field: field_name.to_string(),
                                 message: format!("Missing value {}", required),
+                                span: None,
                             });
                         }
                     }
@@ -293,6 +314,7 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Must contain at least {} value(s)", *min),
+                        span: None,
                     });
                 }
                 if let Some(max) = max_items
@@ -301,6 +323,7 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds values limit (expected {} value(s))", *max),
+                        span: None,
                     });
                 }
                 for (i, item) in arr.iter().enumerate() {
@@ -314,6 +337,7 @@ impl FieldDefinition {
                         field: field_name.to_string(),
                         expected: self.type_name(),
                         actual: value.to_string(),
+                        span: None,
                     });
                 }
                 Ok(())
@@ -330,6 +354,7 @@ impl FieldDefinition {
                 field: field_name.to_string(),
                 expected: self.type_name(),
                 actual: value.to_string(),
+                span: None,
             }),
         }
     }

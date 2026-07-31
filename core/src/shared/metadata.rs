@@ -7,7 +7,75 @@ use walkdir::WalkDir;
 
 use crate::config::CollectionConfig;
 use crate::converter;
-use crate::schema::{ContentSchema, ValidationErrors, validate_metadata};
+use crate::schema::{ContentSchema, ValidationError, ValidationErrors, validate_metadata};
+
+fn find_field_span(content: &str, field: &str) -> Option<miette::SourceSpan> {
+    let meta_start = content.find("@document.meta")?;
+    let block_start_rel = meta_start + "@document.meta".len();
+    let block = &content[block_start_rel..];
+    let block_end_rel = block.find("@end")?;
+    let meta_block = &block[..block_end_rel];
+
+    let key = format!("{}:", field);
+    let mut search_from = 0;
+    let key_rel = loop {
+        let found = meta_block[search_from..].find(&key)? + search_from;
+        let at_line_start = found == 0 || meta_block[..found].ends_with('\n');
+        if at_line_start {
+            break found;
+        }
+        search_from = found + key.len();
+    };
+    let value_start_rel = key_rel + key.len();
+    let value_end_rel = meta_block[value_start_rel..]
+        .find('\n')
+        .map(|i| value_start_rel + i)
+        .unwrap_or(meta_block.len());
+    let raw_value = &meta_block[value_start_rel..value_end_rel];
+    let value = raw_value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let leading_ws = raw_value.len() - raw_value.trim_start().len();
+
+    let start_byte = block_start_rel + value_start_rel + leading_ws;
+    Some(miette::SourceSpan::new(start_byte.into(), value.len()))
+}
+
+fn enrich_spans(errors: Vec<ValidationError>, content: &str) -> Vec<ValidationError> {
+    errors
+        .into_iter()
+        .map(|error| match error {
+            ValidationError::TypeMismatch {
+                field,
+                expected,
+                actual,
+                ..
+            } => {
+                let span = find_field_span(content, &field);
+                ValidationError::TypeMismatch {
+                    field,
+                    expected,
+                    actual,
+                    span,
+                }
+            }
+            ValidationError::ConstraintViolation {
+                field,
+                message,
+                ..
+            } => {
+                let span = find_field_span(content, &field);
+                ValidationError::ConstraintViolation {
+                    field,
+                    message,
+                    span,
+                }
+            }
+            other => other,
+        })
+        .collect()
+}
 
 /// Computes the permalink for a content file based on its relative path.
 fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
@@ -143,6 +211,7 @@ pub fn validate_content_metadata(
     let errors = validate_metadata(&metadata_map, &merged_schema);
 
     if !errors.is_empty() {
+        let errors = enrich_spans(errors, content);
         let source_name = if matched_path.is_empty() {
             path.display().to_string()
         } else {
@@ -252,4 +321,168 @@ pub fn collect_all_posts_metadata(
     });
 
     Ok(posts)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::schema::ValidationError;
+
+    use super::{enrich_spans, find_field_span};
+
+    fn meta_doc(fields: &str) -> String {
+        format!("some content\n@document.meta\n{}\n@end\nrest", fields)
+    }
+
+    #[test]
+    fn finds_simple_field_value_span() {
+        let content = meta_doc("title: Hello World\nauthor: Alice");
+        let span = find_field_span(&content, "title").unwrap();
+        let expected_start = content.find("Hello World").unwrap();
+        assert_eq!(span.offset(), expected_start);
+        assert_eq!(span.len(), "Hello World".len());
+    }
+
+    #[test]
+    fn span_points_to_value_not_key() {
+        let content = meta_doc("title: My Post");
+        let span = find_field_span(&content, "title").unwrap();
+        let expected = content.find("My Post").unwrap();
+        assert_eq!(span.offset(), expected);
+        assert_eq!(span.len(), "My Post".len());
+    }
+
+    #[test]
+    fn finds_field_at_end_of_meta_block() {
+        let content = meta_doc("title: My Post\nversion: 1.0");
+        let span = find_field_span(&content, "version").unwrap();
+        let expected = content.find("1.0").unwrap();
+        assert_eq!(span.offset(), expected);
+        assert_eq!(span.len(), 3);
+    }
+
+    #[test]
+    fn missing_field_returns_none() {
+        let content = meta_doc("title: My Post");
+        assert!(find_field_span(&content, "author").is_none());
+    }
+
+    #[test]
+    fn no_meta_block_returns_none() {
+        let content = "just a plain norg file without metadata";
+        assert!(find_field_span(&content, "title").is_none());
+    }
+
+    #[test]
+    fn open_meta_block_without_end_returns_none() {
+        let content = "@document.meta\ntitle: My Post\n";
+        assert!(find_field_span(&content, "title").is_none());
+    }
+
+    #[test]
+    fn does_not_match_field_name_inside_string_value() {
+        let content = meta_doc("title: \"talks about author: X\"\nauthor: Alice");
+        let span = find_field_span(&content, "author").unwrap();
+        let expected = content.rfind("Alice").unwrap();
+        assert_eq!(span.offset(), expected);
+    }
+
+    #[test]
+    fn nested_field_dot_path_returns_none() {
+        let content = meta_doc("author:\n  name: Alice");
+        assert!(find_field_span(&content, "author.name").is_none());
+    }
+
+    #[test]
+    fn empty_value_returns_none() {
+        let content = meta_doc("title:\nauthor: Alice");
+        assert!(find_field_span(&content, "title").is_none());
+    }
+
+    #[test]
+    fn enrich_spans_sets_span_for_constraint_violation() {
+        let content = meta_doc("title: This title is way too long");
+        let errors = vec![ValidationError::ConstraintViolation {
+            field: "title".into(),
+            message: "Exceeds max length 5".into(),
+            span: None,
+        }];
+        let enriched = enrich_spans(errors, &content);
+        match &enriched[0] {
+            ValidationError::ConstraintViolation { span, .. } => {
+                let span = span.as_ref().unwrap();
+                assert_eq!(span.offset(), content.find("This title").unwrap());
+            }
+            _ => panic!("expected constraint violation"),
+        }
+    }
+
+    #[test]
+    fn enrich_spans_sets_span_for_type_mismatch() {
+        let content = meta_doc("version: 1.0");
+        let errors = vec![ValidationError::TypeMismatch {
+            field: "version".into(),
+            expected: "string".into(),
+            actual: "1.0".into(),
+            span: None,
+        }];
+        let enriched = enrich_spans(errors, &content);
+        match &enriched[0] {
+            ValidationError::TypeMismatch { span, .. } => {
+                let span = span.as_ref().unwrap();
+                assert_eq!(span.offset(), content.find("1.0").unwrap());
+            }
+            _ => panic!("expected type mismatch"),
+        }
+    }
+
+    #[test]
+    fn enrich_spans_leaves_missing_field_untouched() {
+        let errors = vec![ValidationError::MissingField("author".into())];
+        let enriched = enrich_spans(errors, &meta_doc("title: My Post"));
+        assert!(matches!(&enriched[0], ValidationError::MissingField(f) if f == "author"));
+    }
+
+    #[test]
+    fn enrich_spans_keeps_span_none_when_field_not_found() {
+        let content = meta_doc("title: My Post");
+        let errors = vec![ValidationError::ConstraintViolation {
+            field: "author".into(),
+            message: "Exceeds max length 5".into(),
+            span: None,
+        }];
+        let enriched = enrich_spans(errors, &content);
+        match &enriched[0] {
+            ValidationError::ConstraintViolation { span, .. } => assert!(span.is_none()),
+            _ => panic!("expected constraint violation"),
+        }
+    }
+
+    #[test]
+    fn miette_report_renders_source_label() {
+        let content = "@document.meta\ntitle: A very long title here\n@end";
+        let errors = enrich_spans(
+            vec![ValidationError::ConstraintViolation {
+                field: "title".into(),
+                message: "Exceeds max length 12".into(),
+                span: None,
+            }],
+            content,
+        );
+        let report = miette::Report::new(crate::schema::ValidationErrors(errors))
+            .with_source_code(miette::NamedSource::new("test.norg", content.to_string()));
+        let mut out = String::new();
+        miette::GraphicalReportHandler::new()
+            .render_report(&mut out, report.as_ref())
+            .unwrap();
+        assert!(
+            out.contains("Exceeds max length 12"),
+            "label text missing in rendered output:\n{}",
+            out
+        );
+        assert!(
+            out.contains("A very long title"),
+            "source line missing in rendered output:\n{}",
+            out
+        );
+    }
 }

@@ -207,9 +207,9 @@ Norgolith content schemas system allows you to define and enforce structure and 
      - *Fix*: Add the missing field to the document's `@document.meta` block.
 
 **** `norgolith::schema::type_mismatch`
-     - *Variant*: `TypeMismatch { field, expected, actual }`
-     - *Severity*: Error
-     - *Description*: Metadata field value does not match the type declared in the schema (string, integer, float, boolean, array, object).
+    - *Variant*: `TypeMismatch { field, expected, actual, span }`
+    - *Severity*: Error
+    - *Description*: Metadata field value does not match the type declared in the schema (string, integer, float, boolean, array, object). The `span` (byte offset of the field value in the source) drives the source label rendered by miette.
      - *Example message*:
        @code text
        Type mismatch for field 'version': expected string, got number
@@ -217,9 +217,9 @@ Norgolith content schemas system allows you to define and enforce structure and 
      - *Fix*: Change the field value to match the expected type, or update the schema's field definition.
 
 **** `norgolith::schema::constraint_violation`
-     - *Variant*: `ConstraintViolation { field, message }`
-     - *Severity*: Error
-     - *Description*: Value passes type checking but violates a field constraint — min/max length for strings, min/max for integer/float, regex pattern, array item bounds, etc.
+    - *Variant*: `ConstraintViolation { field, message, span }`
+    - *Severity*: Error
+    - *Description*: Value passes type checking but violates a field constraint — min/max length for strings, min/max for integer/float, regex pattern, array item bounds, etc. The `span` (byte offset of the field value in the source) drives the source label rendered by miette.
      - *Example message*:
        @code text
        Constraint violation for field 'title': Exceeds max length 12
