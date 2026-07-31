@@ -398,32 +398,7 @@ pub struct RuleAction {
     pub fields: Option<HashMap<String, FieldDefinition>>,
 }
 
-pub fn format_errors(
-    file_path: &Path,
-    schema_path: &str,
-    errors: &[ValidationError],
-    as_warnings: bool,
-) -> String {
-    let mut output = format!(
-        "{} '{}'\n",
-        format!(
-            "Validation {} for",
-            if as_warnings { "issues" } else { "failed" }
-        )
-        .bold(),
-        file_path.display()
-    );
-    output.push_str(&format!(
-        "  {} {}: '{}'\n",
-        "→".blue(),
-        "Schema applied".bold(),
-        schema_path
-    ));
-    for error in errors {
-        output.push_str(&format!("  {} {}\n", "→".blue(), error));
-    }
-    output
-}
+
 
 #[cfg(test)]
 mod tests {
