@@ -152,6 +152,7 @@ impl ContentSchema {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FieldDefinition {
     String {
+        min_length: Option<usize>,
         max_length: Option<usize>,
         pattern: Option<String>, // Regex patterns
     },
@@ -180,11 +181,20 @@ impl FieldDefinition {
         match (self, value) {
             (
                 FieldDefinition::String {
+                    min_length,
                     max_length,
                     pattern,
                 },
                 toml::Value::String(s),
             ) => {
+                if let Some(min) = min_length
+                    && s.len() < *min
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Below minimum length {}", min),
+                    });
+                }
                 if let Some(max) = max_length
                     && s.len() > *max
                 {
@@ -428,6 +438,7 @@ mod tests {
     #[test]
     fn string_valid() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: None,
         };
@@ -440,6 +451,7 @@ mod tests {
     #[test]
     fn string_within_max_length_ok() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: Some(10),
             pattern: None,
         };
@@ -452,6 +464,7 @@ mod tests {
     #[test]
     fn string_at_exact_max_length_ok() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: Some(5),
             pattern: None,
         };
@@ -464,6 +477,7 @@ mod tests {
     #[test]
     fn string_exceeds_max_length() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: Some(3),
             pattern: None,
         };
@@ -476,6 +490,7 @@ mod tests {
     #[test]
     fn string_matching_pattern_ok() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: Some(r"^\d+$".into()),
         };
@@ -488,6 +503,7 @@ mod tests {
     #[test]
     fn string_non_matching_pattern_errors() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: Some(r"^\d+$".into()),
         };
@@ -500,6 +516,7 @@ mod tests {
     #[test]
     fn string_wrong_type_errors() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: None,
         };
@@ -543,7 +560,8 @@ mod tests {
     fn array_valid_no_constraints() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: None,
@@ -557,7 +575,8 @@ mod tests {
     fn array_min_items_exactly_satisfied() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: Some(2),
@@ -571,7 +590,8 @@ mod tests {
     fn array_min_items_violated() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: Some(3),
@@ -586,7 +606,8 @@ mod tests {
     fn array_max_items_exactly_satisfied() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: None,
@@ -600,7 +621,8 @@ mod tests {
     fn array_max_items_violated() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: None,
@@ -617,7 +639,8 @@ mod tests {
     fn array_must_contain_present_ok() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: None,
@@ -634,7 +657,8 @@ mod tests {
     fn array_must_contain_absent_errors() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: None,
@@ -665,7 +689,8 @@ mod tests {
     fn array_item_type_mismatch_errors() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
             }),
             min_items: None,
@@ -684,7 +709,8 @@ mod tests {
     fn array_item_string_pattern_validates() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: Some(r"^\d+$".into()),
             }),
             min_items: None,
@@ -765,7 +791,8 @@ mod tests {
         a.fields.insert(
             "title".into(),
             FieldDefinition::String {
-                max_length: Some(50),
+            min_length: None,
+            max_length: Some(50),
                 pattern: None,
             },
         );
@@ -773,7 +800,8 @@ mod tests {
         b.fields.insert(
             "title".into(),
             FieldDefinition::String {
-                max_length: Some(120),
+            min_length: None,
+            max_length: Some(120),
                 pattern: None,
             },
         );

@@ -129,7 +129,8 @@ mod tests {
         merged.fields.insert(
             "title".into(),
             FieldDefinition::String {
-                max_length: Some(5),
+            min_length: None,
+            max_length: Some(5),
                 pattern: None,
             },
         );
