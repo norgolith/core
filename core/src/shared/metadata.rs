@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use miette::{Result, Severity, miette};
+use miette::{NamedSource, Result, Severity, miette};
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
 use crate::config::CollectionConfig;
 use crate::converter;
-use crate::schema::{ContentSchema, ValidationErrors, format_errors, validate_metadata};
+use crate::schema::{ContentSchema, ValidationErrors, validate_metadata};
 
 /// Computes the permalink for a content file based on its relative path.
 fn compute_permalink(rel_path: &Path, routes_url: &str) -> String {
@@ -101,22 +101,22 @@ pub fn extract_metadata_from_content(
 /// # Arguments
 /// * `content_dir` - The content directory.
 /// * `path` - The path to the content file.
+/// * `content` - The raw file content (for miette source snippets).
+/// * `metadata` - The parsed metadata to validate.
 /// * `schema` - The schema to validate the metadata against.
 /// * `as_warnings` - Whether to format errors as warnings or errors.
-///
-/// # Returns
-/// * `Result<String>` - Empty String if the validation did not find any error, an String containing all the errors otherwise.
 pub fn validate_content_metadata(
     content_dir: &Path,
     path: &Path,
+    content: &str,
     metadata: &toml::Value,
     schema: &ContentSchema,
     as_warnings: bool,
-) -> Result<String> {
+) -> Result<()> {
     let relative_path = path
         .strip_prefix(content_dir)
         .map_err(|e| miette!("Path {} is not under content_dir: {}", path.display(), e))?;
-    // We do not need to do anything with the metadata permalink here so we pass an empty string to it
+
     let metadata_map = metadata
         .as_table()
         .ok_or_else(|| miette!("Metadata for {} is not a table", path.display()))?
@@ -136,12 +136,15 @@ pub fn validate_content_metadata(
     let errors = validate_metadata(&metadata_map, &merged_schema);
 
     if !errors.is_empty() {
+        let report = miette::Report::new(ValidationErrors(errors))
+            .with_source_code(NamedSource::new(path.display().to_string(), content.to_string()));
         if as_warnings {
-            return Ok(format_errors(path, &content_path, &errors, as_warnings));
+            eprintln!("{:?}", report);
+            return Ok(());
         }
-        return Err(miette::Report::new(ValidationErrors(errors)));
+        return Err(report);
     }
-    Ok(String::new())
+    Ok(())
 }
 
 /// Collects all unique categories from post metadata
