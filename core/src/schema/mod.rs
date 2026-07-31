@@ -155,6 +155,14 @@ pub enum FieldDefinition {
         max_length: Option<usize>,
         pattern: Option<String>, // Regex patterns
     },
+    Integer {
+        min: Option<i64>,
+        max: Option<i64>,
+    },
+    Float {
+        min: Option<f64>,
+        max: Option<f64>,
+    },
     Array {
         items: Box<FieldDefinition>,
         min_items: Option<usize>,
@@ -201,6 +209,36 @@ impl FieldDefinition {
                             message: format!("No pattern matching {}", pattern),
                         });
                     }
+                }
+                Ok(())
+            }
+            (FieldDefinition::Integer { min, max }, toml::Value::Integer(n)) => {
+                if let Some(min) = min && *n < *min {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Below minimum value {}", min),
+                    });
+                }
+                if let Some(max) = max && *n > *max {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Exceeds maximum value {}", max),
+                    });
+                }
+                Ok(())
+            }
+            (FieldDefinition::Float { min, max }, toml::Value::Float(n)) => {
+                if let Some(min) = min && *n < *min {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Below minimum value {}", min),
+                    });
+                }
+                if let Some(max) = max && *n > *max {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Exceeds maximum value {}", max),
+                    });
                 }
                 Ok(())
             }
@@ -273,6 +311,8 @@ impl FieldDefinition {
     fn type_name(&self) -> String {
         match self {
             FieldDefinition::String { .. } => "string",
+            FieldDefinition::Integer { .. } => "integer",
+            FieldDefinition::Float { .. } => "float",
             FieldDefinition::Array { .. } => "array",
             FieldDefinition::Boolean => "boolean",
             FieldDefinition::Object { .. } => "object",
