@@ -133,11 +133,23 @@ pub fn validate_content_metadata(
 
     let schema_nodes = schema.resolve_path(&content_path);
     let merged_schema = ContentSchema::merge_hierarchy(&schema_nodes);
+
+    let matched_path = content_path
+        .split('/')
+        .take(schema_nodes.len() - 1)
+        .collect::<Vec<_>>()
+        .join("/");
+
     let errors = validate_metadata(&metadata_map, &merged_schema);
 
     if !errors.is_empty() {
+        let source_name = if matched_path.is_empty() {
+            path.display().to_string()
+        } else {
+            format!("{} (schema: '{}')", path.display(), matched_path)
+        };
         let report = miette::Report::new(ValidationErrors(errors))
-            .with_source_code(NamedSource::new(path.display().to_string(), content.to_string()));
+            .with_source_code(NamedSource::new(source_name, content.to_string()));
         if as_warnings {
             eprintln!("{:?}", report);
             return Ok(());
