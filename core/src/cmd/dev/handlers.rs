@@ -249,6 +249,21 @@ async fn handle_norg_content(path: PathBuf, state: Arc<ServerState>) -> Result<R
         return handle_not_found(&state);
     }
 
+    // Schema validation as warnings (non-fatal in dev server)
+    {
+        let config = state.config.read().await;
+        if let Some(schema) = &config.content_schema {
+            let _ = shared::validate_content_metadata(
+                &state.paths.content,
+                &path,
+                &content,
+                &metadata,
+                schema,
+                true,
+            );
+        }
+    }
+
     let cache_key = rel_path.with_extension("");
     let metadata = {
         let cache_guard = state.cache.read().await;
