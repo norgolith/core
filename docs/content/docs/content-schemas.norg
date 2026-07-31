@@ -156,11 +156,18 @@ Norgolith content schemas system allows you to define and enforce structure and 
     [content_schema.fields.author]
     type = "string"
 
+    [content_schema.fields.version]
+    type = "string"
+
+    [content_schema.fields.word_count]
+    type = "integer"
+
     [content_schema.posts.rules]
     if = { draft = false }
     then = { required = ["publish_date"] }
     @end
 
+    This schema validates the `version` string and the numeric `word_count` for every blog post.
 *** Example 2: Project Documentation Schema
     @code toml
     [content_schema]
