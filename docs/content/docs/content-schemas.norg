@@ -190,19 +190,48 @@ Norgolith content schemas system allows you to define and enforce structure and 
    → Constraint violation for field 'title': Exceeds max length 12
    @end
 
-*** Common Errors and Fixes
-**** Missing Required Field
-     - *Error*: `Missing field 'title'`.
-     - *Fix*: Add the missing field to your metadata.
+*** Error Code Reference
+    Norgolith schema validation uses structured error codes. Each error has a unique miette diagnostic code, a severity level, and a machine-readable field payload.
 
-**** Type Mismatch
-     - *Error*: `Type mismatch for field 'version': expected string, got number`.
-     - *Fix*: Ensure the field value matches the expected type.
+    +html.class text-base-alt mt-12 lg:mt-14
+    ___
 
-**** Constraint Violation
-     - *Error*: `Constraint violation for field 'title': Exceeds max length 12`.
-     - *Fix*: Shorten the field value to meet the constraint.
+**** `norgolith::schema::missing_field`
+     - *Variant*: `MissingField(String)`
+     - *Severity*: Error
+     - *Description*: A field declared as required in the content schema is absent from the document metadata.
+     - *Example message*:
+       @code text
+       Missing field 'publish_date'
+       @end
+     - *Fix*: Add the missing field to the document's `@document.meta` block.
 
-**** Rule Condition Failed
-     - *Error*: `Rule condition failed: Missing condition field 'draft'`.
-     - *Fix*: Add the required condition field or update the rule.
+**** `norgolith::schema::type_mismatch`
+     - *Variant*: `TypeMismatch { field, expected, actual }`
+     - *Severity*: Error
+     - *Description*: Metadata field value does not match the type declared in the schema (string, integer, float, boolean, array, object).
+     - *Example message*:
+       @code text
+       Type mismatch for field 'version': expected string, got number
+       @end
+     - *Fix*: Change the field value to match the expected type, or update the schema's field definition.
+
+**** `norgolith::schema::constraint_violation`
+     - *Variant*: `ConstraintViolation { field, message }`
+     - *Severity*: Error
+     - *Description*: Value passes type checking but violates a field constraint — min/max length for strings, min/max for integer/float, regex pattern, array item bounds, etc.
+     - *Example message*:
+       @code text
+       Constraint violation for field 'title': Exceeds max length 12
+       @end
+     - *Fix*: Adjust the field value to satisfy the constraint, or relax the schema definition.
+
+**** `norgolith::schema::rule_condition`
+     - *Variant*: `RuleConditionFailed { message }`
+     - *Severity*: Warning
+     - *Description*: A conditional validation rule's `if` condition could not be evaluated (missing condition field) or the `then` clause failed.
+     - *Example message*:
+       @code text
+       Rule condition failed: Missing condition field 'draft'
+       @end
+     - *Fix*: Ensure the condition field exists in the metadata, or update the rule definition.
