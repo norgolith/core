@@ -201,6 +201,18 @@ fn enrich_spans(
                     span,
                 }
             }
+            ValidationError::UnknownField {
+                field,
+                suggested,
+                ..
+            } => {
+                let span = spans.get(&field).copied();
+                ValidationError::UnknownField {
+                    field,
+                    suggested,
+                    span,
+                }
+            }
             other => other,
         })
         .collect()

@@ -313,3 +313,13 @@ Norgolith content schemas system allows you to define and enforce structure and 
        Rule condition failed: Missing condition field 'draft'
        @end
      - *Fix*: Ensure the condition field exists in the metadata, or update the rule definition.
+
+**** `norgolith::schema::unknown_field`
+     - *Variant*: `UnknownField { field, suggested, span }`
+     - *Severity*: Warning
+     - *Description*: A metadata field is not defined in the content schema, but its name matches a defined field once casing and separators (`-`, `_`) are ignored. Likely a typo or kebab-case/snake-case drift, e.g. metadata `project-version` vs schema `project_version`.
+     - *Example message*:
+       @code text
+       Unknown field 'project-version' (did you mean 'project_version'?)
+       @end
+     - *Fix*: Rename the metadata field to match the schema, or add it to the schema if it is intentional. Metadata keys are matched exactly and case-sensitively.

@@ -53,6 +53,18 @@ pub enum ValidationError {
         severity(Warning)
     )]
     RuleConditionFailed { message: String },
+    #[diagnostic(
+        code("norgolith::schema::unknown_field"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-unknown-field"),
+        help("Field '{}' is not defined in the content schema{}", field, suggested.as_ref().map(|s| format!("; did you mean '{}'?", s)).unwrap_or_default()),
+        severity(Warning)
+    )]
+    UnknownField {
+        field: String,
+        suggested: Option<String>,
+        #[label("unknown field '{}'{}", field, suggested.as_ref().map(|s| format!(" (did you mean '{}'?)", s)).unwrap_or_default())]
+        span: Option<miette::SourceSpan>,
+    },
 }
 
 impl std::error::Error for ValidationError {}
@@ -88,6 +100,16 @@ impl std::fmt::Display for ValidationError {
             Self::RuleConditionFailed { message } => {
                 write!(f, "{}: {}", "Rule condition failed".bold(), message)
             }
+            Self::UnknownField { field, suggested, .. } => match suggested {
+                Some(s) => write!(
+                    f,
+                    "{} '{}' (did you mean '{}'?)",
+                    "Unknown field".bold(),
+                    field.bold(),
+                    s.bold()
+                ),
+                None => write!(f, "{} '{}'", "Unknown field".bold(), field.bold()),
+            },
         }
     }
 }
