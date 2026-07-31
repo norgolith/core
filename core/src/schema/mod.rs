@@ -125,7 +125,6 @@ pub struct MergedSchema {
 }
 
 impl ContentSchema {
-    /// Resolves schema hierarchy for a content path
     pub fn resolve_path<'a>(&'a self, content_path: &str) -> Vec<&'a ContentSchema> {
         let mut nodes = vec![self];
         let mut current = self;
@@ -135,6 +134,14 @@ impl ContentSchema {
             if let Some(child) = current.paths.get(component) {
                 nodes.push(child);
                 current = child;
+            } else if let Some(child) = current.paths.get("*") {
+                nodes.push(child);
+                current = child;
+            } else if let Some(child) = current.paths.get("**") {
+                nodes.push(child);
+                break;
+            } else {
+                break;
             }
         }
 
@@ -786,6 +793,81 @@ mod tests {
             .insert("posts".into(), Box::new(bare_schema(&["category"])));
         // "posts" matches, "2025" has no child entry under posts
         let nodes = schema.resolve_path("posts/2025/my-post");
+        assert_eq!(nodes.len(), 2);
+    }
+
+    #[test]
+    fn resolve_path_star_matches_single_component() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("*".into(), Box::new(bare_schema(&["year"])));
+        let nodes = schema.resolve_path("posts/2025/my-post");
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes[2].required.contains(&"year".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_double_star_matches_any_depth() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("**".into(), Box::new(bare_schema(&["year"])));
+        let nodes = schema.resolve_path("posts/2025/01/my-post");
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes[2].required.contains(&"year".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_exact_takes_precedence_over_star() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("*".into(), Box::new(bare_schema(&["year"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("2025".into(), Box::new(bare_schema(&["exact"])));
+        let nodes = schema.resolve_path("posts/2025/my-post");
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes[2].required.contains(&"exact".to_string()));
+        assert!(!nodes[2].required.contains(&"year".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_star_skips_unknown_component() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("2025".into(), Box::new(bare_schema(&["year"])));
+        // "2025" doesn't exist, so "*" would not match "2024/01"
+        let nodes = schema.resolve_path("posts/nope/my-post");
         assert_eq!(nodes.len(), 2);
     }
 

@@ -183,6 +183,21 @@ Norgolith content schemas system allows you to define and enforce structure and 
     - Posts require a `category` field.
     - Posts in `/posts/2023` require a `year` field.
 
+*** Wildcard Paths
+    Schema nodes can use `"*"` to match a single path component and `"**"` to match any number of remaining components. Precedence is exact match, then `"*"`, then `"**"`.
+
+    @code toml
+    # Applies to any single subdirectory under /posts (posts/2024, posts/2025, ...)
+    [content_schema.posts."*"]
+    required = ["publish_date"]
+
+    # Applies to everything under /docs at any depth (docs/rust, docs/rust/advanced, ...)
+    [content_schema.docs."**"]
+    required = ["reviewer"]
+    @end
+
+    Note: `*` and `**` are not valid bare TOML keys, so they must be quoted. Schemas apply by longest matching prefix: a schema node always inherits the rules of its ancestors, and rules for a deeper node never leak to its parents.
+
     +html.class text-base-alt mt-12 lg:mt-14
     ___
 
