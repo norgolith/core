@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 use crate::schema::{MergedSchema, ValidationError};
 
+fn normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(['-', '_'], "")
+}
+
 pub fn validate_metadata(
     metadata: &HashMap<String, toml::Value>,
     merged: &MergedSchema,
@@ -11,10 +15,10 @@ pub fn validate_metadata(
     // Check required fields
     for field in &merged.required {
         if !metadata.contains_key(field) {
-                            errors.push(ValidationError::MissingField {
-                                field: field.clone(),
-                                span: None,
-                            });
+            errors.push(ValidationError::MissingField {
+                field: field.clone(),
+                span: None,
+            });
         }
     }
 
@@ -30,6 +34,27 @@ pub fn validate_metadata(
         }
     }
 
+    // Warn on near-miss unknown fields (casing/separator drift, e.g.
+    // metadata `project-version` vs schema `project_version`)
+    for key in metadata.keys() {
+        if merged.fields.contains_key(key) {
+            continue;
+        }
+        let normalized = normalize_key(key);
+        let suggested = merged
+            .fields
+            .keys()
+            .find(|f| normalize_key(f) == normalized)
+            .cloned();
+        if let Some(suggested) = suggested {
+            errors.push(ValidationError::UnknownField {
+                field: key.clone(),
+                suggested: Some(suggested),
+                span: None,
+            });
+        }
+    }
+
     // Apply conditional rules
     for rule in &merged.rules {
         match rule.applies(metadata) {
@@ -37,10 +62,10 @@ pub fn validate_metadata(
                 if let Some(required) = &rule.then.required {
                     for field in required {
                         if !metadata.contains_key(field) {
-            errors.push(ValidationError::MissingField {
-                field: field.clone(),
-                span: None,
-            });
+                            errors.push(ValidationError::MissingField {
+                                field: field.clone(),
+                                span: None,
+                            });
                         }
                     }
                 }
@@ -158,6 +183,99 @@ mod tests {
         let merged = required_only(&[]);
         let errors = validate_metadata(
             &meta(&[("unknown_field", toml::Value::String("value".into()))]),
+            &merged,
+        );
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn near_miss_kebab_vs_snake_warns_with_suggestion() {
+        let mut merged = required_only(&[]);
+        merged.fields.insert(
+            "project_version".into(),
+            FieldDefinition::String {
+                min_length: None,
+                max_length: None,
+                pattern: None,
+            },
+        );
+        let errors = validate_metadata(
+            &meta(&[("project-version", toml::Value::String("1.0".into()))]),
+            &merged,
+        );
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            ValidationError::UnknownField { field, suggested: Some(s), .. }
+                if field == "project-version" && s == "project_version"
+        ));
+    }
+
+    #[test]
+    fn near_miss_case_mismatch_warns() {
+        let mut merged = required_only(&[]);
+        merged.fields.insert(
+            "title".into(),
+            FieldDefinition::String {
+                min_length: None,
+                max_length: None,
+                pattern: None,
+            },
+        );
+        let errors = validate_metadata(
+            &meta(&[("Title", toml::Value::String("My Post".into()))]),
+            &merged,
+        );
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            ValidationError::UnknownField { field, suggested, .. }
+                if field == "Title" && suggested.as_deref() == Some("title")
+        ));
+    }
+
+    #[test]
+    fn genuine_unknown_key_does_not_warn() {
+        let mut merged = required_only(&[]);
+        merged.fields.insert(
+            "title".into(),
+            FieldDefinition::String {
+                min_length: None,
+                max_length: None,
+                pattern: None,
+            },
+        );
+        let errors = validate_metadata(
+            &meta(&[("random", toml::Value::String("value".into()))]),
+            &merged,
+        );
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn defined_fields_do_not_warn() {
+        let mut merged = required_only(&[]);
+        merged.fields.insert(
+            "title".into(),
+            FieldDefinition::String {
+                min_length: None,
+                max_length: None,
+                pattern: None,
+            },
+        );
+        merged.fields.insert(
+            "author".into(),
+            FieldDefinition::String {
+                min_length: None,
+                max_length: None,
+                pattern: None,
+            },
+        );
+        let errors = validate_metadata(
+            &meta(&[
+                ("title", toml::Value::String("My Post".into())),
+                ("author", toml::Value::String("Alice".into())),
+            ]),
             &merged,
         );
         assert!(errors.is_empty());
