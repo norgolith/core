@@ -52,6 +52,7 @@ Norgolith content schemas system allows you to define and enforce structure and 
     - Validates text fields.
 
 **** Options
+     - `min_length`: Minimum allowed characters.
      - `max_length`: Maximum allowed characters.
      - `pattern`: Regex pattern for validation.
 
@@ -61,6 +62,35 @@ Norgolith content schemas system allows you to define and enforce structure and 
      type = "string"
      max_length = 100
      pattern = "^[A-Z].*"  # Must start with uppercase letter
+     @end
+
+*** Integer
+    - Validates whole numbers.
+
+**** Options
+     - `min`: Minimum value.
+     - `max`: Maximum value.
+
+**** Example
+     @code toml
+     [content_schema.fields.word_count]
+     type = "integer"
+     min = 100
+     @end
+
+*** Float
+    - Validates decimal numbers.
+
+**** Options
+     - `min`: Minimum value.
+     - `max`: Maximum value.
+
+**** Example
+     @code toml
+     [content_schema.fields.rating]
+     type = "float"
+     min = 0.0
+     max = 5.0
      @end
 
 *** Boolean
@@ -115,6 +145,19 @@ Norgolith content schemas system allows you to define and enforce structure and 
     @end
 
     This rule ensures that if `draft` is `false`, the `publish_date` field must be present in any `posts/` file.
+
+    The `then` action supports two clauses:
+    - `required`: Fields that must be present when the condition matches.
+    - `fields`: Additional field definitions enforced when the condition matches, using the same options as `[content_schema.fields.*]`.
+
+*** Example: `then.fields`
+    @code toml
+    [content_schema.posts.rules]
+    if = { featured = true }  # Condition
+    then = { fields = { hero_image = { type = "string", min_length = 10 } } }  # Action
+    @end
+
+    When `featured` is `true`, the `hero_image` field must exist and be a string of at least 10 characters in any `posts/` file.
 
 ** Schema Inheritance
    Schemas can inherit and extend rules based on content paths. For example, rules for `/posts` can extend global rules, and `/posts/2023` can further extend `/posts`.
@@ -192,10 +235,23 @@ Norgolith content schemas system allows you to define and enforce structure and 
    Norgolith will show you validation issues by default in the following format, either as errors when trying to build the site or as warnings during the development server:
 
    @code bash
-   11:58 AM 2025-03-01 ERROR Validation failed for '/home/amartin/Develop/Rust/norgolith/my-site/content/index.norg'
-   → Schema applied: 'index'
-   → Constraint violation for field 'title': Exceeds max length 12
+   × Schema validation failed (2 errors)
+   help: Fix the listed metadata field(s) and rebuild
+
+   Error: norgolith::schema::constraint_violation (https://norgolith.dev/docs/content-schemas/#norgolith-schema-constraint-violation)
+
+   × Constraint violation for field 'title': Exceeds max length 12
+    ╭─[ content/posts/hello.norg:2:8 ]
+   1 │ @document.meta
+   2 │ title: A Very Long Title That Exceeds Maximum Length
+    ·        ────────────────┬────────────────
+    ·                        ╰── Exceeds max length 12
+   3 │ author: alice
+     ╰────
+   help: Exceeds max length 12
    @end
+
+   Each error identifies the offending file and line, highlights the value that failed, and links to the matching error code reference below.
 
 *** Error Code Reference
     Norgolith schema validation uses structured error codes. Each error has a unique miette diagnostic code, a severity level, and a machine-readable field payload.
