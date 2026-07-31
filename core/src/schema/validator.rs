@@ -11,7 +11,10 @@ pub fn validate_metadata(
     // Check required fields
     for field in &merged.required {
         if !metadata.contains_key(field) {
-            errors.push(ValidationError::MissingField(field.clone()));
+                            errors.push(ValidationError::MissingField {
+                                field: field.clone(),
+                                span: None,
+                            });
         }
     }
 
@@ -34,7 +37,10 @@ pub fn validate_metadata(
                 if let Some(required) = &rule.then.required {
                     for field in required {
                         if !metadata.contains_key(field) {
-                            errors.push(ValidationError::MissingField(field.clone()));
+            errors.push(ValidationError::MissingField {
+                field: field.clone(),
+                span: None,
+            });
                         }
                     }
                 }
@@ -79,7 +85,7 @@ mod tests {
         let merged = required_only(&["title"]);
         let errors = validate_metadata(&meta(&[]), &merged);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], ValidationError::MissingField(f) if f == "title"));
+        assert!(matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "title"));
     }
 
     #[test]
@@ -172,7 +178,7 @@ mod tests {
         // draft = false and publish_date absent → error expected
         let errors = validate_metadata(&meta(&[("draft", toml::Value::Boolean(false))]), &merged);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], ValidationError::MissingField(f) if f == "publish_date"));
+        assert!(matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "publish_date"));
     }
 
     #[test]

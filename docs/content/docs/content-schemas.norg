@@ -204,9 +204,9 @@ Norgolith content schemas system allows you to define and enforce structure and 
     ___
 
 **** `norgolith::schema::missing_field`
-     - *Variant*: `MissingField(String)`
+     - *Variant*: `MissingField { field, span }`
      - *Severity*: Error
-     - *Description*: A field declared as required in the content schema is absent from the document metadata.
+     - *Description*: A field declared as required in the content schema is absent from the document metadata. The span points at the `@document.meta` directive, identifying the offending file.
      - *Example message*:
        @code text
        Missing field 'publish_date'

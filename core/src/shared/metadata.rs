@@ -29,6 +29,10 @@ fn scan_meta_spans(content: &str) -> HashMap<String, miette::SourceSpan> {
         return spans;
     };
     let base = meta_start + "@document.meta".len();
+    spans.insert(
+        "@meta".to_string(),
+        miette::SourceSpan::new(meta_start.into(), "@document.meta".len()),
+    );
     let block = &content[base..];
     let Some(block_end_rel) = block.find("@end") else {
         return spans;
@@ -167,6 +171,10 @@ fn enrich_spans(
     errors
         .into_iter()
         .map(|error| match error {
+            ValidationError::MissingField { field, .. } => {
+                let span = spans.get("@meta").copied();
+                ValidationError::MissingField { field, span }
+            }
             ValidationError::TypeMismatch {
                 field,
                 expected,
@@ -558,11 +566,21 @@ mod tests {
     }
 
     #[test]
-    fn enrich_spans_leaves_missing_field_untouched() {
-        let errors = vec![ValidationError::MissingField("author".into())];
+    fn enrich_spans_points_missing_field_at_meta_directive() {
+        let errors = vec![ValidationError::MissingField {
+            field: "author".into(),
+            span: None,
+        }];
         let content = meta_doc("title: My Post");
         let enriched = enrich_spans(errors, &scan_meta_spans(&content));
-        assert!(matches!(&enriched[0], ValidationError::MissingField(f) if f == "author"));
+        match &enriched[0] {
+            ValidationError::MissingField { field, span } => {
+                assert_eq!(field, "author");
+                let span = span.as_ref().unwrap();
+                assert_eq!(span.offset(), content.find("@document.meta").unwrap());
+            }
+            _ => panic!("expected missing field"),
+        }
     }
 
     #[test]
