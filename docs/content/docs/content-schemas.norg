@@ -121,6 +121,8 @@ Norgolith content schemas system allows you to define and enforce structure and 
      must_contain = ["norgolith"]
      @end
 
+     Inline `items = { ... }` is the recommended style. An equivalent nested table (`[content_schema.fields.categories.items]`) also works, but array-of-tables syntax (`[[items]]`) is not supported: `items` takes a single field definition, not a list.
+
 *** Object
     - Validates nested metadata structures.
 
