@@ -10,17 +10,33 @@ pub use validator::validate_metadata;
 
 #[derive(Clone, Debug, Diagnostic)]
 pub enum ValidationError {
-    #[diagnostic(help("Add the missing field to your content metadata"))]
+    #[diagnostic(
+        code("norgolith::schema::missing_field"),
+        help("Add the missing field '{}' to your content metadata", .0),
+        severity(Error)
+    )]
     MissingField(String),
-    #[diagnostic(help("Update the field value to match the expected type"))]
+    #[diagnostic(
+        code("norgolith::schema::type_mismatch"),
+        help("Change field '{}' to expected type {}", field, expected),
+        severity(Error)
+    )]
     TypeMismatch {
         field: String,
         expected: String,
         actual: String,
     },
-    #[diagnostic(help("Review the field constraints in your schema"))]
+    #[diagnostic(
+        code("norgolith::schema::constraint_violation"),
+        help("Review the field constraints: {}", message),
+        severity(Error)
+    )]
     ConstraintViolation { field: String, message: String },
-    #[diagnostic(help("Fix the rule condition or the metadata values"))]
+    #[diagnostic(
+        code("norgolith::schema::rule_condition"),
+        help("{}", message),
+        severity(Warning)
+    )]
     RuleConditionFailed { message: String },
 }
 
