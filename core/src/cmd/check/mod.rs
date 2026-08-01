@@ -80,7 +80,7 @@ pub fn check() -> Result<()> {
 
     let error_count: usize = failures.iter().map(|(_, r)| count_errors(r)).sum();
     for (_, report) in &failures {
-        println!("{report}");
+        println!("{report:?}");
     }
     bail!(
         "Schema validation failed: {} file(s) failed ({} error(s) total)",
