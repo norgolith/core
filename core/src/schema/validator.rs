@@ -163,6 +163,7 @@ mod tests {
             min_length: None,
             max_length: Some(5),
                 pattern: None,
+                one_of: None,
             },
         );
         let errors = validate_metadata(
@@ -197,6 +198,7 @@ mod tests {
                 min_length: None,
                 max_length: None,
                 pattern: None,
+                one_of: None,
             },
         );
         let errors = validate_metadata(
@@ -220,6 +222,7 @@ mod tests {
                 min_length: None,
                 max_length: None,
                 pattern: None,
+                one_of: None,
             },
         );
         let errors = validate_metadata(
@@ -243,6 +246,7 @@ mod tests {
                 min_length: None,
                 max_length: None,
                 pattern: None,
+                one_of: None,
             },
         );
         let errors = validate_metadata(
@@ -261,6 +265,7 @@ mod tests {
                 min_length: None,
                 max_length: None,
                 pattern: None,
+                one_of: None,
             },
         );
         merged.fields.insert(
@@ -269,6 +274,7 @@ mod tests {
                 min_length: None,
                 max_length: None,
                 pattern: None,
+                one_of: None,
             },
         );
         let errors = validate_metadata(

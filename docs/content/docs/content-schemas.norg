@@ -55,6 +55,7 @@ Norgolith content schemas system allows you to define and enforce structure and 
      - `min_length`: Minimum allowed characters.
      - `max_length`: Maximum allowed characters.
      - `pattern`: Regex pattern for validation.
+     - `one_of`: List of allowed values. The value must match one of them; combined with `pattern`, both checks apply.
 
 **** Example
      @code toml
@@ -62,6 +63,10 @@ Norgolith content schemas system allows you to define and enforce structure and 
      type = "string"
      max_length = 100
      pattern = "^[A-Z].*"  # Must start with uppercase letter
+
+     [content_schema.fields.status]
+     type = "string"
+     one_of = ["draft", "published", "archived"]  # Rejects typos like "publishd"
      @end
 
 *** Integer
