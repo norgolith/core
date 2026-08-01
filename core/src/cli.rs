@@ -137,6 +137,8 @@ enum Commands {
         #[command(subcommand)]
         subcommand: cmd::PluginCommands,
     },
+    /// Validate content files against the configured content schema
+    Check {},
     /// Preview from build result
     Preview {
         #[arg(short = 'p', long, default_value_t = 3030, help = "Port to be used")]
@@ -205,6 +207,7 @@ pub async fn start() -> Result<()> {
             })?;
             cmd::new(&kind, &name, open, collection.as_ref()).await?
         }
+        Commands::Check {} => cmd::check()?,
         Commands::Preview { port, host, open } => cmd::preview(port, open, host).await?,
     }
 
