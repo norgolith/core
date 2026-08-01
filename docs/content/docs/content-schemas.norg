@@ -248,6 +248,13 @@ Norgolith content schemas system allows you to define and enforce structure and 
     +html.class text-base-alt mt-12 lg:mt-14
     ___
 
+** Checking Content From the CLI
+   Run `lith check` to validate every content file against the schema without building the site. Useful for CI or pre-commit hooks.
+   - Exits with code 1 if any file has validation errors.
+   - Prints the same diagnostics as `lith build`.
+   - Warning-severity issues (near-miss field names, failing rule conditions) are reported but do not fail the check.
+   - Prints "No content schema configured; nothing to check" and exits 0 when no `[content_schema]` is set.
+
 ** Troubleshooting Validation Errors
    Norgolith will show you validation issues by default in the following format, either as errors when trying to build the site or as warnings during the development server:
 
