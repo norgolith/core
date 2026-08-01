@@ -1134,7 +1134,7 @@ mod tests {
             min: None,
             max: None,
         };
-        assert!(def.validate(&toml::Value::Float(3.14), "pi").is_ok());
+        assert!(def.validate(&toml::Value::Float(std::f64::consts::PI), "pi").is_ok());
     }
 
     #[test]

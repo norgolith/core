@@ -9,6 +9,7 @@ use crate::config::CollectionConfig;
 use crate::converter;
 use crate::schema::{ContentSchema, ValidationError, ValidationErrors, validate_metadata};
 
+#[cfg(test)]
 fn find_field_span(content: &str, field: &str) -> Option<miette::SourceSpan> {
     scan_meta_spans(content).get(field).copied()
 }
@@ -511,13 +512,13 @@ mod tests {
     #[test]
     fn no_meta_block_returns_none() {
         let content = "just a plain norg file without metadata";
-        assert!(find_field_span(&content, "title").is_none());
+        assert!(find_field_span(content, "title").is_none());
     }
 
     #[test]
     fn open_meta_block_without_end_returns_none() {
         let content = "@document.meta\ntitle: My Post\n";
-        assert!(find_field_span(&content, "title").is_none());
+        assert!(find_field_span(content, "title").is_none());
     }
 
     #[test]
