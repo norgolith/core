@@ -218,6 +218,8 @@ pub enum FieldDefinition {
         min_length: Option<usize>,
         max_length: Option<usize>,
         pattern: Option<String>, // Regex patterns
+        #[serde(default)]
+        one_of: Option<Vec<String>>,
     },
     Integer {
         min: Option<i64>,
@@ -247,6 +249,7 @@ impl FieldDefinition {
                     min_length,
                     max_length,
                     pattern,
+                    one_of,
                 },
                 toml::Value::String(s),
             ) => {
@@ -286,6 +289,15 @@ impl FieldDefinition {
                             span: None,
                         });
                     }
+                }
+                if let Some(values) = one_of
+                    && !values.iter().any(|v| v == s)
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Must be one of: {}", values.join(", ")),
+                        span: None,
+                    });
                 }
                 Ok(())
             }
@@ -525,6 +537,7 @@ mod tests {
             min_length: None,
             max_length: None,
             pattern: None,
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("hello".into()), "title")
@@ -533,11 +546,27 @@ mod tests {
     }
 
     #[test]
+    fn string_one_of() {
+        let def = FieldDefinition::String {
+            min_length: None,
+            max_length: None,
+            pattern: None,
+            one_of: Some(vec!["draft".into(), "published".into()]),
+        };
+        assert!(def.validate(&toml::Value::String("published".into()), "status").is_ok());
+        let err = def
+            .validate(&toml::Value::String("publishd".into()), "status")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { message, .. } if message.contains("one of: draft, published")));
+    }
+
+    #[test]
     fn string_within_max_length_ok() {
         let def = FieldDefinition::String {
             min_length: None,
             max_length: Some(10),
             pattern: None,
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("hello".into()), "title")
@@ -551,6 +580,7 @@ mod tests {
             min_length: None,
             max_length: Some(5),
             pattern: None,
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("hello".into()), "title")
@@ -564,6 +594,7 @@ mod tests {
             min_length: None,
             max_length: Some(3),
             pattern: None,
+            one_of: None,
         };
         let err = def
             .validate(&toml::Value::String("hello".into()), "title")
@@ -577,6 +608,7 @@ mod tests {
             min_length: None,
             max_length: None,
             pattern: Some(r"^\d+$".into()),
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("1234".into()), "title")
@@ -590,6 +622,7 @@ mod tests {
             min_length: None,
             max_length: None,
             pattern: Some(r"^\d+$".into()),
+            one_of: None,
         };
         let err = def
             .validate(&toml::Value::String("abc".into()), "title")
@@ -603,6 +636,7 @@ mod tests {
             min_length: None,
             max_length: None,
             pattern: None,
+            one_of: None,
         };
         let err = def
             .validate(&toml::Value::Boolean(true), "title")
@@ -647,6 +681,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -662,6 +697,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: Some(2),
             max_items: None,
@@ -677,6 +713,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: Some(3),
             max_items: None,
@@ -693,6 +730,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: Some(3),
@@ -708,6 +746,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: Some(2),
@@ -726,6 +765,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -744,6 +784,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -776,6 +817,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -796,6 +838,7 @@ mod tests {
             min_length: None,
             max_length: None,
                 pattern: Some(r"^\d+$".into()),
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -953,6 +996,7 @@ mod tests {
             min_length: None,
             max_length: Some(50),
                 pattern: None,
+                one_of: None,
             },
         );
         let mut b = bare_schema(&[]);
@@ -962,6 +1006,7 @@ mod tests {
             min_length: None,
             max_length: Some(120),
                 pattern: None,
+                one_of: None,
             },
         );
         let merged = ContentSchema::merge_hierarchy(&[&a, &b]);
@@ -1074,6 +1119,7 @@ mod tests {
                         min_length: None,
                         max_length: None,
                         pattern: None,
+                        one_of: None,
                     },
                 ),
                 (
@@ -1082,6 +1128,7 @@ mod tests {
                         min_length: None,
                         max_length: None,
                         pattern: None,
+                        one_of: None,
                     },
                 ),
             ]),
@@ -1269,6 +1316,10 @@ max = 1.0
 
 [fields.draft]
 type = "boolean"
+
+[fields.status]
+type = "string"
+one_of = ["draft", "published"]
 
 [fields.author]
 type = "object"
