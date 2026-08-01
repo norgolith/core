@@ -152,6 +152,8 @@ Norgolith content schemas system allows you to define and enforce structure and 
     - `required`: Fields that must be present when the condition matches.
     - `fields`: Additional field definitions enforced when the condition matches, using the same options as `[content_schema.fields.*]`.
 
+    Condition fields can reference nested metadata with dot and bracket paths, e.g. `author.team = "core"` or `authors[0].role = "maintainer"`. Keys that resolve to no value (missing field or a non-object/non-array on the path) are treated as a non-matching condition.
+
 *** Example: `then.fields`
     @code toml
     [content_schema.posts.rules]
