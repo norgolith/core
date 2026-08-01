@@ -407,6 +407,39 @@ impl FieldDefinition {
     }
 }
 
+/// Resolves a dot/bracket path like `author.team` or `authors[0].role` into the
+/// nested metadata value. Plain keys resolve as before.
+// ponytail: exact paths only: `key`, `key.sub`, `arr[0]`, `arr[0].sub`. No wildcards
+// (match-any across array items is a separate feature), no escaping.
+fn get_path<'a>(metadata: &'a HashMap<String, toml::Value>, path: &str) -> Option<&'a toml::Value> {
+    let mut parts = path.split('.');
+    let (key, idx) = split_index(parts.next()?);
+    let mut value = metadata.get(key)?;
+    if let Some(i) = idx {
+        value = value.as_array()?.get(i)?;
+    }
+    for segment in parts {
+        let (key, idx) = split_index(segment);
+        value = match idx {
+            Some(i) => value.as_table()?.get(key)?.as_array()?.get(i)?,
+            None => value.as_table()?.get(key)?,
+        };
+    }
+    Some(value)
+}
+
+fn split_index(segment: &str) -> (&str, Option<usize>) {
+    match segment.find('[') {
+        Some(i) => (
+            &segment[..i],
+            segment[i + 1..]
+                .strip_suffix(']')
+                .and_then(|s| s.parse().ok()),
+        ),
+        None => (segment, None),
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidationRule {
     #[serde(rename = "if")]
@@ -421,7 +454,7 @@ impl ValidationRule {
     ) -> Result<bool, ValidationError> {
         self.condition
             .iter()
-            .try_fold(true, |acc, (field, expected)| match metadata.get(field) {
+            .try_fold(true, |acc, (field, expected)| match get_path(metadata, field) {
                 Some(actual) => {
                     if actual.type_str() != expected.type_str() {
                         Err(ValidationError::RuleConditionFailed {
@@ -996,6 +1029,38 @@ mod tests {
             draft_rule().applies(&meta),
             Err(ValidationError::RuleConditionFailed { .. })
         ));
+    }
+
+    #[test]
+    fn nested_condition_paths() {
+        let rule = ValidationRule {
+            condition: HashMap::from([("author.team".into(), toml::Value::String("core".into()))]),
+            then: RuleAction {
+                required: None,
+                fields: None,
+            },
+        };
+        let mut team = toml::map::Map::new();
+        team.insert("team".into(), toml::Value::String("core".into()));
+        let nested = HashMap::from([("author".into(), toml::Value::Table(team))]);
+        assert!(matches!(rule.applies(&nested), Ok(true)));
+        assert!(matches!(rule.applies(&HashMap::new()), Ok(false)));
+
+        let mut author = toml::map::Map::new();
+        author.insert("role".into(), toml::Value::String("maintainer".into()));
+        let array =
+            HashMap::from([("authors".into(), toml::Value::Array(vec![toml::Value::Table(author)]))]);
+        let array_rule = ValidationRule {
+            condition: HashMap::from([(
+                "authors[0].role".into(),
+                toml::Value::String("maintainer".into()),
+            )]),
+            then: RuleAction {
+                required: None,
+                fields: None,
+            },
+        };
+        assert!(matches!(array_rule.applies(&array), Ok(true)));
     }
 
     // FieldDefinition::Object
