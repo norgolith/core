@@ -38,13 +38,14 @@
           useNextest = true;
           dontUseCargoParallelTests = true;
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
+          nativeBuildInputs = [
+            pkgs.pkg-config
           ];
-          buildInputs = with pkgs; [
-            libgit2
-            openssl
-            zlib
+
+          buildInputs = [
+            pkgs.libgit2
+            pkgs.openssl
+            pkgs.zlib
           ];
 
           env = {
@@ -110,24 +111,24 @@
 
         # nix develop
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
+          buildInputs = [
 						toolchain.rustLibSrc
 
-            cargo
-            rustc
-            clippy
-            rustfmt
-            cargo-edit
-            cargo-nextest
-            rust-analyzer
-            pkg-config # Required by git2 crate
-            openssl # Required by git2 crate
+            pkgs.cargo
+            pkgs.rustc
+            pkgs.clippy
+            pkgs.rustfmt
+            pkgs.cargo-edit
+            pkgs.cargo-nextest
+            pkgs.rust-analyzer
+            pkgs.pkg-config # Required by git2 crate
+            pkgs.openssl # Required by git2 crate
 
             # Documentation site dev tools
-            tailwindcss_4
-            mprocs
-            watchman
-            tailwindcss-language-server
+            pkgs.tailwindcss_4
+            pkgs.mprocs
+            pkgs.watchman
+            pkgs.tailwindcss-language-server
           ];
 
           # Many editors rely on this rust-src PATH variable
