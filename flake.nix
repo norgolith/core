@@ -111,11 +111,10 @@
         # nix develop
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            (with toolchain; [
-              cargo
-              rustc
-              rustLibSrc
-            ])
+						toolchain.rustLibSrc
+
+            cargo
+            rustc
             clippy
             rustfmt
             cargo-edit
