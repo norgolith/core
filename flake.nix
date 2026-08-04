@@ -42,11 +42,34 @@
               pkgs.pkg-config
             ];
 
-            buildInputs = [
-              pkgs.libgit2
-              pkgs.openssl
-              pkgs.zlib
-            ];
+            buildInputs =
+              let
+                libgit2-196 =
+                  let
+                    overrideObsolete = pkgs.lib.versionAtLeast pkgs.libgit2.version "1.9.6";
+                  in
+                  (
+                    if overrideObsolete then
+                      pkgs.lib.warn "The libgit2 override is no longer needed, `pkgs.libgit2.version`>=`${pkgs.libgit2.version}`." pkgs.libgit2
+                    else
+                      (pkgs.libgit2.overrideAttrs (
+                        f: p: {
+                          version = "1.9.6";
+                          src = pkgs.fetchFromGitHub {
+                            owner = "libgit2";
+                            repo = "libgit2";
+                            tag = "v${f.version}";
+                            hash = "sha256-ogowkZrw9MG4pcgXHzzNX5fm1Z8L2tNW8MDfL4ySJyY=";
+                          };
+                        }
+                      ))
+                  );
+              in
+              [
+                libgit2-196
+                pkgs.openssl
+                pkgs.zlib
+              ];
 
             env = {
               LIBGIT2_NO_VENDOR = true;
