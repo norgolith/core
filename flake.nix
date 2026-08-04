@@ -6,25 +6,31 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-    ...
-  }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      ...
+    }:
     flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = import nixpkgs {inherit system;};
+      system:
+      let
+        pkgs = import nixpkgs { inherit system; };
         toolchain = pkgs.rustPlatform;
         corePackage = (pkgs.lib.importTOML "${self}/core/Cargo.toml").package;
         sdkPackage = (pkgs.lib.importTOML "${self}/sdk/Cargo.toml").package;
         mcpPackage = (pkgs.lib.importTOML "${self}/norgolith-mcp/Cargo.toml").package;
-      in rec {
+      in
+      rec {
+        formatter = pkgs.nixfmt-tree;
+
         # nix build
         packages.default = toolchain.buildRustPackage {
           pname = corePackage.name;
           version = corePackage.version;
           src = pkgs.lib.cleanSource "${self}";
+
           cargoLock = {
             lockFile = "${self}/Cargo.lock";
             allowBuiltinFetchGit = true;
@@ -63,6 +69,7 @@
           pname = sdkPackage.name;
           version = sdkPackage.version;
           src = pkgs.lib.cleanSource "${self}";
+
           cargoLock = {
             lockFile = "${self}/sdk/Cargo.lock";
             allowBuiltinFetchGit = true;
@@ -82,6 +89,7 @@
           pname = mcpPackage.name;
           version = mcpPackage.version;
           src = pkgs.lib.cleanSource "${self}";
+
           cargoLock = {
             lockFile = "${self}/norgolith-mcp/Cargo.lock";
             allowBuiltinFetchGit = true;
@@ -98,7 +106,7 @@
         };
 
         # nix run
-        apps.default = flake-utils.lib.mkApp {drv = packages.default;};
+        apps.default = flake-utils.lib.mkApp { drv = packages.default; };
 
         # nix develop
         devShells.default = pkgs.mkShell {
@@ -132,7 +140,7 @@
     );
 
   nixConfig = {
-    extra-substituters = ["https://ntbbloodbath.cachix.org"];
+    extra-substituters = [ "https://ntbbloodbath.cachix.org" ];
     extra-trusted-public-keys = [
       "ntbbloodbath.cachix.org-1:L4DjjGwDB6O3BJ4SmtYTZbvWKLi+1v/hRlLWKOtq+f0="
     ];
