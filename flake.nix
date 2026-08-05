@@ -110,7 +110,7 @@
 
       devShells = eachSystem (pkgs: {
         default = pkgs.mkShell {
-          buildInputs = [
+          nativeBuildInputs = [
             pkgs.rustPlatform.rustLibSrc
 
             pkgs.cargo
@@ -130,10 +130,12 @@
             pkgs.tailwindcss-language-server
           ];
 
-          # Many editors rely on this rust-src PATH variable
-          RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
+          env = {
+            # Many editors rely on this rust-src PATH variable
+            RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
 
-          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+          };
         };
       });
     };
