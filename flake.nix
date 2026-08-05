@@ -105,9 +105,6 @@
           };
         };
 
-        # nix run
-        apps.default = flake-utils.lib.mkApp { drv = self.packages.default; };
-
         # nix develop
         devShells.default = pkgs.mkShell {
           buildInputs = [
