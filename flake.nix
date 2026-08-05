@@ -21,8 +21,7 @@
         corePackage = (pkgs.lib.importTOML "${self}/core/Cargo.toml").package;
         sdkPackage = (pkgs.lib.importTOML "${self}/sdk/Cargo.toml").package;
         mcpPackage = (pkgs.lib.importTOML "${self}/norgolith-mcp/Cargo.toml").package;
-      in
-      rec {
+      in {
         formatter = pkgs.nixfmt-tree;
 
         # nix build
@@ -107,7 +106,7 @@
         };
 
         # nix run
-        apps.default = flake-utils.lib.mkApp { drv = packages.default; };
+        apps.default = flake-utils.lib.mkApp { drv = self.packages.default; };
 
         # nix develop
         devShells.default = pkgs.mkShell {
