@@ -251,15 +251,7 @@ fn build_contents(
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!(
-                    "{:?}",
-                    miette!(
-                        severity = Severity::Warning,
-                        help = "Fix the reported file and run the build again",
-                        "{:#}",
-                        e
-                    )
-                );
+                eprintln!("{:?}", e);
                 page_errors.push(e);
             }
         }
@@ -335,7 +327,7 @@ fn build_content_entry(
     if let Some(schema) = &ctx.site_config.content_schema
         && !rel_path.starts_with(&ctx.site_config.categories_dir)
     {
-        shared::validate_content_metadata(&ctx.paths.content, path, &metadata, schema, false)?;
+        shared::validate_content_metadata(&ctx.paths.content, path, &content, &metadata, schema, false)?;
     }
     let schema_ms = t.elapsed().as_micros();
 

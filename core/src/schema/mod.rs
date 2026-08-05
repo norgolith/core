@@ -2,7 +2,7 @@ use colored::Colorize;
 use miette::{Diagnostic, Severity, miette};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 mod validator;
 
@@ -10,18 +10,61 @@ pub use validator::validate_metadata;
 
 #[derive(Clone, Debug, Diagnostic)]
 pub enum ValidationError {
-    #[diagnostic(help("Add the missing field to your content metadata"))]
-    MissingField(String),
-    #[diagnostic(help("Update the field value to match the expected type"))]
+    #[diagnostic(
+        code("norgolith::schema::missing_field"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-missing-field"),
+        help("Add the missing field '{}' to your content metadata", field),
+        severity(Error)
+    )]
+    MissingField {
+        field: String,
+        #[label("missing field '{}'", field)]
+        span: Option<miette::SourceSpan>,
+    },
+    #[diagnostic(
+        code("norgolith::schema::type_mismatch"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-type-mismatch"),
+        help("Change field '{}' to expected type {}", field, expected),
+        severity(Error)
+    )]
     TypeMismatch {
         field: String,
         expected: String,
         actual: String,
+        #[label("expected {}, got {}", expected, actual)]
+        span: Option<miette::SourceSpan>,
     },
-    #[diagnostic(help("Review the field constraints in your schema"))]
-    ConstraintViolation { field: String, message: String },
-    #[diagnostic(help("Fix the rule condition or the metadata values"))]
+    #[diagnostic(
+        code("norgolith::schema::constraint_violation"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-constraint-violation"),
+        help("{}", message),
+        severity(Error)
+    )]
+    ConstraintViolation {
+        field: String,
+        message: String,
+        #[label("{}", message)]
+        span: Option<miette::SourceSpan>,
+    },
+    #[diagnostic(
+        code("norgolith::schema::rule_condition"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-rule-condition"),
+        help("{}", message),
+        severity(Warning)
+    )]
     RuleConditionFailed { message: String },
+    #[diagnostic(
+        code("norgolith::schema::unknown_field"),
+        url("https://norgolith.dev/docs/content-schemas/#norgolith-schema-unknown-field"),
+        help("Field '{}' is not defined in the content schema{}", field, suggested.as_ref().map(|s| format!("; did you mean '{}'?", s)).unwrap_or_default()),
+        severity(Warning)
+    )]
+    UnknownField {
+        field: String,
+        suggested: Option<String>,
+        #[label("unknown field '{}'{}", field, suggested.as_ref().map(|s| format!(" (did you mean '{}'?)", s)).unwrap_or_default())]
+        span: Option<miette::SourceSpan>,
+    },
 }
 
 impl std::error::Error for ValidationError {}
@@ -29,11 +72,14 @@ impl std::error::Error for ValidationError {}
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingField(field) => write!(f, "{} '{}'", "Missing field".bold(), field.bold()),
+            Self::MissingField { field, .. } => {
+                write!(f, "{} '{}'", "Missing field".bold(), field.bold())
+            }
             Self::TypeMismatch {
                 field,
                 expected,
                 actual,
+                ..
             } => write!(
                 f,
                 "{} '{}': expected {}, got {}",
@@ -42,7 +88,7 @@ impl std::fmt::Display for ValidationError {
                 expected.bold(),
                 actual.bold()
             ),
-            Self::ConstraintViolation { field, message } => {
+            Self::ConstraintViolation { field, message, .. } => {
                 write!(
                     f,
                     "{} '{}': {}",
@@ -54,6 +100,16 @@ impl std::fmt::Display for ValidationError {
             Self::RuleConditionFailed { message } => {
                 write!(f, "{}: {}", "Rule condition failed".bold(), message)
             }
+            Self::UnknownField { field, suggested, .. } => match suggested {
+                Some(s) => write!(
+                    f,
+                    "{} '{}' (did you mean '{}'?)",
+                    "Unknown field".bold(),
+                    field.bold(),
+                    s.bold()
+                ),
+                None => write!(f, "{} '{}'", "Unknown field".bold(), field.bold()),
+            },
         }
     }
 }
@@ -91,7 +147,6 @@ pub struct MergedSchema {
 }
 
 impl ContentSchema {
-    /// Resolves schema hierarchy for a content path
     pub fn resolve_path<'a>(&'a self, content_path: &str) -> Vec<&'a ContentSchema> {
         let mut nodes = vec![self];
         let mut current = self;
@@ -101,6 +156,14 @@ impl ContentSchema {
             if let Some(child) = current.paths.get(component) {
                 nodes.push(child);
                 current = child;
+            } else if let Some(child) = current.paths.get("*") {
+                nodes.push(child);
+                current = child;
+            } else if let Some(child) = current.paths.get("**") {
+                nodes.push(child);
+                break;
+            } else {
+                break;
             }
         }
 
@@ -132,14 +195,39 @@ impl ContentSchema {
             acc
         })
     }
+
+    /// Validates config consistency: required fields must have matching field definitions
+    pub fn validate_config(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+        for field in &self.required {
+            if !self.fields.contains_key(field) {
+                errors.push(format!(
+                    "Required field '{}' has no matching [content_schema.fields.{}] section",
+                    field, field
+                ));
+            }
+        }
+        errors
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FieldDefinition {
     String {
+        min_length: Option<usize>,
         max_length: Option<usize>,
         pattern: Option<String>, // Regex patterns
+        #[serde(default)]
+        one_of: Option<Vec<String>>,
+    },
+    Integer {
+        min: Option<i64>,
+        max: Option<i64>,
+    },
+    Float {
+        min: Option<f64>,
+        max: Option<f64>,
     },
     Array {
         items: Box<FieldDefinition>,
@@ -158,17 +246,29 @@ impl FieldDefinition {
         match (self, value) {
             (
                 FieldDefinition::String {
+                    min_length,
                     max_length,
                     pattern,
+                    one_of,
                 },
                 toml::Value::String(s),
             ) => {
+                if let Some(min) = min_length
+                    && s.len() < *min
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Below minimum length {}", min),
+                        span: None,
+                    });
+                }
                 if let Some(max) = max_length
                     && s.len() > *max
                 {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds max length {}", max),
+                        span: None,
                     });
                 }
                 if let Some(pattern) = pattern {
@@ -178,6 +278,7 @@ impl FieldDefinition {
                             return Err(ValidationError::ConstraintViolation {
                                 field: field_name.to_string(),
                                 message: format!("Invalid regex pattern: {}", pattern),
+                                span: None,
                             });
                         }
                     };
@@ -185,8 +286,52 @@ impl FieldDefinition {
                         return Err(ValidationError::ConstraintViolation {
                             field: field_name.to_string(),
                             message: format!("No pattern matching {}", pattern),
+                            span: None,
                         });
                     }
+                }
+                if let Some(values) = one_of
+                    && !values.iter().any(|v| v == s)
+                {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Must be one of: {}", values.join(", ")),
+                        span: None,
+                    });
+                }
+                Ok(())
+            }
+            (FieldDefinition::Integer { min, max }, toml::Value::Integer(n)) => {
+                if let Some(min) = min && *n < *min {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Below minimum value {}", min),
+                        span: None,
+                    });
+                }
+                if let Some(max) = max && *n > *max {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Exceeds maximum value {}", max),
+                        span: None,
+                    });
+                }
+                Ok(())
+            }
+            (FieldDefinition::Float { min, max }, toml::Value::Float(n)) => {
+                if let Some(min) = min && *n < *min {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Below minimum value {}", min),
+                        span: None,
+                    });
+                }
+                if let Some(max) = max && *n > *max {
+                    return Err(ValidationError::ConstraintViolation {
+                        field: field_name.to_string(),
+                        message: format!("Exceeds maximum value {}", max),
+                        span: None,
+                    });
                 }
                 Ok(())
             }
@@ -205,6 +350,7 @@ impl FieldDefinition {
                             return Err(ValidationError::ConstraintViolation {
                                 field: field_name.to_string(),
                                 message: format!("Missing value {}", required),
+                                span: None,
                             });
                         }
                     }
@@ -215,6 +361,7 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Must contain at least {} value(s)", *min),
+                        span: None,
                     });
                 }
                 if let Some(max) = max_items
@@ -223,6 +370,7 @@ impl FieldDefinition {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds values limit (expected {} value(s))", *max),
+                        span: None,
                     });
                 }
                 for (i, item) in arr.iter().enumerate() {
@@ -236,7 +384,16 @@ impl FieldDefinition {
                         field: field_name.to_string(),
                         expected: self.type_name(),
                         actual: value.to_string(),
+                        span: None,
                     });
+                }
+                Ok(())
+            }
+            (FieldDefinition::Object { schema }, toml::Value::Table(table)) => {
+                for (key, def) in schema {
+                    if let Some(val) = table.get(key) {
+                        def.validate(val, &format!("{}.{}", field_name, key))?;
+                    }
                 }
                 Ok(())
             }
@@ -244,6 +401,7 @@ impl FieldDefinition {
                 field: field_name.to_string(),
                 expected: self.type_name(),
                 actual: value.to_string(),
+                span: None,
             }),
         }
     }
@@ -251,11 +409,46 @@ impl FieldDefinition {
     fn type_name(&self) -> String {
         match self {
             FieldDefinition::String { .. } => "string",
+            FieldDefinition::Integer { .. } => "integer",
+            FieldDefinition::Float { .. } => "float",
             FieldDefinition::Array { .. } => "array",
             FieldDefinition::Boolean => "boolean",
             FieldDefinition::Object { .. } => "object",
         }
         .to_string()
+    }
+}
+
+/// Resolves a dot/bracket path like `author.team` or `authors[0].role` into the
+/// nested metadata value. Plain keys resolve as before.
+// ponytail: exact paths only: `key`, `key.sub`, `arr[0]`, `arr[0].sub`. No wildcards
+// (match-any across array items is a separate feature), no escaping.
+fn get_path<'a>(metadata: &'a HashMap<String, toml::Value>, path: &str) -> Option<&'a toml::Value> {
+    let mut parts = path.split('.');
+    let (key, idx) = split_index(parts.next()?);
+    let mut value = metadata.get(key)?;
+    if let Some(i) = idx {
+        value = value.as_array()?.get(i)?;
+    }
+    for segment in parts {
+        let (key, idx) = split_index(segment);
+        value = match idx {
+            Some(i) => value.as_table()?.get(key)?.as_array()?.get(i)?,
+            None => value.as_table()?.get(key)?,
+        };
+    }
+    Some(value)
+}
+
+fn split_index(segment: &str) -> (&str, Option<usize>) {
+    match segment.find('[') {
+        Some(i) => (
+            &segment[..i],
+            segment[i + 1..]
+                .strip_suffix(']')
+                .and_then(|s| s.parse().ok()),
+        ),
+        None => (segment, None),
     }
 }
 
@@ -273,7 +466,7 @@ impl ValidationRule {
     ) -> Result<bool, ValidationError> {
         self.condition
             .iter()
-            .try_fold(true, |acc, (field, expected)| match metadata.get(field) {
+            .try_fold(true, |acc, (field, expected)| match get_path(metadata, field) {
                 Some(actual) => {
                     if actual.type_str() != expected.type_str() {
                         Err(ValidationError::RuleConditionFailed {
@@ -310,32 +503,7 @@ pub struct RuleAction {
     pub fields: Option<HashMap<String, FieldDefinition>>,
 }
 
-pub fn format_errors(
-    file_path: &Path,
-    schema_path: &str,
-    errors: &[ValidationError],
-    as_warnings: bool,
-) -> String {
-    let mut output = format!(
-        "{} '{}'\n",
-        format!(
-            "Validation {} for",
-            if as_warnings { "issues" } else { "failed" }
-        )
-        .bold(),
-        file_path.display()
-    );
-    output.push_str(&format!(
-        "  {} {}: '{}'\n",
-        "→".blue(),
-        "Schema applied".bold(),
-        schema_path
-    ));
-    for error in errors {
-        output.push_str(&format!("  {} {}\n", "→".blue(), error));
-    }
-    output
-}
+
 
 #[cfg(test)]
 mod tests {
@@ -366,8 +534,10 @@ mod tests {
     #[test]
     fn string_valid() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: None,
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("hello".into()), "title")
@@ -376,10 +546,27 @@ mod tests {
     }
 
     #[test]
+    fn string_one_of() {
+        let def = FieldDefinition::String {
+            min_length: None,
+            max_length: None,
+            pattern: None,
+            one_of: Some(vec!["draft".into(), "published".into()]),
+        };
+        assert!(def.validate(&toml::Value::String("published".into()), "status").is_ok());
+        let err = def
+            .validate(&toml::Value::String("publishd".into()), "status")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { message, .. } if message.contains("one of: draft, published")));
+    }
+
+    #[test]
     fn string_within_max_length_ok() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: Some(10),
             pattern: None,
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("hello".into()), "title")
@@ -390,8 +577,10 @@ mod tests {
     #[test]
     fn string_at_exact_max_length_ok() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: Some(5),
             pattern: None,
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("hello".into()), "title")
@@ -402,8 +591,10 @@ mod tests {
     #[test]
     fn string_exceeds_max_length() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: Some(3),
             pattern: None,
+            one_of: None,
         };
         let err = def
             .validate(&toml::Value::String("hello".into()), "title")
@@ -414,8 +605,10 @@ mod tests {
     #[test]
     fn string_matching_pattern_ok() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: Some(r"^\d+$".into()),
+            one_of: None,
         };
         assert!(
             def.validate(&toml::Value::String("1234".into()), "title")
@@ -426,8 +619,10 @@ mod tests {
     #[test]
     fn string_non_matching_pattern_errors() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: Some(r"^\d+$".into()),
+            one_of: None,
         };
         let err = def
             .validate(&toml::Value::String("abc".into()), "title")
@@ -438,8 +633,10 @@ mod tests {
     #[test]
     fn string_wrong_type_errors() {
         let def = FieldDefinition::String {
+            min_length: None,
             max_length: None,
             pattern: None,
+            one_of: None,
         };
         let err = def
             .validate(&toml::Value::Boolean(true), "title")
@@ -481,8 +678,10 @@ mod tests {
     fn array_valid_no_constraints() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -495,8 +694,10 @@ mod tests {
     fn array_min_items_exactly_satisfied() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: Some(2),
             max_items: None,
@@ -509,8 +710,10 @@ mod tests {
     fn array_min_items_violated() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: Some(3),
             max_items: None,
@@ -524,8 +727,10 @@ mod tests {
     fn array_max_items_exactly_satisfied() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: Some(3),
@@ -538,8 +743,10 @@ mod tests {
     fn array_max_items_violated() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: Some(2),
@@ -555,8 +762,10 @@ mod tests {
     fn array_must_contain_present_ok() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -572,8 +781,10 @@ mod tests {
     fn array_must_contain_absent_errors() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -603,8 +814,10 @@ mod tests {
     fn array_item_type_mismatch_errors() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: None,
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -622,8 +835,10 @@ mod tests {
     fn array_item_string_pattern_validates() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-                max_length: None,
+            min_length: None,
+            max_length: None,
                 pattern: Some(r"^\d+$".into()),
+                one_of: None,
             }),
             min_items: None,
             max_items: None,
@@ -679,6 +894,81 @@ mod tests {
         assert_eq!(nodes.len(), 2);
     }
 
+    #[test]
+    fn resolve_path_star_matches_single_component() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("*".into(), Box::new(bare_schema(&["year"])));
+        let nodes = schema.resolve_path("posts/2025/my-post");
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes[2].required.contains(&"year".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_double_star_matches_any_depth() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("**".into(), Box::new(bare_schema(&["year"])));
+        let nodes = schema.resolve_path("posts/2025/01/my-post");
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes[2].required.contains(&"year".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_exact_takes_precedence_over_star() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("*".into(), Box::new(bare_schema(&["year"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("2025".into(), Box::new(bare_schema(&["exact"])));
+        let nodes = schema.resolve_path("posts/2025/my-post");
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes[2].required.contains(&"exact".to_string()));
+        assert!(!nodes[2].required.contains(&"year".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_star_skips_unknown_component() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        schema
+            .paths
+            .get_mut("posts")
+            .unwrap()
+            .paths
+            .insert("2025".into(), Box::new(bare_schema(&["year"])));
+        // "2025" doesn't exist, so "*" would not match "2024/01"
+        let nodes = schema.resolve_path("posts/nope/my-post");
+        assert_eq!(nodes.len(), 2);
+    }
+
     // ContentSchema::merge_hierarchy
 
     #[test]
@@ -703,16 +993,20 @@ mod tests {
         a.fields.insert(
             "title".into(),
             FieldDefinition::String {
-                max_length: Some(50),
+            min_length: None,
+            max_length: Some(50),
                 pattern: None,
+                one_of: None,
             },
         );
         let mut b = bare_schema(&[]);
         b.fields.insert(
             "title".into(),
             FieldDefinition::String {
-                max_length: Some(120),
+            min_length: None,
+            max_length: Some(120),
                 pattern: None,
+                one_of: None,
             },
         );
         let merged = ContentSchema::merge_hierarchy(&[&a, &b]);
@@ -780,5 +1074,261 @@ mod tests {
             draft_rule().applies(&meta),
             Err(ValidationError::RuleConditionFailed { .. })
         ));
+    }
+
+    #[test]
+    fn nested_condition_paths() {
+        let rule = ValidationRule {
+            condition: HashMap::from([("author.team".into(), toml::Value::String("core".into()))]),
+            then: RuleAction {
+                required: None,
+                fields: None,
+            },
+        };
+        let mut team = toml::map::Map::new();
+        team.insert("team".into(), toml::Value::String("core".into()));
+        let nested = HashMap::from([("author".into(), toml::Value::Table(team))]);
+        assert!(matches!(rule.applies(&nested), Ok(true)));
+        assert!(matches!(rule.applies(&HashMap::new()), Ok(false)));
+
+        let mut author = toml::map::Map::new();
+        author.insert("role".into(), toml::Value::String("maintainer".into()));
+        let array =
+            HashMap::from([("authors".into(), toml::Value::Array(vec![toml::Value::Table(author)]))]);
+        let array_rule = ValidationRule {
+            condition: HashMap::from([(
+                "authors[0].role".into(),
+                toml::Value::String("maintainer".into()),
+            )]),
+            then: RuleAction {
+                required: None,
+                fields: None,
+            },
+        };
+        assert!(matches!(array_rule.applies(&array), Ok(true)));
+    }
+
+    // FieldDefinition::Object
+
+    fn flat_object_schema() -> FieldDefinition {
+        FieldDefinition::Object {
+            schema: HashMap::from([
+                (
+                    "name".into(),
+                    FieldDefinition::String {
+                        min_length: None,
+                        max_length: None,
+                        pattern: None,
+                        one_of: None,
+                    },
+                ),
+                (
+                    "email".into(),
+                    FieldDefinition::String {
+                        min_length: None,
+                        max_length: None,
+                        pattern: None,
+                        one_of: None,
+                    },
+                ),
+            ]),
+        }
+    }
+
+    #[test]
+    fn object_valid_flat() {
+        let table = toml::Value::Table(
+            [("name".into(), toml::Value::String("Alice".into())),
+                ("email".into(), toml::Value::String("alice@example.com".into())),
+            ].into_iter().collect(),
+        );
+        assert!(flat_object_schema().validate(&table, "author").is_ok());
+    }
+
+    #[test]
+    fn object_partial_fields_ok() {
+        let table = toml::Value::Table(
+            [("name".into(), toml::Value::String("Alice".into()))]
+                .into_iter()
+                .collect(),
+        );
+        assert!(flat_object_schema().validate(&table, "author").is_ok());
+    }
+
+    #[test]
+    fn object_empty_ok() {
+        let table = toml::Value::Table(toml::map::Map::new());
+        assert!(flat_object_schema().validate(&table, "author").is_ok());
+    }
+
+    #[test]
+    fn object_child_type_mismatch() {
+        let table = toml::Value::Table(
+            [("name".into(), toml::Value::Integer(42))]
+                .into_iter()
+                .collect(),
+        );
+        let err = flat_object_schema()
+            .validate(&table, "author")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    #[test]
+    fn object_wrong_type_errors() {
+        let err = flat_object_schema()
+            .validate(&toml::Value::String("not an object".into()), "author")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    // FieldDefinition::Integer
+
+    #[test]
+    fn integer_valid() {
+        let def = FieldDefinition::Integer {
+            min: None,
+            max: None,
+        };
+        assert!(def.validate(&toml::Value::Integer(42), "count").is_ok());
+    }
+
+    #[test]
+    fn integer_within_range_ok() {
+        let def = FieldDefinition::Integer {
+            min: Some(1),
+            max: Some(100),
+        };
+        assert!(def.validate(&toml::Value::Integer(50), "count").is_ok());
+    }
+
+    #[test]
+    fn integer_below_min() {
+        let def = FieldDefinition::Integer {
+            min: Some(10),
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::Integer(5), "count")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn integer_above_max() {
+        let def = FieldDefinition::Integer {
+            min: None,
+            max: Some(10),
+        };
+        let err = def
+            .validate(&toml::Value::Integer(42), "count")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn integer_wrong_type_errors() {
+        let def = FieldDefinition::Integer {
+            min: None,
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::String("42".into()), "count")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    // FieldDefinition::Float
+
+    #[test]
+    fn float_valid() {
+        let def = FieldDefinition::Float {
+            min: None,
+            max: None,
+        };
+        assert!(def.validate(&toml::Value::Float(std::f64::consts::PI), "pi").is_ok());
+    }
+
+    #[test]
+    fn float_within_range_ok() {
+        let def = FieldDefinition::Float {
+            min: Some(0.0),
+            max: Some(1.0),
+        };
+        assert!(def.validate(&toml::Value::Float(0.5), "pct").is_ok());
+    }
+
+    #[test]
+    fn float_below_min() {
+        let def = FieldDefinition::Float {
+            min: Some(0.0),
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::Float(-1.0), "pct")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn float_above_max() {
+        let def = FieldDefinition::Float {
+            min: None,
+            max: Some(1.0),
+        };
+        let err = def
+            .validate(&toml::Value::Float(42.0), "pct")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn float_wrong_type_errors() {
+        let def = FieldDefinition::Float {
+            min: None,
+            max: None,
+        };
+        let err = def
+            .validate(&toml::Value::String("3.14".into()), "pi")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    // ContentSchema serde round-trip
+
+    #[test]
+    fn content_schema_toml_roundtrip() {
+        let toml_str = r#"
+required = ["title", "author"]
+
+[fields.title]
+type = "string"
+max_length = 120
+
+[fields.count]
+type = "integer"
+min = 0
+
+[fields.ratio]
+type = "float"
+min = 0.0
+max = 1.0
+
+[fields.draft]
+type = "boolean"
+
+[fields.status]
+type = "string"
+one_of = ["draft", "published"]
+
+[fields.author]
+type = "object"
+schema = { name = { type = "string" }, email = { type = "string" } }
+"#;
+        let schema: ContentSchema = toml::from_str(toml_str).unwrap();
+        let restored: ContentSchema = toml::from_str(&toml::to_string(&schema).unwrap()).unwrap();
+
+        assert_eq!(schema.required, restored.required);
+        assert_eq!(schema.fields.len(), restored.fields.len());
     }
 }

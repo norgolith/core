@@ -153,24 +153,28 @@ impl SiteConfig {
 
         if self.root_url.is_empty() {
             errors.push(
-                "'rootUrl' must not be empty — set 'rootUrl = \"https://example.com\"' in norgolith.toml".into(),
+                "'rootUrl' must not be empty: set 'rootUrl = \"https://example.com\"' in norgolith.toml".into(),
             );
         }
         if self.title.is_empty() {
             errors.push(
-                "'title' must not be empty — set 'title = \"My Site\"' in norgolith.toml".into(),
+                "'title' must not be empty: set 'title = \"My Site\"' in norgolith.toml".into(),
             );
         }
         if self.author.is_empty() {
             errors.push(
-                "'author' must not be empty — set 'author = \"Your Name\"' in norgolith.toml"
+                "'author' must not be empty: set 'author = \"Your Name\"' in norgolith.toml"
                     .into(),
             );
         }
         if self.language.is_empty() {
             errors.push(
-                "'language' must not be empty — set 'language = \"en\"' in norgolith.toml".into(),
+                "'language' must not be empty: set 'language = \"en\"' in norgolith.toml".into(),
             );
+        }
+
+        if let Some(schema) = &self.content_schema {
+            errors.extend(schema.validate_config());
         }
 
         errors

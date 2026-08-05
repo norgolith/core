@@ -52,8 +52,10 @@ Norgolith content schemas system allows you to define and enforce structure and 
     - Validates text fields.
 
 **** Options
+     - `min_length`: Minimum allowed characters.
      - `max_length`: Maximum allowed characters.
      - `pattern`: Regex pattern for validation.
+     - `one_of`: List of allowed values. The value must match one of them; combined with `pattern`, both checks apply.
 
 **** Example
      @code toml
@@ -61,6 +63,39 @@ Norgolith content schemas system allows you to define and enforce structure and 
      type = "string"
      max_length = 100
      pattern = "^[A-Z].*"  # Must start with uppercase letter
+
+     [content_schema.fields.status]
+     type = "string"
+     one_of = ["draft", "published", "archived"]  # Rejects typos like "publishd"
+     @end
+
+*** Integer
+    - Validates whole numbers.
+
+**** Options
+     - `min`: Minimum value.
+     - `max`: Maximum value.
+
+**** Example
+     @code toml
+     [content_schema.fields.word_count]
+     type = "integer"
+     min = 100
+     @end
+
+*** Float
+    - Validates decimal numbers.
+
+**** Options
+     - `min`: Minimum value.
+     - `max`: Maximum value.
+
+**** Example
+     @code toml
+     [content_schema.fields.rating]
+     type = "float"
+     min = 0.0
+     max = 5.0
      @end
 
 *** Boolean
@@ -91,6 +126,8 @@ Norgolith content schemas system allows you to define and enforce structure and 
      must_contain = ["norgolith"]
      @end
 
+     Inline `items = { ... }` is the recommended style. An equivalent nested table (`[content_schema.fields.categories.items]`) also works, but array-of-tables syntax (`[[items]]`) is not supported: `items` takes a single field definition, not a list.
+
 *** Object
     - Validates nested metadata structures.
 
@@ -116,6 +153,21 @@ Norgolith content schemas system allows you to define and enforce structure and 
 
     This rule ensures that if `draft` is `false`, the `publish_date` field must be present in any `posts/` file.
 
+    The `then` action supports two clauses:
+    - `required`: Fields that must be present when the condition matches.
+    - `fields`: Additional field definitions enforced when the condition matches, using the same options as `[content_schema.fields.*]`.
+
+    Condition fields can reference nested metadata with dot and bracket paths, e.g. `author.team = "core"` or `authors[0].role = "maintainer"`. Keys that resolve to no value (missing field or a non-object/non-array on the path) are treated as a non-matching condition.
+
+*** Example: `then.fields`
+    @code toml
+    [content_schema.posts.rules]
+    if = { featured = true }  # Condition
+    then = { fields = { hero_image = { type = "string", min_length = 10 } } }  # Action
+    @end
+
+    When `featured` is `true`, the `hero_image` field must exist and be a string of at least 10 characters in any `posts/` file.
+
 ** Schema Inheritance
    Schemas can inherit and extend rules based on content paths. For example, rules for `/posts` can extend global rules, and `/posts/2023` can further extend `/posts`.
 
@@ -140,6 +192,21 @@ Norgolith content schemas system allows you to define and enforce structure and 
     - Posts require a `category` field.
     - Posts in `/posts/2023` require a `year` field.
 
+*** Wildcard Paths
+    Schema nodes can use `"*"` to match a single path component and `"**"` to match any number of remaining components. Precedence is exact match, then `"*"`, then `"**"`.
+
+    @code toml
+    # Applies to any single subdirectory under /posts (posts/2024, posts/2025, ...)
+    [content_schema.posts."*"]
+    required = ["publish_date"]
+
+    # Applies to everything under /docs at any depth (docs/rust, docs/rust/advanced, ...)
+    [content_schema.docs."**"]
+    required = ["reviewer"]
+    @end
+
+    Note: `*` and `**` are not valid bare TOML keys, so they must be quoted. Schemas apply by longest matching prefix: a schema node always inherits the rules of its ancestors, and rules for a deeper node never leak to its parents.
+
     +html.class text-base-alt mt-12 lg:mt-14
     ___
 
@@ -156,11 +223,18 @@ Norgolith content schemas system allows you to define and enforce structure and 
     [content_schema.fields.author]
     type = "string"
 
+    [content_schema.fields.version]
+    type = "string"
+
+    [content_schema.fields.word_count]
+    type = "integer"
+
     [content_schema.posts.rules]
     if = { draft = false }
     then = { required = ["publish_date"] }
     @end
 
+    This schema validates the `version` string and the numeric `word_count` for every blog post.
 *** Example 2: Project Documentation Schema
     @code toml
     [content_schema]
@@ -181,28 +255,87 @@ Norgolith content schemas system allows you to define and enforce structure and 
     +html.class text-base-alt mt-12 lg:mt-14
     ___
 
+** Checking Content From the CLI
+   Run `lith check` to validate every content file against the schema without building the site. Useful for CI or pre-commit hooks.
+   - Exits with code 1 if any file has validation errors.
+   - Prints the same diagnostics as `lith build`.
+   - Warning-severity issues (near-miss field names, failing rule conditions) are reported but do not fail the check.
+   - Prints "No content schema configured; nothing to check" and exits 0 when no `[content_schema]` is set.
+
 ** Troubleshooting Validation Errors
    Norgolith will show you validation issues by default in the following format, either as errors when trying to build the site or as warnings during the development server:
 
    @code bash
-   11:58 AM 2025-03-01 ERROR Validation failed for '/home/amartin/Develop/Rust/norgolith/my-site/content/index.norg'
-   → Schema applied: 'index'
-   → Constraint violation for field 'title': Exceeds max length 12
+   × Schema validation failed (2 errors)
+   help: Fix the listed metadata field(s) and rebuild
+
+   Error: norgolith::schema::constraint_violation (https://norgolith.dev/docs/content-schemas/#norgolith-schema-constraint-violation)
+
+   × Constraint violation for field 'title': Exceeds max length 12
+    ╭─[ content/posts/hello.norg:2:8 ]
+   1 │ @document.meta
+   2 │ title: A Very Long Title That Exceeds Maximum Length
+    ·        ────────────────┬────────────────
+    ·                        ╰── Exceeds max length 12
+   3 │ author: alice
+     ╰────
+   help: Exceeds max length 12
    @end
 
-*** Common Errors and Fixes
-**** Missing Required Field
-     - *Error*: `Missing field 'title'`.
-     - *Fix*: Add the missing field to your metadata.
+   Each error identifies the offending file and line, highlights the value that failed, and links to the matching error code reference below.
 
-**** Type Mismatch
-     - *Error*: `Type mismatch for field 'version': expected string, got number`.
-     - *Fix*: Ensure the field value matches the expected type.
+*** Error Code Reference
+    Norgolith schema validation uses structured error codes. Each error has a unique miette diagnostic code, a severity level, and a machine-readable field payload.
 
-**** Constraint Violation
-     - *Error*: `Constraint violation for field 'title': Exceeds max length 12`.
-     - *Fix*: Shorten the field value to meet the constraint.
+    +html.class text-base-alt mt-12 lg:mt-14
+    ___
 
-**** Rule Condition Failed
-     - *Error*: `Rule condition failed: Missing condition field 'draft'`.
-     - *Fix*: Add the required condition field or update the rule.
+**** `norgolith::schema::missing_field`
+     - *Variant*: `MissingField { field, span }`
+     - *Severity*: Error
+     - *Description*: A field declared as required in the content schema is absent from the document metadata. The span points at the `@document.meta` directive, identifying the offending file.
+     - *Example message*:
+       @code text
+       Missing field 'publish_date'
+       @end
+     - *Fix*: Add the missing field to the document's `@document.meta` block.
+
+**** `norgolith::schema::type_mismatch`
+    - *Variant*: `TypeMismatch { field, expected, actual, span }`
+    - *Severity*: Error
+    - *Description*: Metadata field value does not match the type declared in the schema (string, integer, float, boolean, array, object). The `span` (byte offset of the field value in the source) drives the source label rendered by miette.
+     - *Example message*:
+       @code text
+       Type mismatch for field 'version': expected string, got number
+       @end
+     - *Fix*: Change the field value to match the expected type, or update the schema's field definition.
+
+**** `norgolith::schema::constraint_violation`
+    - *Variant*: `ConstraintViolation { field, message, span }`
+    - *Severity*: Error
+    - *Description*: Value passes type checking but violates a field constraint — min/max length for strings, min/max for integer/float, regex pattern, array item bounds, etc. The `span` (byte offset of the field value in the source) drives the source label rendered by miette.
+     - *Example message*:
+       @code text
+       Constraint violation for field 'title': Exceeds max length 12
+       @end
+     - *Fix*: Adjust the field value to satisfy the constraint, or relax the schema definition.
+
+**** `norgolith::schema::rule_condition`
+     - *Variant*: `RuleConditionFailed { message }`
+     - *Severity*: Warning
+     - *Description*: A conditional validation rule's `if` condition could not be evaluated (missing condition field) or the `then` clause failed.
+     - *Example message*:
+       @code text
+       Rule condition failed: Missing condition field 'draft'
+       @end
+     - *Fix*: Ensure the condition field exists in the metadata, or update the rule definition.
+
+**** `norgolith::schema::unknown_field`
+     - *Variant*: `UnknownField { field, suggested, span }`
+     - *Severity*: Warning
+     - *Description*: A metadata field is not defined in the content schema, but its name matches a defined field once casing and separators (`-`, `_`) are ignored. Likely a typo or kebab-case/snake-case drift, e.g. metadata `project-version` vs schema `project_version`.
+     - *Example message*:
+       @code text
+       Unknown field 'project-version' (did you mean 'project_version'?)
+       @end
+     - *Fix*: Rename the metadata field to match the schema, or add it to the schema if it is intentional. Metadata keys are matched exactly and case-sensitively.
