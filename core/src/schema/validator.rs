@@ -110,7 +110,9 @@ mod tests {
         let merged = required_only(&["title"]);
         let errors = validate_metadata(&meta(&[]), &merged);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "title"));
+        assert!(
+            matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "title")
+        );
     }
 
     #[test]
@@ -160,8 +162,8 @@ mod tests {
         merged.fields.insert(
             "title".into(),
             FieldDefinition::String {
-            min_length: None,
-            max_length: Some(5),
+                min_length: None,
+                max_length: Some(5),
                 pattern: None,
                 one_of: None,
             },
@@ -302,7 +304,9 @@ mod tests {
         // draft = false and publish_date absent → error expected
         let errors = validate_metadata(&meta(&[("draft", toml::Value::Boolean(false))]), &merged);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "publish_date"));
+        assert!(
+            matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "publish_date")
+        );
     }
 
     #[test]
