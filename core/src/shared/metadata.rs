@@ -51,9 +51,9 @@ fn skip_hspaces(s: &str) -> usize {
 }
 
 fn is_nil_at(text: &str, pos: usize) -> bool {
-    text.as_bytes().get(pos).is_none_or(|c| {
-        matches!(c, b'\n' | b'}' | b']')
-    })
+    text.as_bytes()
+        .get(pos)
+        .is_none_or(|c| matches!(c, b'\n' | b'}' | b']'))
 }
 
 fn parse_object(
@@ -71,10 +71,7 @@ fn parse_object(
         }
         let key_start = i;
         while i < text.len()
-            && !matches!(
-                text.as_bytes()[i],
-                b':' | b'{' | b'}' | b'[' | b']' | b'\n'
-            )
+            && !matches!(text.as_bytes()[i], b':' | b'{' | b'}' | b'[' | b']' | b'\n')
         {
             i += 1;
         }
@@ -190,11 +187,7 @@ fn enrich_spans(
                     span,
                 }
             }
-            ValidationError::ConstraintViolation {
-                field,
-                message,
-                ..
-            } => {
+            ValidationError::ConstraintViolation { field, message, .. } => {
                 let span = spans.get(&field).copied();
                 ValidationError::ConstraintViolation {
                     field,
@@ -203,9 +196,7 @@ fn enrich_spans(
                 }
             }
             ValidationError::UnknownField {
-                field,
-                suggested,
-                ..
+                field, suggested, ..
             } => {
                 let span = spans.get(&field).copied();
                 ValidationError::UnknownField {

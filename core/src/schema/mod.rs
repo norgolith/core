@@ -100,7 +100,9 @@ impl std::fmt::Display for ValidationError {
             Self::RuleConditionFailed { message } => {
                 write!(f, "{}: {}", "Rule condition failed".bold(), message)
             }
-            Self::UnknownField { field, suggested, .. } => match suggested {
+            Self::UnknownField {
+                field, suggested, ..
+            } => match suggested {
                 Some(s) => write!(
                     f,
                     "{} '{}' (did you mean '{}'?)",
@@ -302,14 +304,18 @@ impl FieldDefinition {
                 Ok(())
             }
             (FieldDefinition::Integer { min, max }, toml::Value::Integer(n)) => {
-                if let Some(min) = min && *n < *min {
+                if let Some(min) = min
+                    && *n < *min
+                {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Below minimum value {}", min),
                         span: None,
                     });
                 }
-                if let Some(max) = max && *n > *max {
+                if let Some(max) = max
+                    && *n > *max
+                {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds maximum value {}", max),
@@ -319,14 +325,18 @@ impl FieldDefinition {
                 Ok(())
             }
             (FieldDefinition::Float { min, max }, toml::Value::Float(n)) => {
-                if let Some(min) = min && *n < *min {
+                if let Some(min) = min
+                    && *n < *min
+                {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Below minimum value {}", min),
                         span: None,
                     });
                 }
-                if let Some(max) = max && *n > *max {
+                if let Some(max) = max
+                    && *n > *max
+                {
                     return Err(ValidationError::ConstraintViolation {
                         field: field_name.to_string(),
                         message: format!("Exceeds maximum value {}", max),
@@ -466,32 +476,35 @@ impl ValidationRule {
     ) -> Result<bool, ValidationError> {
         self.condition
             .iter()
-            .try_fold(true, |acc, (field, expected)| match get_path(metadata, field) {
-                Some(actual) => {
-                    if actual.type_str() != expected.type_str() {
-                        Err(ValidationError::RuleConditionFailed {
-                            message: format!(
-                                "Type mismatch in condition field '{}': expected {}, got {}",
-                                field,
-                                expected.type_str(),
-                                actual.type_str()
-                            ),
-                        })
-                    } else {
-                        Ok(acc && actual == expected)
+            .try_fold(true, |acc, (field, expected)| {
+                match get_path(metadata, field) {
+                    Some(actual) => {
+                        if actual.type_str() != expected.type_str() {
+                            Err(ValidationError::RuleConditionFailed {
+                                message: format!(
+                                    "Type mismatch in condition field '{}': expected {}, got {}",
+                                    field,
+                                    expected.type_str(),
+                                    actual.type_str()
+                                ),
+                            })
+                        } else {
+                            Ok(acc && actual == expected)
+                        }
                     }
-                }
-                None => {
-                    eprintln!(
-                        "{:?}",
-                        miette!(
-                            severity = Severity::Warning,
-                            help = "Check the 'conditional_on' field in content schema definition",
-                            "Missing condition field '{}'",
-                            field
-                        )
-                    );
-                    Ok(false)
+                    None => {
+                        eprintln!(
+                            "{:?}",
+                            miette!(
+                                severity = Severity::Warning,
+                                help =
+                                    "Check the 'conditional_on' field in content schema definition",
+                                "Missing condition field '{}'",
+                                field
+                            )
+                        );
+                        Ok(false)
+                    }
                 }
             })
     }
@@ -502,8 +515,6 @@ pub struct RuleAction {
     pub required: Option<Vec<String>>,
     pub fields: Option<HashMap<String, FieldDefinition>>,
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -553,11 +564,16 @@ mod tests {
             pattern: None,
             one_of: Some(vec!["draft".into(), "published".into()]),
         };
-        assert!(def.validate(&toml::Value::String("published".into()), "status").is_ok());
+        assert!(
+            def.validate(&toml::Value::String("published".into()), "status")
+                .is_ok()
+        );
         let err = def
             .validate(&toml::Value::String("publishd".into()), "status")
             .unwrap_err();
-        assert!(matches!(err, ValidationError::ConstraintViolation { message, .. } if message.contains("one of: draft, published")));
+        assert!(
+            matches!(err, ValidationError::ConstraintViolation { message, .. } if message.contains("one of: draft, published"))
+        );
     }
 
     #[test]
@@ -678,8 +694,8 @@ mod tests {
     fn array_valid_no_constraints() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -694,8 +710,8 @@ mod tests {
     fn array_min_items_exactly_satisfied() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -710,8 +726,8 @@ mod tests {
     fn array_min_items_violated() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -727,8 +743,8 @@ mod tests {
     fn array_max_items_exactly_satisfied() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -743,8 +759,8 @@ mod tests {
     fn array_max_items_violated() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -762,8 +778,8 @@ mod tests {
     fn array_must_contain_present_ok() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -781,8 +797,8 @@ mod tests {
     fn array_must_contain_absent_errors() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -814,8 +830,8 @@ mod tests {
     fn array_item_type_mismatch_errors() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: None,
                 one_of: None,
             }),
@@ -835,8 +851,8 @@ mod tests {
     fn array_item_string_pattern_validates() {
         let def = FieldDefinition::Array {
             items: Box::new(FieldDefinition::String {
-            min_length: None,
-            max_length: None,
+                min_length: None,
+                max_length: None,
                 pattern: Some(r"^\d+$".into()),
                 one_of: None,
             }),
@@ -993,8 +1009,8 @@ mod tests {
         a.fields.insert(
             "title".into(),
             FieldDefinition::String {
-            min_length: None,
-            max_length: Some(50),
+                min_length: None,
+                max_length: Some(50),
                 pattern: None,
                 one_of: None,
             },
@@ -1003,8 +1019,8 @@ mod tests {
         b.fields.insert(
             "title".into(),
             FieldDefinition::String {
-            min_length: None,
-            max_length: Some(120),
+                min_length: None,
+                max_length: Some(120),
                 pattern: None,
                 one_of: None,
             },
@@ -1093,8 +1109,10 @@ mod tests {
 
         let mut author = toml::map::Map::new();
         author.insert("role".into(), toml::Value::String("maintainer".into()));
-        let array =
-            HashMap::from([("authors".into(), toml::Value::Array(vec![toml::Value::Table(author)]))]);
+        let array = HashMap::from([(
+            "authors".into(),
+            toml::Value::Array(vec![toml::Value::Table(author)]),
+        )]);
         let array_rule = ValidationRule {
             condition: HashMap::from([(
                 "authors[0].role".into(),
@@ -1138,9 +1156,15 @@ mod tests {
     #[test]
     fn object_valid_flat() {
         let table = toml::Value::Table(
-            [("name".into(), toml::Value::String("Alice".into())),
-                ("email".into(), toml::Value::String("alice@example.com".into())),
-            ].into_iter().collect(),
+            [
+                ("name".into(), toml::Value::String("Alice".into())),
+                (
+                    "email".into(),
+                    toml::Value::String("alice@example.com".into()),
+                ),
+            ]
+            .into_iter()
+            .collect(),
         );
         assert!(flat_object_schema().validate(&table, "author").is_ok());
     }
@@ -1168,9 +1192,7 @@ mod tests {
                 .into_iter()
                 .collect(),
         );
-        let err = flat_object_schema()
-            .validate(&table, "author")
-            .unwrap_err();
+        let err = flat_object_schema().validate(&table, "author").unwrap_err();
         assert!(matches!(err, ValidationError::TypeMismatch { .. }));
     }
 
@@ -1208,9 +1230,7 @@ mod tests {
             min: Some(10),
             max: None,
         };
-        let err = def
-            .validate(&toml::Value::Integer(5), "count")
-            .unwrap_err();
+        let err = def.validate(&toml::Value::Integer(5), "count").unwrap_err();
         assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
     }
 
@@ -1246,7 +1266,10 @@ mod tests {
             min: None,
             max: None,
         };
-        assert!(def.validate(&toml::Value::Float(std::f64::consts::PI), "pi").is_ok());
+        assert!(
+            def.validate(&toml::Value::Float(std::f64::consts::PI), "pi")
+                .is_ok()
+        );
     }
 
     #[test]
@@ -1264,9 +1287,7 @@ mod tests {
             min: Some(0.0),
             max: None,
         };
-        let err = def
-            .validate(&toml::Value::Float(-1.0), "pct")
-            .unwrap_err();
+        let err = def.validate(&toml::Value::Float(-1.0), "pct").unwrap_err();
         assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
     }
 
@@ -1276,9 +1297,7 @@ mod tests {
             min: None,
             max: Some(1.0),
         };
-        let err = def
-            .validate(&toml::Value::Float(42.0), "pct")
-            .unwrap_err();
+        let err = def.validate(&toml::Value::Float(42.0), "pct").unwrap_err();
         assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
     }
 

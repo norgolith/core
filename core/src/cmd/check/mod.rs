@@ -8,7 +8,10 @@ use crate::{config, fs};
 
 pub fn check() -> Result<()> {
     let Some(root) = fs::find_config_file()? else {
-        bail!("{}: not in a Norgolith site directory", "Could not check the site");
+        bail!(
+            "{}: not in a Norgolith site directory",
+            "Could not check the site"
+        );
     };
 
     let config_content = std::fs::read_to_string(&root)
@@ -38,7 +41,12 @@ pub fn check() -> Result<()> {
 
     let root_dir = root
         .parent()
-        .ok_or_else(|| miette!("Config file path {} has no parent directory", root.display()))?
+        .ok_or_else(|| {
+            miette!(
+                "Config file path {} has no parent directory",
+                root.display()
+            )
+        })?
         .to_path_buf();
     let paths = SitePaths::new(root_dir.clone());
 
@@ -59,14 +67,16 @@ pub fn check() -> Result<()> {
         }
         total += 1;
         let content = std::fs::read_to_string(path).into_diagnostic()?;
-        let metadata = match extract_metadata_from_content(&content, rel_path, &site_config.root_url) {
-            Ok(metadata) => metadata,
-            Err(report) => {
-                failures.push((path.to_path_buf(), report));
-                continue;
-            }
-        };
-        if let Err(report) = validate_content_metadata(&paths.content, path, &content, &metadata, schema, false)
+        let metadata =
+            match extract_metadata_from_content(&content, rel_path, &site_config.root_url) {
+                Ok(metadata) => metadata,
+                Err(report) => {
+                    failures.push((path.to_path_buf(), report));
+                    continue;
+                }
+            };
+        if let Err(report) =
+            validate_content_metadata(&paths.content, path, &content, &metadata, schema, false)
             && count_errors(&report) > 0
         {
             failures.push((path.to_path_buf(), report));
