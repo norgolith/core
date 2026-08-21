@@ -63,13 +63,46 @@ fn generate_content_title(base_path: &Path, full_path: &Path) -> String {
     title
 }
 
+/// Render the default norg document template with user-provided metadata
+fn render_norg_template(
+    title: &str,
+    description: &str,
+    authors: &str,
+    categories: &str,
+    layout: &str,
+    creation_date: &str,
+) -> String {
+    let re = Regex::new(r",\s*").expect("static regex is valid");
+    formatdoc!(
+        r#"
+        @document.meta
+        title: {title}
+        description: {description}
+        authors: [
+          {}
+        ]
+        categories: [
+          {}
+        ]
+        created: {creation_date}
+        updated: {creation_date}
+        draft: true
+        layout: {layout}
+        version: 1.1.1
+        @end
+
+        * {title}
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+          labore et dolore magna aliqua. Lobortis scelerisque fermentum dui faucibus in ornare."#,
+        re.replace_all(authors, "\n  "),
+        re.replace_all(categories, "\n  "),
+    )
+}
+
 /// Create a new norg document
 #[instrument(level = "debug", skip(path, title))]
 async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
     debug!("Creating new norg document: {}", path.display());
-    let re = Regex::new(r",\s*")
-        .into_diagnostic()
-        .wrap_err("Failed to compile regex")?;
     let creation_date = Local::now().to_rfc3339_opts(SecondsFormat::Secs, false);
 
     // Prompt norg file metadata
@@ -102,29 +135,13 @@ async fn create_norg_document(path: &Path, title: &str) -> Result<()> {
         .prompt()
         .map_err(|e| miette!("Failed to get document layout: {}", e))?;
 
-    let content = formatdoc!(
-        r#"
-        @document.meta
-        title: {title}
-        description: {description}
-        authors: [
-          {}
-        ]
-        categories: [
-          {}
-        ]
-        created: {creation_date}
-        updated: {creation_date}
-        draft: true
-        layout: {layout}
-        version: 1.1.1
-        @end
-
-        * {title}
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
-          labore et dolore magna aliqua. Lobortis scelerisque fermentum dui faucibus in ornare."#,
-        re.replace_all(&authors, "\n  "),
-        re.replace_all(&categories, "\n  "),
+    let content = render_norg_template(
+        &title,
+        &description,
+        &authors,
+        &categories,
+        &layout,
+        &creation_date,
     );
     tokio::fs::write(path, content)
         .await
@@ -285,4 +302,97 @@ pub async fn new(kind: &str, name: &str, open: bool, collection: Option<&String>
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, path::Path};
+
+    use super::render_norg_template;
+    use crate::schema::{ContentSchema, FieldDefinition};
+    use crate::shared::{extract_metadata_from_content, validate_content_metadata};
+
+    const CREATED_AT: &str = "2026-08-21T12:00:00-04:00";
+
+    fn string_def() -> FieldDefinition {
+        FieldDefinition::String {
+            min_length: None,
+            max_length: None,
+            pattern: None,
+            one_of: None,
+        }
+    }
+
+    fn string_array_def() -> FieldDefinition {
+        FieldDefinition::Array {
+            items: Box::new(string_def()),
+            min_items: None,
+            max_items: None,
+            must_contain: None,
+        }
+    }
+
+    /// Schema a blog site would declare against the fields emitted by
+    /// `lith new` templates.
+    fn template_schema() -> ContentSchema {
+        let mut schema = ContentSchema {
+            required: vec!["title".into(), "draft".into(), "layout".into()],
+            fields: HashMap::new(),
+            rules: Vec::new(),
+            paths: HashMap::new(),
+        };
+        for name in [
+            "title",
+            "description",
+            "layout",
+            "version",
+            "created",
+            "updated",
+        ] {
+            schema.fields.insert(name.into(), string_def());
+        }
+        schema
+            .fields
+            .insert("draft".into(), FieldDefinition::Boolean);
+        schema.fields.insert("authors".into(), string_array_def());
+        schema
+            .fields
+            .insert("categories".into(), string_array_def());
+        schema
+    }
+
+    #[test]
+    fn new_template_metadata_passes_schema_validation() {
+        let content = render_norg_template(
+            "Hello World",
+            "A description",
+            "alice, bob",
+            "Rust, SSG",
+            "post",
+            CREATED_AT,
+        );
+
+        let metadata = extract_metadata_from_content(&content, Path::new("posts/hello.norg"), "/")
+            .expect("template parses");
+
+        // TOML datetimes emitted by the template must arrive as RFC3339 strings
+        assert_eq!(
+            metadata.get("created").and_then(|v| v.as_str()),
+            Some(CREATED_AT)
+        );
+        assert_eq!(
+            metadata.get("updated").and_then(|v| v.as_str()),
+            Some(CREATED_AT)
+        );
+
+        validate_content_metadata(
+            Path::new("/site"),
+            Path::new("/site/content/posts/hello.norg"),
+            &content,
+            &metadata,
+            &template_schema(),
+            false,
+        )
+        .expect("template metadata validates against a matching schema");
+    }
 }
