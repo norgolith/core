@@ -985,6 +985,37 @@ mod tests {
         assert_eq!(nodes.len(), 2);
     }
 
+    #[test]
+    fn resolve_path_leading_slash() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        let nodes = schema.resolve_path("/posts/2025/my-post");
+        assert_eq!(nodes.len(), 2);
+        assert!(nodes[1].required.contains(&"category".to_string()));
+    }
+
+    #[test]
+    fn resolve_path_trailing_slash() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        let nodes = schema.resolve_path("posts/");
+        assert_eq!(nodes.len(), 2);
+    }
+
+    #[test]
+    fn resolve_path_double_slashes() {
+        let mut schema = bare_schema(&["title"]);
+        schema
+            .paths
+            .insert("posts".into(), Box::new(bare_schema(&["category"])));
+        let nodes = schema.resolve_path("//posts//my-post");
+        assert_eq!(nodes.len(), 2);
+    }
+
     // ContentSchema::merge_hierarchy
 
     #[test]
