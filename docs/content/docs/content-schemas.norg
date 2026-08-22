@@ -168,11 +168,24 @@ Norgolith content schemas system allows you to define and enforce structure and 
 
     This rule ensures that if `draft` is `false`, the `publish_date` field must be present in any `posts/` file.
 
-    The `then` action supports two clauses:
+    The `then` action supports three clauses:
     - `required`: Fields that must be present when the condition matches.
+    - `not_required`: Fields exempted from requirements when the condition matches. The exemption applies to the global `required` list and to requirements added by any other rule — a matching exemption always wins, regardless of rule order. It only lifts the requirement; it does not forbid the field from being present.
     - `fields`: Additional field definitions enforced when the condition matches, using the same options as `[content_schema.fields.*]`.
 
     Condition fields can reference nested metadata with dot and bracket paths, e.g. `author.team = "core"` or `authors[0].role = "maintainer"`. Keys that resolve to no value (missing field or a non-object/non-array on the path) are treated as a non-matching condition.
+
+*** Example: `then.not_required`
+    @code toml
+    [content_schema]
+    required = ["publish_date"]
+
+    [content_schema.posts.rules]
+    if = { draft = true }  # Condition
+    then = { not_required = ["publish_date"] }  # Action
+    @end
+
+    Every post must have a `publish_date`, except drafts — so saving an unfinished post no longer spams `missing_field` warnings in the dev server.
 
 *** Example: `then.fields`
     @code toml

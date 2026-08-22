@@ -12,9 +12,20 @@ pub fn validate_metadata(
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
+    // Collect not_required exemptions up front so a matching exemption wins
+    // over requirements regardless of rule order (global or rule-added).
+    let mut exempted = std::collections::HashSet::new();
+    for rule in &merged.rules {
+        if let Ok(true) = rule.applies(metadata) {
+            if let Some(not_required) = &rule.then.not_required {
+                exempted.extend(not_required.iter().cloned());
+            }
+        }
+    }
+
     // Check required fields
     for field in &merged.required {
-        if !metadata.contains_key(field) {
+        if !metadata.contains_key(field) && !exempted.contains(field) {
             errors.push(ValidationError::MissingField {
                 field: field.clone(),
                 span: None,
@@ -61,7 +72,7 @@ pub fn validate_metadata(
             Ok(true) => {
                 if let Some(required) = &rule.then.required {
                     for field in required {
-                        if !metadata.contains_key(field) {
+                        if !metadata.contains_key(field) && !exempted.contains(field) {
                             errors.push(ValidationError::MissingField {
                                 field: field.clone(),
                                 span: None,
@@ -298,6 +309,7 @@ mod tests {
             condition: HashMap::from([("draft".into(), toml::Value::Boolean(false))]),
             then: RuleAction {
                 required: Some(vec!["publish_date".into()]),
+                not_required: None,
                 fields: None,
             },
         });
@@ -316,6 +328,7 @@ mod tests {
             condition: HashMap::from([("draft".into(), toml::Value::Boolean(false))]),
             then: RuleAction {
                 required: Some(vec!["publish_date".into()]),
+                not_required: None,
                 fields: None,
             },
         });
@@ -331,6 +344,7 @@ mod tests {
             condition: HashMap::from([("draft".into(), toml::Value::Boolean(false))]),
             then: RuleAction {
                 required: Some(vec!["publish_date".into()]),
+                not_required: None,
                 fields: None,
             },
         });
@@ -346,6 +360,7 @@ mod tests {
             condition: HashMap::from([("draft".into(), toml::Value::Boolean(false))]),
             then: RuleAction {
                 required: Some(vec!["publish_date".into()]),
+                not_required: None,
                 fields: None,
             },
         });
@@ -356,6 +371,71 @@ mod tests {
                     "publish_date",
                     toml::Value::String("2026-01-01T00:00:00Z".into()),
                 ),
+            ]),
+            &merged,
+        );
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn conditional_not_required_exempts_global_requirement() {
+        let mut merged = required_only(&["publish_date"]);
+        merged.rules.push(ValidationRule {
+            condition: HashMap::from([("draft".into(), toml::Value::Boolean(true))]),
+            then: RuleAction {
+                required: None,
+                not_required: Some(vec!["publish_date".into()]),
+                fields: None,
+            },
+        });
+        // draft = true → publish_date exempt despite being globally required
+        let errors = validate_metadata(&meta(&[("draft", toml::Value::Boolean(true))]), &merged);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn not_required_ignored_when_condition_not_met() {
+        let mut merged = required_only(&["publish_date"]);
+        merged.rules.push(ValidationRule {
+            condition: HashMap::from([("draft".into(), toml::Value::Boolean(true))]),
+            then: RuleAction {
+                required: None,
+                not_required: Some(vec!["publish_date".into()]),
+                fields: None,
+            },
+        });
+        // draft = false → exemption inactive, publish_date still required
+        let errors = validate_metadata(&meta(&[("draft", toml::Value::Boolean(false))]), &merged);
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(&errors[0], ValidationError::MissingField { field, .. } if field == "publish_date")
+        );
+    }
+
+    #[test]
+    fn not_required_wins_over_rule_added_requirement() {
+        let mut merged = required_only(&[]);
+        merged.rules.push(ValidationRule {
+            condition: HashMap::from([("featured".into(), toml::Value::Boolean(true))]),
+            then: RuleAction {
+                required: Some(vec!["reviewer".into()]),
+                not_required: None,
+                fields: None,
+            },
+        });
+        merged.rules.push(ValidationRule {
+            condition: HashMap::from([("urgent".into(), toml::Value::Boolean(true))]),
+            then: RuleAction {
+                required: None,
+                not_required: Some(vec!["reviewer".into()]),
+                fields: None,
+            },
+        });
+        // Both conditions met: the exemption wins regardless of rule order
+        let errors = validate_metadata(
+            &meta(&[
+                ("featured", toml::Value::Boolean(true)),
+                ("urgent", toml::Value::Boolean(true)),
             ]),
             &merged,
         );
