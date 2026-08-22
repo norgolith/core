@@ -231,6 +231,13 @@ pub enum FieldDefinition {
         min: Option<f64>,
         max: Option<f64>,
     },
+    /// Accepts TOML datetimes and RFC3339-parseable strings: the content
+    /// pipeline normalizes top-level datetimes to RFC3339 strings before
+    /// validation, so both forms must validate.
+    Datetime {
+        #[serde(default)]
+        require_offset: bool,
+    },
     Array {
         items: Box<FieldDefinition>,
         min_items: Option<usize>,
@@ -345,6 +352,20 @@ impl FieldDefinition {
                 }
                 Ok(())
             }
+            (FieldDefinition::Datetime { require_offset }, toml::Value::Datetime(dt)) => {
+                validate_datetime_offset(dt, *require_offset, field_name)
+            }
+            (FieldDefinition::Datetime { require_offset }, toml::Value::String(s)) => {
+                match s.parse::<toml::value::Datetime>() {
+                    Ok(dt) => validate_datetime_offset(&dt, *require_offset, field_name),
+                    Err(_) => Err(ValidationError::TypeMismatch {
+                        field: field_name.to_string(),
+                        expected: "datetime".to_string(),
+                        actual: format!("string '{s}'"),
+                        span: None,
+                    }),
+                }
+            }
             (
                 FieldDefinition::Array {
                     items,
@@ -421,12 +442,29 @@ impl FieldDefinition {
             FieldDefinition::String { .. } => "string",
             FieldDefinition::Integer { .. } => "integer",
             FieldDefinition::Float { .. } => "float",
+            FieldDefinition::Datetime { .. } => "datetime",
             FieldDefinition::Array { .. } => "array",
             FieldDefinition::Boolean => "boolean",
             FieldDefinition::Object { .. } => "object",
         }
         .to_string()
     }
+}
+
+/// Validates offset presence on a parsed datetime when required.
+fn validate_datetime_offset(
+    dt: &toml::value::Datetime,
+    require_offset: bool,
+    field_name: &str,
+) -> Result<(), ValidationError> {
+    if require_offset && dt.offset.is_none() {
+        return Err(ValidationError::ConstraintViolation {
+            field: field_name.to_string(),
+            message: "Datetime requires an explicit UTC offset".to_string(),
+            span: None,
+        });
+    }
+    Ok(())
 }
 
 /// Resolves a dot/bracket path like `author.team` or `authors[0].role` into the
@@ -1344,6 +1382,99 @@ mod tests {
         assert!(matches!(err, ValidationError::TypeMismatch { .. }));
     }
 
+    // FieldDefinition::Datetime
+
+    fn datetime(s: &str) -> toml::Value {
+        toml::Value::Datetime(s.parse().expect("valid TOML datetime"))
+    }
+
+    #[test]
+    fn datetime_valid() {
+        let def = FieldDefinition::Datetime {
+            require_offset: false,
+        };
+        assert!(
+            def.validate(&datetime("2026-07-28T12:56:53-04:00"), "published")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn datetime_local_date_ok_without_offset_requirement() {
+        let def = FieldDefinition::Datetime {
+            require_offset: false,
+        };
+        assert!(def.validate(&datetime("2026-07-28"), "published").is_ok());
+    }
+
+    #[test]
+    fn datetime_string_rfc3339_ok() {
+        // The content pipeline normalizes top-level datetimes to RFC3339 strings
+        let def = FieldDefinition::Datetime {
+            require_offset: false,
+        };
+        assert!(
+            def.validate(
+                &toml::Value::String("2026-07-28T12:56:53-04:00".into()),
+                "published"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn datetime_unparseable_string_errors() {
+        let def = FieldDefinition::Datetime {
+            require_offset: false,
+        };
+        let err = def
+            .validate(&toml::Value::String("tomorrow".into()), "published")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
+    #[test]
+    fn datetime_require_offset_rejects_naive() {
+        let def = FieldDefinition::Datetime {
+            require_offset: true,
+        };
+        let err = def
+            .validate(&datetime("2026-07-28T12:00:00"), "published")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::ConstraintViolation { .. }));
+    }
+
+    #[test]
+    fn datetime_require_offset_accepts_rfc3339() {
+        let def = FieldDefinition::Datetime {
+            require_offset: true,
+        };
+        // As native TOML datetime...
+        assert!(
+            def.validate(&datetime("2026-07-28T12:00:00Z"), "published")
+                .is_ok()
+        );
+        // ...and as normalized RFC3339 string
+        assert!(
+            def.validate(
+                &toml::Value::String("2026-07-28T12:00:00Z".into()),
+                "published"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn datetime_wrong_type_errors() {
+        let def = FieldDefinition::Datetime {
+            require_offset: false,
+        };
+        let err = def
+            .validate(&toml::Value::Integer(42), "published")
+            .unwrap_err();
+        assert!(matches!(err, ValidationError::TypeMismatch { .. }));
+    }
+
     // ContentSchema serde round-trip
 
     #[test]
@@ -1363,6 +1494,10 @@ min = 0
 type = "float"
 min = 0.0
 max = 1.0
+
+[fields.published]
+type = "datetime"
+require_offset = true
 
 [fields.draft]
 type = "boolean"

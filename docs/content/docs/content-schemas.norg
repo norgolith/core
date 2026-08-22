@@ -98,6 +98,21 @@ Norgolith content schemas system allows you to define and enforce structure and 
      max = 5.0
      @end
 
+*** Datetime
+    - Validates dates and timestamps (TOML datetime values).
+
+    Accepts native TOML datetimes and RFC 3339 strings: Norgolith normalizes top-level datetime metadata to RFC 3339 strings before validation, so both forms pass.
+
+**** Options
+     - `require_offset`: When `true`, rejects datetimes without an explicit UTC offset (e.g. `2026-07-28T12:00:00` or date-only `2026-07-28`). Defaults to `false`.
+
+**** Example
+     @code toml
+     [content_schema.fields.published]
+     type = "datetime"
+     require_offset = true  # Ensures date arithmetic in templates is safe
+     @end
+
 *** Boolean
     - Validates `true` or `false` values.
 
