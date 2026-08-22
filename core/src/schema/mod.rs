@@ -551,6 +551,9 @@ impl ValidationRule {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RuleAction {
     pub required: Option<Vec<String>>,
+    /// Exempts fields from accumulated requirements (global `required` and
+    /// requirements added by other rules) when the rule condition matches.
+    pub not_required: Option<Vec<String>>,
     pub fields: Option<HashMap<String, FieldDefinition>>,
 }
 
@@ -1108,6 +1111,7 @@ mod tests {
             condition: HashMap::from([("draft".into(), toml::Value::Boolean(false))]),
             then: RuleAction {
                 required: Some(vec!["publish_date".into()]),
+                not_required: None,
                 fields: None,
             },
         });
@@ -1116,6 +1120,7 @@ mod tests {
             condition: HashMap::from([("featured".into(), toml::Value::Boolean(true))]),
             then: RuleAction {
                 required: Some(vec!["hero_image".into()]),
+                not_required: None,
                 fields: None,
             },
         });
@@ -1130,6 +1135,7 @@ mod tests {
             condition: HashMap::from([("draft".into(), toml::Value::Boolean(false))]),
             then: RuleAction {
                 required: Some(vec!["publish_date".into()]),
+                not_required: None,
                 fields: None,
             },
         }
@@ -1167,6 +1173,7 @@ mod tests {
             condition: HashMap::from([("author.team".into(), toml::Value::String("core".into()))]),
             then: RuleAction {
                 required: None,
+                not_required: None,
                 fields: None,
             },
         };
@@ -1189,6 +1196,7 @@ mod tests {
             )]),
             then: RuleAction {
                 required: None,
+                not_required: None,
                 fields: None,
             },
         };
@@ -1509,11 +1517,22 @@ one_of = ["draft", "published"]
 [fields.author]
 type = "object"
 schema = { name = { type = "string" }, email = { type = "string" } }
+
+[[rules]]
+if = { draft = true }
+
+[rules.then]
+not_required = ["publish_date"]
 "#;
         let schema: ContentSchema = toml::from_str(toml_str).unwrap();
         let restored: ContentSchema = toml::from_str(&toml::to_string(&schema).unwrap()).unwrap();
 
         assert_eq!(schema.required, restored.required);
         assert_eq!(schema.fields.len(), restored.fields.len());
+        assert_eq!(schema.rules.len(), restored.rules.len());
+        assert_eq!(
+            schema.rules[0].then.not_required,
+            Some(vec!["publish_date".into()])
+        );
     }
 }
