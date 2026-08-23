@@ -22,6 +22,9 @@ validation with Norg-to-HTML conversion to build static sites from Norg content.
 - **Incremental builds** via content-hash caching
 - **Parallel builds** powered by Rayon
 - **SEO** out of the box: sitemap.xml, robots.txt, OpenGraph, Twitter Cards
+- **Built-in search index** (`search_index.json` + dev server endpoint)
+- **Asset fingerprinting** (blake3 + `fingerprint` Tera filter)
+- **Schema validation** for content metadata via `lith check`
 - **Custom error pages** (404.html, 500.html)
 - **Live preview** dev server with hot reload and config hot-reloading
 - **Plugin sources**: install from crates.io, Git repositories, or local paths
@@ -32,17 +35,17 @@ validation with Norg-to-HTML conversion to build static sites from Norg content.
 | Dimension            | Hugo                              | Zola                | Norgolith                     |
 | -------------------- | --------------------------------- | ------------------- | ----------------------------- |
 | Language             | Go                                | Rust                | Rust                          |
-| Templates            | Go templates                      | Tera v1             | Tera v2 + shortcodes          |
+| Templates            | Go templates                      | Tera v2             | Tera v2                       |
 | Content format       | Markdown + 5 others               | Markdown only       | Norg only                     |
 | Plugin system        | None                              | None                | C ABI + Landlock sandbox      |
-| Content validation   | None                              | Link checking       | rust-norg parser + schemas    |
+| Content validation   | None                              | Link checking       | rust-norg parser + schemas (`lith check`) |
 | Syntax highlighting  | Built-in (Chroma)                 | Built-in            | Via plugin (tree-sitter)      |
 | Image processing     | Yes                               | Yes                 | Planned                       |
 | Asset bundling       | Yes                               | No                  | Planned                       |
 | Asset fingerprinting | Yes                               | No                  | Yes (blake3)                  |
 | Configuration        | TOML / YAML / JSON                | TOML                | TOML                          |
 | Multilingual         | Yes                               | Yes                 | No                            |
-| Shortcodes           | Built-in                          | No                  | Tera v2 `component()`         |
+| Shortcodes           | Built-in                          | Tera v2 components  | Tera v2 `component()`         |
 | Custom output        | JSON, RSS, etc                    | RSS, Atom           | RSS, Atom                     |
 | Theme system         | Yes                               | Yes                 | Yes                           |
 | Built-in search      | No                                | Yes                 | Yes                           |
@@ -277,6 +280,7 @@ Commands:
   new      Create a new asset in the site and optionally open it using your preferred system editor. e.g. 'new -k norg post1.norg' -> 'content/post1.norg'
   build    Build a site for production
   plugin   Plugin management
+  check    Validate content files against the configured content schema
   preview  Preview from build result
   help     Print this message or the help of the given subcommand(s)
 
