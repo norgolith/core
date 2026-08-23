@@ -2,137 +2,147 @@
   description = "Norg static site generator and plugin SDK";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.zst";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-    ...
-  }:
-    flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = import nixpkgs {inherit system;};
-        toolchain = pkgs.rustPlatform;
-        corePackage = (pkgs.lib.importTOML "${self}/core/Cargo.toml").package;
-        sdkPackage = (pkgs.lib.importTOML "${self}/sdk/Cargo.toml").package;
-        mcpPackage = (pkgs.lib.importTOML "${self}/norgolith-mcp/Cargo.toml").package;
-      in rec {
-        # nix build
-        packages.default = toolchain.buildRustPackage {
-          pname = corePackage.name;
-          version = corePackage.version;
-          src = pkgs.lib.cleanSource "${self}";
-          cargoLock = {
-            lockFile = "${self}/Cargo.lock";
-            allowBuiltinFetchGit = true;
-          };
-          useNextest = true;
-          dontUseCargoParallelTests = true;
+  outputs =
+    {
+      self,
+      nixpkgs,
+      ...
+    }:
+    let
+      systems = nixpkgs.lib.systems.doubles.linux ++ nixpkgs.lib.systems.doubles.darwin;
+      eachSystem = f: nixpkgs.lib.genAttrs systems (s: f nixpkgs.legacyPackages.${s});
+    in
+    {
+      formatter = eachSystem (pkgs: pkgs.nixfmt-tree);
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-          buildInputs = with pkgs; [
-            libgit2
-            openssl
-            zlib
+      packages = eachSystem (
+        pkgs:
+        let
+          corePackage = (pkgs.lib.importTOML "${self}/core/Cargo.toml").package;
+          sdkPackage = (pkgs.lib.importTOML "${self}/sdk/Cargo.toml").package;
+          mcpPackage = (pkgs.lib.importTOML "${self}/norgolith-mcp/Cargo.toml").package;
+        in
+        {
+          default = pkgs.rustPlatform.buildRustPackage {
+            pname = corePackage.name;
+            version = corePackage.version;
+            src = pkgs.lib.cleanSource "${self}";
+
+            cargoLock = {
+              lockFile = "${self}/Cargo.lock";
+              allowBuiltinFetchGit = true;
+            };
+            useNextest = true;
+            dontUseCargoParallelTests = true;
+
+            nativeBuildInputs = [
+              pkgs.pkg-config
+            ];
+
+            buildInputs =
+              [
+                pkgs.libgit2
+                pkgs.openssl
+                pkgs.zlib
+              ];
+
+            env = {
+              LIBGIT2_NO_VENDOR = true;
+              OPENSSL_NO_VENDOR = true;
+            };
+
+            __darwinAllowLocalNetworking = true;
+
+            meta = {
+              description = corePackage.description;
+              homepage = corePackage.repository;
+              license = pkgs.lib.licenses.gpl2Only;
+              maintainers = corePackage.authors;
+            };
+
+            # For other makeRustPlatform features see:
+            # https://github.com/NixOS/nixpkgs/blob/master/doc/languages-frameworks/rust.section.md#cargo-features-cargo-features
+          };
+
+          norgolith-plugin-sdk = pkgs.rustPlatform.buildRustPackage {
+            pname = sdkPackage.name;
+            version = sdkPackage.version;
+            src = pkgs.lib.cleanSource "${self}";
+
+            cargoLock = {
+              lockFile = "${self}/sdk/Cargo.lock";
+              allowBuiltinFetchGit = true;
+            };
+            cargoRoot = "sdk";
+            buildAndTestSubdir = "sdk";
+
+            meta = {
+              description = sdkPackage.description;
+              homepage = sdkPackage.repository;
+              license = pkgs.lib.licenses.gpl2Only;
+              maintainers = sdkPackage.authors;
+            };
+          };
+
+          norgolith-mcp = pkgs.rustPlatform.buildRustPackage {
+            pname = mcpPackage.name;
+            version = mcpPackage.version;
+            src = pkgs.lib.cleanSource "${self}";
+
+            cargoLock = {
+              lockFile = "${self}/norgolith-mcp/Cargo.lock";
+              allowBuiltinFetchGit = true;
+            };
+            cargoRoot = "norgolith-mcp";
+            buildAndTestSubdir = "norgolith-mcp";
+
+            meta = {
+              description = mcpPackage.description;
+              homepage = mcpPackage.repository;
+              license = pkgs.lib.licenses.gpl2Only;
+              maintainers = mcpPackage.authors;
+            };
+          };
+        }
+      );
+
+      devShells = eachSystem (pkgs: {
+        default = pkgs.mkShell {
+          nativeBuildInputs = [
+            pkgs.rustPlatform.rustLibSrc
+
+            pkgs.cargo
+            pkgs.rustc
+            pkgs.clippy
+            pkgs.rustfmt
+            pkgs.cargo-edit
+            pkgs.cargo-nextest
+            pkgs.rust-analyzer
+            pkgs.pkg-config # Required by git2 crate
+            pkgs.openssl # Required by git2 crate
+
+            # Documentation site dev tools
+            pkgs.tailwindcss_4
+            pkgs.mprocs
+            pkgs.watchman
+            pkgs.tailwindcss-language-server
           ];
 
           env = {
-            LIBGIT2_NO_VENDOR = true;
-            OPENSSL_NO_VENDOR = true;
-          };
+            # Many editors rely on this rust-src PATH variable
+            RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
 
-          __darwinAllowLocalNetworking = true;
-
-          meta = {
-            description = corePackage.description;
-            homepage = corePackage.repository;
-            license = pkgs.lib.licenses.gpl2Only;
-            maintainers = corePackage.authors;
-          };
-
-          # For other makeRustPlatform features see:
-          # https://github.com/NixOS/nixpkgs/blob/master/doc/languages-frameworks/rust.section.md#cargo-features-cargo-features
-        };
-
-        packages.norgolith-plugin-sdk = toolchain.buildRustPackage {
-          pname = sdkPackage.name;
-          version = sdkPackage.version;
-          src = pkgs.lib.cleanSource "${self}";
-          cargoLock = {
-            lockFile = "${self}/sdk/Cargo.lock";
-            allowBuiltinFetchGit = true;
-          };
-          cargoRoot = "sdk";
-          buildAndTestSubdir = "sdk";
-
-          meta = {
-            description = sdkPackage.description;
-            homepage = sdkPackage.repository;
-            license = pkgs.lib.licenses.gpl2Only;
-            maintainers = sdkPackage.authors;
+            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
           };
         };
-
-        packages.norgolith-mcp = toolchain.buildRustPackage {
-          pname = mcpPackage.name;
-          version = mcpPackage.version;
-          src = pkgs.lib.cleanSource "${self}";
-          cargoLock = {
-            lockFile = "${self}/norgolith-mcp/Cargo.lock";
-            allowBuiltinFetchGit = true;
-          };
-          cargoRoot = "norgolith-mcp";
-          buildAndTestSubdir = "norgolith-mcp";
-
-          meta = {
-            description = mcpPackage.description;
-            homepage = mcpPackage.repository;
-            license = pkgs.lib.licenses.gpl2Only;
-            maintainers = mcpPackage.authors;
-          };
-        };
-
-        # nix run
-        apps.default = flake-utils.lib.mkApp {drv = packages.default;};
-
-        # nix develop
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            (with toolchain; [
-              cargo
-              rustc
-              rustLibSrc
-            ])
-            clippy
-            rustfmt
-            cargo-edit
-            cargo-nextest
-            rust-analyzer
-            pkg-config # Required by git2 crate
-            openssl # Required by git2 crate
-
-            # Documentation site dev tools
-            tailwindcss_4
-            mprocs
-            watchman
-            tailwindcss-language-server
-          ];
-
-          # Many editors rely on this rust-src PATH variable
-          RUST_SRC_PATH = "${toolchain.rustLibSrc}";
-
-          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-        };
-      }
-    );
+      });
+    };
 
   nixConfig = {
-    extra-substituters = ["https://ntbbloodbath.cachix.org"];
+    extra-substituters = [ "https://ntbbloodbath.cachix.org" ];
     extra-trusted-public-keys = [
       "ntbbloodbath.cachix.org-1:L4DjjGwDB6O3BJ4SmtYTZbvWKLi+1v/hRlLWKOtq+f0="
     ];
