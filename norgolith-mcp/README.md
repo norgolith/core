@@ -72,6 +72,14 @@ Source code resources (MIME type `text/x-rust`):
 | `run_check(project_dir?)` | Validate site content against its schema; returns a structured diagnostics report |
 | `run_build(project_dir?, no_minify?)` | Run a production build and return the output with exit status |
 | `explain_error(code)` | Explain a norgolith error code: meaning, causes, fix, docs URL |
+| `fix_diagnostic(project_dir?)` | Interactively fix schema errors: prompts you via elicitation (suggestions + free text), patches the `.norg` metadata, re-validates, auto-reverts if errors don't decrease |
+
+`fix_diagnostic` requires an MCP client with
+[elicitation](https://modelcontextprotocol.io/specification/draft/client/elicitation) support
+(`capabilities.elicitation`). **No mainstream client supports this yet**. OpenCode tracks it for v2
+([anomalyco/opencode#28567](https://github.com/anomalyco/opencode/issues/28567)). Without a capable
+client the tool refuses to act and points at `run_check`; its protocol path is covered by
+scripted-client integration tests (`tests/elicitation.rs`, gated on `NORGOLITH_BIN`).
 
 Set `NORGOLITH_BIN` to point at a specific `lith` executable; defaults to `lith` on `PATH`.
 
