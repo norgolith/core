@@ -146,7 +146,7 @@ fn paragraph_to_string(
                             link_name = title_str.clone();
                         }
                         paragraph.push_str("href=\"#");
-                        paragraph.push_str(&title_str.replace(" ", "-"));
+                        paragraph.push_str(&slug::slugify(&title_str));
                         paragraph.push('"');
                     }
                     // Missing: Footnote, Definition, Wiki, Generic, Timestamp, Extendable
@@ -209,12 +209,9 @@ fn paragraph_to_string(
                     LinkTarget::Heading { level: _, title } => {
                         // Regex to remove possible links from heading title ids during href
                         let re = inline_re();
+                        let title_str = paragraph_to_string(title, _strong_carry, weak_carry, root_url);
                         paragraph.push_str(" href=\"#");
-                        paragraph.push_str(&re.replace(
-                            &paragraph_to_string(title, _strong_carry, weak_carry, root_url)
-                                .replace(" ", "-"),
-                            ""
-                        ));
+                        paragraph.push_str(&slug::slugify(&re.replace_all(&title_str, "")));
                         paragraph.push('"');
                     }
                     // Missing: Footnote, Definition, Wiki, Generic, Timestamp, Extendable
