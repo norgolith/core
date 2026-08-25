@@ -16,10 +16,10 @@ pub fn validate_metadata(
     // over requirements regardless of rule order (global or rule-added).
     let mut exempted = std::collections::HashSet::new();
     for rule in &merged.rules {
-        if let Ok(true) = rule.applies(metadata) {
-            if let Some(not_required) = &rule.then.not_required {
-                exempted.extend(not_required.iter().cloned());
-            }
+        if let Ok(true) = rule.applies(metadata)
+            && let Some(not_required) = &rule.then.not_required
+        {
+            exempted.extend(not_required.iter().cloned());
         }
     }
 
