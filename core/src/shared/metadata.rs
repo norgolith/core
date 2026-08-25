@@ -314,6 +314,43 @@ pub fn validate_content_metadata(
     schema: &ContentSchema,
     as_warnings: bool,
 ) -> Result<()> {
+    let errors = validate_content_metadata_errors(content_dir, path, metadata, schema, content)?;
+    if errors.is_empty() {
+        return Ok(());
+    }
+    let report = validation_report(path, content, &errors);
+    if as_warnings {
+        eprintln!("{report:?}");
+        return Ok(());
+    }
+    Err(report)
+}
+
+/// Builds the miette report for a set of enriched validation errors, attaching
+/// the file source so diagnostics render with snippets.
+pub fn validation_report(path: &Path, content: &str, errors: &[ValidationError]) -> miette::Report {
+    miette::Report::new(ValidationErrors(errors.to_vec())).with_source_code(NamedSource::new(
+        path.display().to_string(),
+        content.to_string(),
+    ))
+}
+
+/// Structured variant of [`validate_content_metadata`] returning the enriched
+/// error list instead of a rendered report. `Ok(vec![])` means valid.
+///
+/// # Arguments
+/// * `content_dir` - The content directory.
+/// * `path` - The path to the content file.
+/// * `metadata` - The parsed metadata to validate.
+/// * `schema` - The schema to validate the metadata against.
+/// * `content` - The raw file content (for span resolution).
+pub fn validate_content_metadata_errors(
+    content_dir: &Path,
+    path: &Path,
+    metadata: &toml::Value,
+    schema: &ContentSchema,
+    content: &str,
+) -> Result<Vec<ValidationError>> {
     let relative_path = path
         .strip_prefix(content_dir)
         .map_err(|e| miette!("Path {} is not under content_dir: {}", path.display(), e))?;
@@ -335,31 +372,13 @@ pub fn validate_content_metadata(
     let schema_nodes = schema.resolve_path(&content_path);
     let merged_schema = ContentSchema::merge_hierarchy(&schema_nodes);
 
-    let matched_path = content_path
-        .split('/')
-        .take(schema_nodes.len() - 1)
-        .collect::<Vec<_>>()
-        .join("/");
-
     let errors = validate_metadata(&metadata_map, &merged_schema);
 
-    if !errors.is_empty() {
-        let spans = scan_meta_spans(content);
-        let errors = enrich_spans(errors, &spans);
-        let source_name = if matched_path.is_empty() {
-            path.display().to_string()
-        } else {
-            format!("{} (schema: '{}')", path.display(), matched_path)
-        };
-        let report = miette::Report::new(ValidationErrors(errors))
-            .with_source_code(NamedSource::new(source_name, content.to_string()));
-        if as_warnings {
-            eprintln!("{:?}", report);
-            return Ok(());
-        }
-        return Err(report);
+    if errors.is_empty() {
+        return Ok(Vec::new());
     }
-    Ok(())
+    let spans = scan_meta_spans(content);
+    Ok(enrich_spans(errors, &spans))
 }
 
 /// Collects all unique categories from post metadata

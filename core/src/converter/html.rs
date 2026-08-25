@@ -211,7 +211,7 @@ fn paragraph_to_string(
                         let re = inline_re();
                         let title_str = paragraph_to_string(title, _strong_carry, weak_carry, root_url);
                         paragraph.push_str(" href=\"#");
-                        paragraph.push_str(&slug::slugify(&re.replace_all(&title_str, "")));
+                        paragraph.push_str(&slug::slugify(re.replace_all(&title_str, "")));
                         paragraph.push('"');
                     }
                     // Missing: Footnote, Definition, Wiki, Generic, Timestamp, Extendable

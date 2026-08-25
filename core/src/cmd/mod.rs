@@ -9,7 +9,7 @@ mod seo;
 mod theme;
 
 pub use build::build;
-pub use check::check;
+pub use check::{CheckFormat, check};
 pub use dev::dev;
 pub use init::init;
 pub use new::new;

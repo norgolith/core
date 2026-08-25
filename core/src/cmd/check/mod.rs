@@ -1,12 +1,70 @@
 use std::path::PathBuf;
+use std::process::exit;
 
-use miette::{IntoDiagnostic, NamedSource, Report, Result, Severity, WrapErr, bail, miette};
+use clap::ValueEnum;
+use miette::{
+    Diagnostic, IntoDiagnostic, NamedSource, Report, Result, Severity, WrapErr, bail, miette,
+};
+use regex::Regex;
+use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::shared::{SitePaths, extract_metadata_from_content, validate_content_metadata};
+use crate::schema::ValidationError;
+use crate::shared::{
+    SitePaths, extract_metadata_from_content, validate_content_metadata_errors, validation_report,
+};
 use crate::{config, fs};
 
-pub fn check() -> Result<()> {
+/// Output format for `lith check` diagnostics.
+#[derive(ValueEnum, Clone, Copy, Default)]
+pub enum CheckFormat {
+    /// Human-readable miette rendering (default)
+    #[default]
+    Human,
+    /// Structured JSON for tooling
+    Json,
+    /// GitHub Actions workflow commands (inline PR annotations)
+    Github,
+}
+
+impl std::fmt::Display for CheckFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Human => "human",
+            Self::Json => "json",
+            Self::Github => "github",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// A content file that failed validation, kept structured so machine formats
+/// can serialize it without parsing miette output.
+struct FileFailure {
+    path: PathBuf,
+    content: String,
+    kind: FailureKind,
+}
+
+enum FailureKind {
+    Validation(Vec<ValidationError>),
+    /// Metadata block could not be parsed at all.
+    Extract(Report),
+}
+
+impl FileFailure {
+    fn error_count(&self) -> usize {
+        match &self.kind {
+            FailureKind::Validation(errors) => errors
+                .iter()
+                .filter(|e| !matches!(e.severity(), Some(Severity::Warning)))
+                .count(),
+            FailureKind::Extract(_) => 1,
+        }
+    }
+}
+
+pub fn check(format: CheckFormat) -> Result<()> {
     let Some(root) = fs::find_config_file()? else {
         bail!(
             "{}: not in a Norgolith site directory",
@@ -50,8 +108,8 @@ pub fn check() -> Result<()> {
         .to_path_buf();
     let paths = SitePaths::new(root_dir.clone());
 
-    let mut failures: Vec<(PathBuf, Report)> = Vec::new();
     let mut total = 0usize;
+    let mut failures: Vec<FileFailure> = Vec::new();
     for entry in WalkDir::new(&paths.content)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -71,93 +129,316 @@ pub fn check() -> Result<()> {
             match extract_metadata_from_content(&content, rel_path, &site_config.root_url) {
                 Ok(metadata) => metadata,
                 Err(report) => {
-                    failures.push((path.to_path_buf(), report));
+                    failures.push(FileFailure {
+                        path: path.to_path_buf(),
+                        content: content.clone(),
+                        kind: FailureKind::Extract(report),
+                    });
                     continue;
                 }
             };
-        if let Err(report) =
-            validate_content_metadata(&paths.content, path, &content, &metadata, schema, false)
-            && count_errors(&report) > 0
-        {
-            failures.push((path.to_path_buf(), report));
+        match validate_content_metadata_errors(&paths.content, path, &metadata, schema, &content) {
+            Ok(errors)
+                if !errors.is_empty()
+                    && errors
+                        .iter()
+                        .any(|e| !matches!(e.severity(), Some(Severity::Warning))) =>
+            {
+                failures.push(FileFailure {
+                    path: path.to_path_buf(),
+                    content,
+                    kind: FailureKind::Validation(errors),
+                });
+            }
+            Ok(_) => {}
+            Err(report) => {
+                failures.push(FileFailure {
+                    path: path.to_path_buf(),
+                    content,
+                    kind: FailureKind::Extract(report),
+                });
+            }
         }
     }
 
     if failures.is_empty() {
-        println!("All {} content file(s) passed schema validation", total);
+        match format {
+            CheckFormat::Human => {
+                println!("All {total} content file(s) passed schema validation");
+            }
+            CheckFormat::Json => {
+                let out = JsonOutput {
+                    summary: Summary {
+                        files: total,
+                        errors: 0,
+                        warnings: 0,
+                    },
+                    diagnostics: Vec::new(),
+                };
+                println!("{}", serde_json::to_string_pretty(&out).into_diagnostic()?);
+            }
+            CheckFormat::Github => {}
+        }
         return Ok(());
     }
 
-    let error_count: usize = failures.iter().map(|(_, r)| count_errors(r)).sum();
-    for (_, report) in &failures {
-        println!("{report:?}");
+    let error_count: usize = failures.iter().map(FileFailure::error_count).sum();
+    match format {
+        CheckFormat::Human => {
+            for failure in &failures {
+                match &failure.kind {
+                    FailureKind::Validation(errors) => {
+                        println!(
+                            "{:?}",
+                            validation_report(&failure.path, &failure.content, errors)
+                        );
+                    }
+                    FailureKind::Extract(report) => println!("{report:?}"),
+                }
+            }
+            bail!(
+                "Schema validation failed: {} file(s) failed ({} error(s) total)",
+                failures.len(),
+                error_count
+            );
+        }
+        CheckFormat::Json => {
+            let out = collect_json_output(&failures, total);
+            println!("{}", serde_json::to_string_pretty(&out).into_diagnostic()?);
+        }
+        CheckFormat::Github => {
+            for diag in collect_json_output(&failures, total).diagnostics {
+                println!("{}", github_annotation(&diag));
+            }
+        }
     }
-    bail!(
-        "Schema validation failed: {} file(s) failed ({} error(s) total)",
-        failures.len(),
-        error_count
-    );
+    // Machine-readable formats must not mix a human bail! report into stderr;
+    // a plain non-zero exit is the CI signal.
+    exit(1);
 }
 
-/// Counts Error-severity diagnostics; warnings (unknown_field, rule_condition) do not fail check.
-// ponytail: warnings-only files validate to Err(report) but are discarded here since they never
-// gate CI; surface them via the build output instead. The ValidationErrors container itself has
-// no severity, so a report with related diagnostics counts only those; anything else is a real
-// error (e.g. metadata parse failure) and counts as one.
-fn count_errors(report: &Report) -> usize {
-    match report.related() {
-        Some(related) => related
-            .filter(|d| matches!(d.severity(), None | Some(Severity::Error)))
-            .count(),
-        None => usize::from(matches!(report.severity(), None | Some(Severity::Error))),
+fn count_warnings(failures: &[FileFailure]) -> usize {
+    failures
+        .iter()
+        .flat_map(|f| match &f.kind {
+            FailureKind::Validation(errors) => errors.iter().collect::<Vec<_>>(),
+            FailureKind::Extract(_) => Vec::new(),
+        })
+        .filter(|e| matches!(e.severity(), Some(Severity::Warning)))
+        .count()
+}
+
+fn to_json_diagnostic(failure: &FileFailure, error: &ValidationError) -> JsonDiagnostic {
+    let (line, column) = error.span().map_or((None, None), |span| {
+        let (line, col) = line_col(&failure.content, span.offset());
+        (Some(line), Some(col))
+    });
+    JsonDiagnostic {
+        file: failure.path.display().to_string(),
+        code: error.code().map(|c| c.to_string()),
+        severity: match error.severity() {
+            Some(Severity::Warning) => "warning",
+            _ => "error",
+        },
+        message: strip_ansi(&error.to_string()),
+        help: error.help().map(|h| strip_ansi(&h.to_string())),
+        line,
+        column,
     }
+}
+
+fn collect_json_output(failures: &[FileFailure], total: usize) -> JsonOutput {
+    let mut diagnostics = Vec::new();
+    for failure in failures {
+        match &failure.kind {
+            FailureKind::Validation(errors) => {
+                for error in errors {
+                    diagnostics.push(to_json_diagnostic(failure, error));
+                }
+            }
+            FailureKind::Extract(report) => {
+                diagnostics.push(JsonDiagnostic {
+                    file: failure.path.display().to_string(),
+                    code: None,
+                    severity: "error",
+                    message: strip_ansi(&report.to_string()),
+                    help: report.help().map(|h| strip_ansi(&h.to_string())),
+                    line: None,
+                    column: None,
+                });
+            }
+        }
+    }
+    JsonOutput {
+        summary: Summary {
+            files: total,
+            errors: failures.iter().map(FileFailure::error_count).sum(),
+            warnings: count_warnings(failures),
+        },
+        diagnostics,
+    }
+}
+
+/// Renders a diagnostic as a GitHub Actions workflow command, e.g.
+/// `::error file=content/x.norg,line=2,col=8::norgolith::schema::missing_field: ...`
+/// so GitHub shows inline PR annotations without custom actions.
+fn github_annotation(diag: &JsonDiagnostic) -> String {
+    let props = [
+        ("file", escape_property(&diag.file)),
+        ("line", diag.line.map(|l| l.to_string()).unwrap_or_default()),
+        (
+            "col",
+            diag.column.map(|c| c.to_string()).unwrap_or_default(),
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, v)| !v.is_empty())
+    .map(|(k, v)| format!("{k}={v}"))
+    .collect::<Vec<_>>()
+    .join(",");
+    let code = diag.code.as_deref().unwrap_or("schema");
+    format!(
+        "::{} {}::{}: {}",
+        diag.severity,
+        props,
+        code,
+        escape_data(&diag.message)
+    )
+}
+
+/// Escapes a GitHub workflow-command property value.
+fn escape_property(value: &str) -> String {
+    value
+        .replace('%', "%25")
+        .replace('\r', "%0D")
+        .replace('\n', "%0A")
+        .replace(':', "%3A")
+        .replace(',', "%2C")
+}
+
+/// Escapes a GitHub workflow-command data segment.
+fn escape_data(value: &str) -> String {
+    value
+        .replace('%', "%25")
+        .replace('\r', "%0D")
+        .replace('\n', "%0A")
+}
+
+/// Strips ANSI SGR sequences so machine-readable output stays clean even when
+/// colored paints the Display impls of validation errors.
+fn strip_ansi(s: &str) -> String {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"\x1b\[[0-9;]*[A-Za-z]").unwrap())
+        .replace_all(s, "")
+        .into_owned()
+}
+
+/// Converts a byte offset into a 1-based (line, column) pair, counting columns
+/// in chars so multi-byte Norg text reports sane positions.
+fn line_col(content: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(content.len());
+    let line = content[..offset].bytes().filter(|b| *b == b'\n').count() + 1;
+    let line_start = content[..offset].rfind('\n').map_or(0, |i| i + 1);
+    let col = content[line_start..offset].chars().count() + 1;
+    (line, col)
+}
+
+#[derive(Serialize)]
+struct Summary {
+    files: usize,
+    errors: usize,
+    warnings: usize,
+}
+
+#[derive(Serialize)]
+struct JsonDiagnostic {
+    file: String,
+    code: Option<String>,
+    severity: &'static str,
+    message: String,
+    help: Option<String>,
+    line: Option<usize>,
+    column: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct JsonOutput {
+    summary: Summary,
+    diagnostics: Vec<JsonDiagnostic>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{ValidationError, ValidationErrors};
-    use miette::NamedSource;
+    use crate::schema::ValidationError;
 
     #[test]
-    fn count_errors_counts_only_error_severity() {
-        let errors = vec![
-            ValidationError::UnknownField {
-                field: "Version".into(),
-                suggested: Some("version".into()),
-                span: None,
-            },
-            ValidationError::TypeMismatch {
-                field: "version".into(),
-                expected: "number".into(),
-                actual: "string".into(),
-                span: None,
-            },
-        ];
-        assert_eq!(count_errors(&Report::new(ValidationErrors(errors))), 1);
+    fn strip_ansi_removes_sgr_sequences() {
+        assert_eq!(strip_ansi("\x1b[1mfoo\x1b[0m bar"), "foo bar");
+        assert_eq!(strip_ansi("plain"), "plain");
     }
 
     #[test]
-    fn count_errors_zero_for_warning_only() {
-        let report = Report::new(ValidationErrors(vec![ValidationError::UnknownField {
-            field: "Version".into(),
-            suggested: Some("version".into()),
-            span: None,
-        }]));
-        assert_eq!(count_errors(&report), 0);
+    fn line_col_counts_bytes_for_lines_and_chars_for_columns() {
+        let content = "título\nlínea dos";
+        // Offset of "dos": "título" is 7 bytes + '\n' + "línea" is 6 bytes + ' ' = 15
+        assert_eq!(line_col(content, 15), (2, 7));
+        assert_eq!(line_col(content, 0), (1, 1));
+        assert_eq!(line_col("abc", 99), (1, 4));
     }
 
     #[test]
-    fn count_errors_handles_with_source_code_wrapper() {
-        // validate_content_metadata attaches source code, which re-wraps the report;
-        // related() must still surface the inner ValidationErrors.
-        let report = Report::new(ValidationErrors(vec![ValidationError::TypeMismatch {
-            field: "version".into(),
-            expected: "number".into(),
-            actual: "string".into(),
-            span: None,
-        }]))
-        .with_source_code(NamedSource::new("test.norg", "version: one".to_string()));
-        assert_eq!(count_errors(&report), 1);
+    fn github_annotation_escapes_specials() {
+        let diag = JsonDiagnostic {
+            file: "a,b.norg".into(),
+            code: Some("norgolith::schema::missing_field".into()),
+            severity: "error",
+            message: "missing 'x'\nsecond line".into(),
+            help: None,
+            line: Some(3),
+            column: Some(1),
+        };
+        let ann = github_annotation(&diag);
+        assert!(ann.starts_with("::error file=a%2Cb.norg,line=3,col=1::"));
+        assert!(ann.contains("%0A"));
+        assert!(!ann.contains('\n'));
+    }
+
+    #[test]
+    fn github_annotation_skips_missing_position() {
+        let diag = JsonDiagnostic {
+            file: "x.norg".into(),
+            code: None,
+            severity: "warning",
+            message: "no span".into(),
+            help: None,
+            line: None,
+            column: None,
+        };
+        let ann = github_annotation(&diag);
+        assert!(ann.starts_with("::warning file=x.norg::"));
+        assert!(!ann.contains("line="));
+    }
+
+    #[test]
+    fn error_count_ignores_warnings() {
+        let f = FileFailure {
+            path: PathBuf::from("t.norg"),
+            content: String::new(),
+            kind: FailureKind::Validation(vec![
+                ValidationError::UnknownField {
+                    field: "Version".into(),
+                    suggested: Some("version".into()),
+                    span: None,
+                },
+                ValidationError::TypeMismatch {
+                    field: "version".into(),
+                    expected: "number".into(),
+                    actual: "string".into(),
+                    span: None,
+                },
+            ]),
+        };
+        assert_eq!(f.error_count(), 1);
     }
 }

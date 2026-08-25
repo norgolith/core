@@ -67,6 +67,19 @@ pub enum ValidationError {
     },
 }
 
+impl ValidationError {
+    /// Byte span of the offending token in the source file, if resolvable.
+    pub fn span(&self) -> Option<&miette::SourceSpan> {
+        match self {
+            Self::MissingField { span, .. }
+            | Self::TypeMismatch { span, .. }
+            | Self::ConstraintViolation { span, .. }
+            | Self::UnknownField { span, .. } => span.as_ref(),
+            Self::RuleConditionFailed { .. } => None,
+        }
+    }
+}
+
 impl std::error::Error for ValidationError {}
 
 impl std::fmt::Display for ValidationError {
@@ -469,7 +482,7 @@ fn validate_datetime_offset(
 
 /// Resolves a dot/bracket path like `author.team` or `authors[0].role` into the
 /// nested metadata value. Plain keys resolve as before.
-// ponytail: exact paths only: `key`, `key.sub`, `arr[0]`, `arr[0].sub`. No wildcards
+// INFO: exact paths only: `key`, `key.sub`, `arr[0]`, `arr[0].sub`. No wildcards
 // (match-any across array items is a separate feature), no escaping.
 fn get_path<'a>(metadata: &'a HashMap<String, toml::Value>, path: &str) -> Option<&'a toml::Value> {
     let mut parts = path.split('.');

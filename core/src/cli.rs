@@ -138,7 +138,11 @@ enum Commands {
         subcommand: cmd::PluginCommands,
     },
     /// Validate content files against the configured content schema
-    Check {},
+    Check {
+        /// Output format for diagnostics
+        #[arg(long, value_enum, default_value_t = cmd::CheckFormat::Human)]
+        format: cmd::CheckFormat,
+    },
     /// Preview from build result
     Preview {
         #[arg(short = 'p', long, default_value_t = 3030, help = "Port to be used")]
@@ -207,7 +211,7 @@ pub async fn start() -> Result<()> {
             })?;
             cmd::new(&kind, &name, open, collection.as_ref()).await?
         }
-        Commands::Check {} => cmd::check()?,
+        Commands::Check { format } => cmd::check(format)?,
         Commands::Preview { port, host, open } => cmd::preview(port, open, host).await?,
     }
 
