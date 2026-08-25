@@ -252,6 +252,21 @@ async fn handle_single_event(
     }
 }
 
+// INFO: skip missing dirs (theme-only sites); make mandatory if requirements change
+fn watch_existing(
+    debouncer: &mut Debouncer<RecommendedWatcher, RecommendedCache>,
+    path: &std::path::Path,
+    label: &str,
+) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    debouncer
+        .watch(path, RecursiveMode::Recursive)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("Failed to watch {label} directory"))
+}
+
 #[instrument(skip(state, rt))]
 pub(super) async fn setup_file_watcher(
     state: Arc<ServerState>,
@@ -283,30 +298,15 @@ pub(super) async fn setup_file_watcher(
         .watch(&state.paths.config_file, RecursiveMode::NonRecursive)
         .into_diagnostic()
         .wrap_err("Failed to watch config file")?;
-    debouncer
-        .watch(&state.paths.templates, RecursiveMode::Recursive)
-        .into_diagnostic()
-        .wrap_err("Failed to watch templates directory")?;
-    debouncer
-        .watch(&state.paths.content, RecursiveMode::Recursive)
-        .into_diagnostic()
-        .wrap_err("Failed to watch content directory")?;
-    debouncer
-        .watch(&state.paths.assets, RecursiveMode::Recursive)
-        .into_diagnostic()
-        .wrap_err("Failed to watch assets directory")?;
-    if state.paths.theme_assets.exists() {
-        debouncer
-            .watch(&state.paths.theme_assets, RecursiveMode::Recursive)
-            .into_diagnostic()
-            .wrap_err("Failed to watch theme assets directory")?;
-    }
-    if state.paths.theme_templates.exists() {
-        debouncer
-            .watch(&state.paths.theme_templates, RecursiveMode::Recursive)
-            .into_diagnostic()
-            .wrap_err("Failed to watch theme templates directory")?;
-    }
+    watch_existing(&mut debouncer, &state.paths.templates, "templates")?;
+    watch_existing(&mut debouncer, &state.paths.content, "content")?;
+    watch_existing(&mut debouncer, &state.paths.assets, "assets")?;
+    watch_existing(&mut debouncer, &state.paths.theme_assets, "theme assets")?;
+    watch_existing(
+        &mut debouncer,
+        &state.paths.theme_templates,
+        "theme templates",
+    )?;
 
     Ok((debouncer, ReceiverStream::new(debouncer_rx)))
 }
