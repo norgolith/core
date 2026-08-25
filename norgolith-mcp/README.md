@@ -69,6 +69,11 @@ Source code resources (MIME type `text/x-rust`):
 |------|-------------|
 | `search_docs(query)` | Search all documentation for a query string |
 | `read_source(path)` | Read a source file from the repo (monorepo only) |
+| `run_check(project_dir?)` | Validate site content against its schema; returns a structured diagnostics report |
+| `run_build(project_dir?, no_minify?)` | Run a production build and return the output with exit status |
+| `explain_error(code)` | Explain a norgolith error code: meaning, causes, fix, docs URL |
+
+Set `NORGOLITH_BIN` to point at a specific `lith` executable; defaults to `lith` on `PATH`.
 
 ## Prompts
 

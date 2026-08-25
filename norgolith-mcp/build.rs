@@ -6,7 +6,10 @@ fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let repo_root = Path::new(&manifest_dir).join("..");
     let canonical_root = repo_root.canonicalize().unwrap();
-    println!("cargo:rustc-env=NORGOLITH_ROOT={}", canonical_root.display());
+    println!(
+        "cargo:rustc-env=NORGOLITH_ROOT={}",
+        canonical_root.display()
+    );
 
     let docs_dir = repo_root.join("docs/content");
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -74,10 +77,7 @@ fn walk_dir(base: &Path, dir: &Path, prefix: &str, entries: &mut Vec<(String, St
         if path.is_dir() {
             walk_dir(base, &path, prefix, entries);
         } else if path.extension().and_then(|s| s.to_str()) == Some("norg") {
-            let rel = path
-                .strip_prefix(base)
-                .unwrap()
-                .with_extension("");
+            let rel = path.strip_prefix(base).unwrap().with_extension("");
             let rel_str = rel.to_string_lossy().to_string();
             let name = format!("{}-{}", prefix, rel_str.replace('/', "-"));
             let uri = format!("norgolith://{}/{}", prefix, rel_str);
@@ -96,7 +96,11 @@ fn walk_source(base: &Path, dir: &Path, prefix: &str, entries: &mut Vec<(String,
         } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
             let rel = path.strip_prefix(base).unwrap();
             let rel_str = rel.to_string_lossy().to_string();
-            let name = format!("{}-{}", prefix, rel_str.replace('/', "-").replace(".rs", ""));
+            let name = format!(
+                "{}-{}",
+                prefix,
+                rel_str.replace('/', "-").replace(".rs", "")
+            );
             let uri = format!("norgolith://src/{}/{}", prefix, rel_str);
             let abs_path = path.to_string_lossy().to_string();
             entries.push((name, uri, abs_path));
