@@ -5,6 +5,7 @@ pub(crate) mod search;
 mod timings;
 
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::OnceLock,
     sync::atomic::{AtomicUsize, Ordering},
@@ -40,7 +41,13 @@ pub(super) struct PageTimings {
     pub minify_ms: u128,
 }
 
-pub(super) type CacheInsert = (PathBuf, String, serde_json::Value, Option<String>);
+pub(super) type CacheInsert = (
+    PathBuf,
+    String,
+    serde_json::Value,
+    Option<String>,
+    Option<u64>,
+);
 pub(super) type BuildResult =
     Result<Option<(PathBuf, String, String, Option<CacheInsert>, PageTimings)>>;
 
@@ -173,13 +180,14 @@ fn write_public_file(public_path: &Path, rendered: &str) -> Result<bool> {
     Ok(true)
 }
 
-#[instrument(level = "debug", skip(ctx, shared_context, cache, mp))]
+#[instrument(level = "debug", skip(ctx, shared_context, cache, mp, backlinks_map))]
 fn build_contents(
     ctx: BuildContext<'_>,
     shared_context: &Context,
     cache: &mut BuildCache,
     minify: bool,
     mp: &MultiProgress,
+    backlinks_map: &HashMap<String, Vec<shared::links::Backlink>>,
 ) -> Result<(usize, Vec<String>, BuildTimings)> {
     use rayon::prelude::*;
 
@@ -210,7 +218,7 @@ fn build_contents(
         .map(|entry| {
             let path = entry.path();
             bar.inc(1);
-            build_content_entry(path, ctx, shared_context, cache, minify)
+            build_content_entry(path, ctx, shared_context, cache, minify, backlinks_map)
         })
         .collect();
     bar.finish_and_clear();
@@ -232,9 +240,11 @@ fn build_contents(
             Ok(Some((public_path, content, permalink, cache_entry, pt))) => {
                 buffered_writes.push((public_path, content));
                 permalinks.push(permalink);
-                if let Some((key, content_str, metadata, rendered_html)) = cache_entry {
+                if let Some((key, content_str, metadata, rendered_html, backlinks_sig)) =
+                    cache_entry
+                {
                     if let Some(html) = rendered_html {
-                        cache.insert_rendered(&key, &content_str, metadata, &html);
+                        cache.insert_rendered(&key, &content_str, metadata, &html, backlinks_sig);
                     } else {
                         cache.insert(&key, &content_str, metadata);
                     }
@@ -290,12 +300,14 @@ fn build_contents(
     Ok((built_count, permalinks, timings))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_content_entry(
     path: &Path,
     ctx: BuildContext<'_>,
     shared_context: &Context,
     cache: &BuildCache,
     minify: bool,
+    backlinks_map: &HashMap<String, Vec<shared::links::Backlink>>,
 ) -> BuildResult {
     let rel_path = path
         .strip_prefix(&ctx.paths.content)
@@ -351,6 +363,10 @@ fn build_content_entry(
     let draft_ms = t.elapsed().as_micros();
 
     let cache_key = rel_path.with_extension("");
+    let page_route = shared::route_for(&cache_key.to_string_lossy());
+    let page_backlinks: Vec<shared::links::Backlink> =
+        backlinks_map.get(&page_route).cloned().unwrap_or_default();
+    let backlinks_sig = shared::links::signature(&page_backlinks);
 
     let t = Instant::now();
     let cached = cache.get(&cache_key, &content);
@@ -360,8 +376,9 @@ fn build_content_entry(
     let (mut metadata, cache_insert, from_cache) = if let Some(cached) = cached {
         match serde_json::from_value::<toml::Value>(cached.clone()) {
             Ok(md) => {
-                // Try short-circuit with cached rendered HTML
-                if let Some(html) = cache.get_rendered(&cache_key) {
+                // Try short-circuit with cached rendered HTML; only valid when
+                // the embedded backlinks still match the current graph
+                if let Some(html) = cache.get_rendered_checked(&cache_key, backlinks_sig) {
                     let load_ms = t.elapsed().as_micros();
                     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
                     let permalink = md
@@ -396,6 +413,7 @@ fn build_content_entry(
                         content.clone(),
                         cache_val,
                         None::<String>,
+                        backlinks_sig,
                     )),
                     false,
                 )
@@ -411,6 +429,7 @@ fn build_content_entry(
                 content.clone(),
                 cache_val,
                 None::<String>,
+                backlinks_sig,
             )),
             false,
         )
@@ -436,6 +455,14 @@ fn build_content_entry(
     }
 
     let public_path = determine_public_path(&ctx.paths.public, rel_path)?;
+
+    // Inject backlinks after schema validation and plugin post_convert so the
+    // synthetic field never leaks into validation or plugin rewrites.
+    if let Ok(toml_val) = toml::Value::try_from(&page_backlinks)
+        && let Some(table) = metadata.as_table_mut()
+    {
+        table.insert("backlinks".to_string(), toml_val);
+    }
 
     let t = Instant::now();
     let mut rendered = shared::render_norg_page(ctx.tera, &metadata, shared_context)?;
@@ -485,9 +512,12 @@ fn build_content_entry(
             content.clone(),
             cache_val,
             Some(rendered.clone()),
+            backlinks_sig,
         ))
-    } else if let Some((key, content_str, metadata_val, _)) = cache_insert {
-        Some((key, content_str, metadata_val, Some(rendered.clone())))
+    } else if let Some((key, content_str, metadata_val, _, sig)) = cache_insert {
+        // Fresh render: use the current signature, not the stale one captured
+        // in the cached-metadata branch above.
+        Some((key, content_str, metadata_val, Some(rendered.clone()), sig))
     } else {
         None
     };
@@ -652,6 +682,13 @@ pub fn build(minify: bool) -> Result<()> {
     let mut cache = BuildCache::open(&root_dir)?;
     timings.cache_open_ms = t.elapsed().as_millis();
 
+    // Backlink graph over all content pages
+    let backlinks_map = shared::build_backlink_map(
+        &paths.content,
+        &site_config.categories_dir,
+        &site_config.root_url,
+    )?;
+
     // Assets (run before content for fingerprinting)
     let fingerprint_enabled = site_config
         .assets
@@ -801,8 +838,14 @@ pub fn build(minify: bool) -> Result<()> {
         site_config: &site_config,
         plugins: &plugin_mgr,
     };
-    let (page_count, permalinks, content_timings) =
-        build_contents(ctx, &shared_context, &mut cache, minify, &mp)?;
+    let (page_count, permalinks, content_timings) = build_contents(
+        ctx,
+        &shared_context,
+        &mut cache,
+        minify,
+        &mp,
+        &backlinks_map,
+    )?;
     timings.content_ms = t.elapsed().as_millis();
     timings.page_count = page_count;
     timings.page_file_ms = content_timings.page_file_ms;

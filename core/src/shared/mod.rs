@@ -7,9 +7,11 @@ use tera::Tera;
 use crate::config::SiteConfig;
 use crate::plugin::PluginManager;
 
+pub(crate) mod links;
 pub(crate) mod metadata;
 pub(crate) mod render;
 
+pub use links::*;
 pub use metadata::*;
 pub use render::*;
 

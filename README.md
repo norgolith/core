@@ -22,6 +22,7 @@ validation with Norg-to-HTML conversion to build static sites from Norg content.
 - **Incremental builds** via content-hash caching
 - **Parallel builds** powered by Rayon
 - **SEO** out of the box: sitemap.xml, robots.txt, OpenGraph, Twitter Cards
+- **Built-in backlinks** computed automatically from internal Norg links
 - **Built-in search index** (`search_index.json` + dev server endpoint)
 - **Asset fingerprinting** (blake3 + `fingerprint` Tera filter)
 - **Schema validation** for content metadata via `lith check`
@@ -48,6 +49,7 @@ validation with Norg-to-HTML conversion to build static sites from Norg content.
 | Shortcodes           | Built-in                          | Tera v2 components  | Tera v2 `component()`         |
 | Custom output        | JSON, RSS, etc                    | RSS, Atom           | RSS, Atom                     |
 | Theme system         | Yes                               | Yes                 | Yes                           |
+| Backlinks            | No (custom templates)             | No                  | Yes (automatic)               |
 | Built-in search      | No                                | Yes                 | Yes                           |
 | Build                | Parallel (pages)                  | Parallel            | Parallel + incremental        |
 

@@ -9,9 +9,15 @@ use tera::{Context, Tera};
 use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, info, instrument};
 
-/// Result of converting a single page: (html, raw, Option<(path, content, metadata)>)
-type ConversionResult =
-    Result<Option<(String, String, Option<(PathBuf, String, serde_json::Value)>)>>;
+/// Result of converting a single page:
+/// (url_path, html, Option<(path, content, metadata, backlinks_sig)>)
+type ConversionResult = Result<
+    Option<(
+        String,
+        String,
+        Option<(PathBuf, String, serde_json::Value, Option<u64>)>,
+    )>,
+>;
 use walkdir::WalkDir;
 
 use crate::cmd::build::progress::{make_bar, make_spinner};
@@ -171,6 +177,14 @@ pub fn render_all_pages(
     let collections = shared::precompute_collection_subsets(posts, ctx.site_config);
     let shared_context = shared::build_shared_context(posts, ctx.site_config, &collections);
 
+    // Fresh graph per rebuild; the fresh cache below discards rendered HTML
+    // wholesale, so no signature checking is needed on this path.
+    let backlinks_map = shared::build_backlink_map(
+        &ctx.paths.content,
+        &ctx.site_config.categories_dir,
+        routes_url,
+    )?;
+
     let entries: Vec<_> = WalkDir::new(&ctx.paths.content)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -206,9 +220,15 @@ pub fn render_all_pages(
             }
 
             let cache_key = rel_path.with_extension("");
+            let page_backlinks: Vec<shared::links::Backlink> = backlinks_map
+                .get(&shared::route_for(&cache_key.to_string_lossy()))
+                .cloned()
+                .unwrap_or_default();
 
             // PERF(cache): skip re-render when rendered_html cache hit
-            if let Some(cached_html) = cache_ref.get_rendered(&cache_key) {
+            if let Some(cached_html) = cache_ref
+                .get_rendered_checked(&cache_key, shared::links::signature(&page_backlinks))
+            {
                 let body = super::handlers::rewrite_urls(
                     cached_html,
                     &ctx.site_config.root_url,
@@ -258,6 +278,14 @@ pub fn render_all_pages(
                 }
             }
 
+            // NOTE: injected after post_convert so plugins never see the
+            // synthetic field.
+            if let Ok(toml_val) = toml::Value::try_from(&page_backlinks)
+                && let Some(table) = metadata.as_table_mut()
+            {
+                table.insert("backlinks".to_string(), toml_val);
+            }
+
             let body = shared::render_norg_page(ctx.tera, &metadata, &shared_context)?;
 
             let body = ctx
@@ -268,10 +296,12 @@ pub fn render_all_pages(
 
             let url_path = format!("/{}", rel_path.with_extension("").display());
 
+            let backlinks_sig = shared::links::signature(&page_backlinks);
             let cache_data = (
                 cache_key,
                 content,
                 serde_json::to_value(&metadata).unwrap_or_default(),
+                backlinks_sig,
             );
 
             Ok(Some((url_path, body, Some(cache_data))))
@@ -281,8 +311,8 @@ pub fn render_all_pages(
     let mut pages = HashMap::new();
     for result in results {
         if let Some((url, body, cache_back)) = result? {
-            if let Some((key, content, md)) = cache_back {
-                cache.insert_rendered(&key, &content, md, &body);
+            if let Some((key, content, md, sig)) = cache_back {
+                cache.insert_rendered(&key, &content, md, &body, sig);
             }
             pages.insert(url, body);
         }

@@ -12,6 +12,12 @@ struct CacheEntry {
     metadata: serde_json::Value,
     #[serde(default)]
     rendered_html: Option<String>,
+    /// Hash of the backlinks list embedded in the rendered HTML. Rendered
+    /// entries are only reused when this matches the current build's map,
+    /// otherwise cross-page backlinks would go stale (serde default keeps
+    /// pre-existing caches loadable).
+    #[serde(default)]
+    backlinks_hash: Option<u64>,
 }
 
 /// Returns the XDG cache directory for a site: `~/.cache/norgolith/{site_name}/`
@@ -101,12 +107,22 @@ impl BuildCache {
         }
     }
 
-    /// Looks up cached rendered HTML for a file.
+    /// Looks up cached rendered HTML for a file, but only when its embedded
+    /// backlinks match `backlinks_hash`. A `None` expected hash (page has no
+    /// backlinks) matches entries without a stored hash or with an equal hash.
     ///
-    /// Returns `Some(html)` if cache hit (content unchanged AND rendered_html exists).
-    /// Returns `None` on miss.
-    pub fn get_rendered(&self, rel_path: &Path) -> Option<String> {
-        self.entries.get(rel_path)?.rendered_html.clone()
+    /// Returns `Some(html)` if cache hit (content unchanged AND rendered_html
+    /// exists AND backlinks unchanged). Returns `None` on miss.
+    pub fn get_rendered_checked(
+        &self,
+        rel_path: &Path,
+        backlinks_hash: Option<u64>,
+    ) -> Option<String> {
+        let entry = self.entries.get(rel_path)?;
+        if entry.rendered_html.is_some() && entry.backlinks_hash != backlinks_hash {
+            return None;
+        }
+        entry.rendered_html.clone()
     }
 
     /// Stores metadata and rendered HTML in a single cache entry.
@@ -119,6 +135,7 @@ impl BuildCache {
         content: &str,
         metadata: serde_json::Value,
         rendered_html: &str,
+        backlinks_hash: Option<u64>,
     ) {
         let hash = blake3_hash(content);
         self.entries.insert(
@@ -127,6 +144,7 @@ impl BuildCache {
                 content_hash: hash,
                 metadata,
                 rendered_html: Some(rendered_html.to_string()),
+                backlinks_hash,
             },
         );
     }
@@ -140,6 +158,7 @@ impl BuildCache {
                 content_hash: hash,
                 metadata,
                 rendered_html: None,
+                backlinks_hash: None,
             },
         );
     }

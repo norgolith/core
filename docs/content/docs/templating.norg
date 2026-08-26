@@ -149,6 +149,43 @@ Norgolith uses the {https://keats.github.io/tera/}[Tera] templating engine to ge
      {% endif %}
      @end
 
+** Backlinks
+
+   Norgolith automatically computes which pages link to the current page and
+   exposes the list as @code metadata.backlinks@. Each entry has two fields:
+
+   - `url`: permalink of the referencing page.
+   - `title`: title of the referencing page.
+
+   The list is empty when no other page links to the current one, so guard the
+   render behind a length check.
+
+**** Example: "Referenced by" Section
+     @code tera
+     {% if metadata.backlinks and metadata.backlinks | length > 0 %}
+       <aside id="backlinks">
+         <h2>Referenced by</h2>
+         <ul>
+           {% for link in metadata.backlinks %}
+             <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+           {% endfor %}
+         </ul>
+       </aside>
+     {% endif %}
+     @end
+
+*** How Links Are Resolved
+
+    Backlinks are built from internal Norg links ({: :/path: } style) across
+    every content page:
+
+    - External URLs, same-page heading links, and fragments are ignored.
+    - `/index` routes fold into their parent (a link to {:/blog/index:} counts
+      as a reference to {:/blog/:}).
+    - Draft pages never appear as backlink sources.
+    - The list is recomputed on every build; incremental builds re-render any
+      page whose backlinks changed.
+
 *** Including Partial Templates
     You can include other templates within a template.
 
