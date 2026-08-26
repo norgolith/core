@@ -249,15 +249,28 @@ pub fn generate_sitemap_xml(urls: &[SitemapUrl], root_url: &str) -> String {
 "#,
     );
 
+    let mut seen = std::collections::HashSet::new();
     for url in urls {
+        // Permalinks may already be absolute URLs; don't prepend the root twice
+        let loc = if url.loc.starts_with("http://") || url.loc.starts_with("https://") {
+            url.loc.clone()
+        } else {
+            format!(
+                "{}/{}",
+                root_url.trim_end_matches('/'),
+                url.loc.trim_start_matches('/')
+            )
+        };
+        if !seen.insert(loc.clone()) {
+            continue;
+        }
+
         let _ = writeln!(buf, "  <url>");
-        let _ = writeln!(
-            buf,
-            "    <loc>{}/{}</loc>",
-            root_url.trim_end_matches('/'),
-            url.loc.trim_start_matches('/')
-        );
-        if let Some(ref lastmod) = url.lastmod {
+        let _ = writeln!(buf, "    <loc>{}</loc>", loc);
+        // INFO: unparseable lastmod is dropped silently; Google treats a missing
+        // lastmod as fine but an invalid one as an error
+        // see: https://developers.google.com/search/blog/2006/04/using-lastmod-attribute
+        if let Some(lastmod) = url.lastmod.as_deref().and_then(normalize_lastmod) {
             let _ = writeln!(buf, "    <lastmod>{}</lastmod>", lastmod);
         }
         let _ = writeln!(buf, "  </url>");
@@ -265,6 +278,25 @@ pub fn generate_sitemap_xml(urls: &[SitemapUrl], root_url: &str) -> String {
 
     buf.push_str("</urlset>\n");
     buf
+}
+
+/// Normalizes a metadata date string to a W3C Datetime value valid for sitemap
+/// `<lastmod>` (Google requires either date-only or a colon in the TZ offset).
+/// Returns None when the input is not parseable as a date at all.
+fn normalize_lastmod(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(raw) {
+        return Some(dt.format("%Y-%m-%dT%H:%M:%S%:z").to_string());
+    }
+    // Accept offsets without colon (e.g. "-0400"), invalid per W3C Datetime
+    if let Ok(dt) = chrono::DateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S%z") {
+        return Some(dt.format("%Y-%m-%dT%H:%M:%S%:z").to_string());
+    }
+    // Date-only is valid on its own; also the fallback when time is malformed
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d") {
+        return Some(date.format("%Y-%m-%d").to_string());
+    }
+    None
 }
 
 #[cfg(test)]
@@ -300,7 +332,68 @@ mod tests {
             lastmod: Some("2026-01-15T12:00:00Z".into()),
         }];
         let xml = generate_sitemap_xml(&urls, "https://example.com");
-        assert!(xml.contains("<lastmod>2026-01-15T12:00:00Z</lastmod>"));
+        assert!(xml.contains("<lastmod>2026-01-15T12:00:00+00:00</lastmod>"));
+    }
+
+    #[test]
+    fn sitemap_absolute_loc_not_doubled() {
+        let urls = vec![SitemapUrl {
+            loc: "https://example.com/about/".into(),
+            lastmod: None,
+        }];
+        let xml = generate_sitemap_xml(&urls, "https://example.com");
+        assert!(xml.contains("<loc>https://example.com/about/</loc>"));
+        assert!(!xml.contains("https://example.com/https://"));
+    }
+
+    #[test]
+    fn sitemap_dedups_urls() {
+        let urls = vec![
+            SitemapUrl {
+                loc: "/".into(),
+                lastmod: None,
+            },
+            SitemapUrl {
+                loc: "https://example.com/".into(),
+                lastmod: None,
+            },
+            SitemapUrl {
+                loc: "/about/".into(),
+                lastmod: None,
+            },
+        ];
+        let xml = generate_sitemap_xml(&urls, "https://example.com");
+        assert_eq!(xml.matches("<loc>").count(), 2);
+    }
+
+    #[test]
+    fn sitemap_lastmod_offset_without_colon_normalized() {
+        let urls = vec![SitemapUrl {
+            loc: "/posts/hello/".into(),
+            lastmod: Some("2025-07-24T16:51:07-0400".into()),
+        }];
+        let xml = generate_sitemap_xml(&urls, "https://example.com");
+        assert!(xml.contains("<lastmod>2025-07-24T16:51:07-04:00</lastmod>"));
+    }
+
+    #[test]
+    fn sitemap_lastmod_date_only_kept() {
+        let urls = vec![SitemapUrl {
+            loc: "/posts/hello/".into(),
+            lastmod: Some("2025-07-24".into()),
+        }];
+        let xml = generate_sitemap_xml(&urls, "https://example.com");
+        assert!(xml.contains("<lastmod>2025-07-24</lastmod>"));
+    }
+
+    #[test]
+    fn sitemap_invalid_lastmod_dropped() {
+        let urls = vec![SitemapUrl {
+            loc: "/posts/hello/".into(),
+            lastmod: Some("not a date".into()),
+        }];
+        let xml = generate_sitemap_xml(&urls, "https://example.com");
+        assert!(!xml.contains("<lastmod>"));
     }
 
     #[test]
