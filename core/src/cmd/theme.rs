@@ -36,7 +36,7 @@ async fn find_theme_dir() -> Result<PathBuf> {
 
 #[derive(Subcommand, Clone)]
 pub enum ThemeCommands {
-    /// Install a theme from a repository (github, codeberg or sourcehut)
+    /// Install a theme from a repository (github, tangled, codeberg or sourcehut)
     Pull {
         /// Repository shorthand (e.g. user/repo or github:user/repo)
         repo: String,
@@ -246,7 +246,7 @@ async fn init_theme() -> Result<()> {
 
     let repository = Text::new("Repository URL (optional):")
         .with_help_message(
-            "Format: 'github:user/repo', 'codeberg:user/repo' or 'sourcehut:user/repo'",
+            "Format: 'github:user/repo', 'tangled:user/repo', 'codeberg:user/repo' or 'sourcehut:user/repo'",
         )
         .prompt()
         .into_diagnostic()

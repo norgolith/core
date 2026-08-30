@@ -48,6 +48,7 @@ pub async fn resolve_repo_shorthand(repo: &str) -> Result<String> {
         debug!("Processing repository service {}", service.to_lowercase());
         match service.to_lowercase().as_str() {
             "gh" | "github" => Ok(format!("https://github.com/{}", rest)),
+            "tngl" | "tangled" => Ok(format!("https://tangled.org/{}", rest)),
             "srht" | "sourcehut" => Ok(format!("https://git.sr.ht/~{}", rest)),
             "berg" | "codeberg" => Ok(format!("https://codeberg.org/{}", rest)),
             _ => bail!("{}: {}", "Unknown repository service".bold(), service),

@@ -151,7 +151,7 @@ Norgolith provides a powerful CLI for managing your static sites and themes. Thi
      @end
 
 ***** `lith theme pull`
-      Install a theme from a repository (`github`, `codeberg` or `sourcehut`). If no `VERSION` has been provided it will fallback to the latest Git tag available.
+      Install a theme from a repository (`github`, `tangled`, `codeberg` or `sourcehut`). If no `VERSION` has been provided it will fallback to the latest Git tag available.
 
 ****** Usage
        @code bash
