@@ -41,6 +41,7 @@ pub struct BuildCache {
     cache_dir: PathBuf,
     entries: HashMap<PathBuf, CacheEntry>,
     global_hash: String,
+    stored_fp_sig: Option<String>,
 }
 
 impl BuildCache {
@@ -56,12 +57,13 @@ impl BuildCache {
         let global_hash = compute_global_hash(site_root)?;
 
         // Load existing cache
-        let (mut entries, stored_global) = if cache_dir.exists() {
+        let (mut entries, stored_global, stored_fp_sig) = if cache_dir.exists() {
             let stored = read_global_hash(&cache_dir);
+            let fp_sig = read_fingerprint_sig(&cache_dir);
             let entries = load_entries(&cache_dir)?;
-            (entries, stored)
+            (entries, stored, fp_sig)
         } else {
-            (HashMap::new(), None)
+            (HashMap::new(), None, None)
         };
 
         // If global hash changed, clear all entries
@@ -88,7 +90,21 @@ impl BuildCache {
             cache_dir,
             entries,
             global_hash,
+            stored_fp_sig,
         })
+    }
+
+    /// Invalidates cached rendered HTML when the fingerprint snapshot that
+    /// produced it differs from the current one. Metadata is kept. Build and
+    /// dev compute different snapshots (build has the map populated, dev's is empty),
+    /// so neither can serve the other's rendered HTML; an absent stored signature is treated as stale.
+    pub fn refresh_fingerprint_sig(&mut self, current: &str) {
+        if self.stored_fp_sig.as_deref() != Some(current) {
+            for entry in self.entries.values_mut() {
+                entry.rendered_html = None;
+            }
+            self.stored_fp_sig = Some(current.to_string());
+        }
     }
 
     /// Looks up cached metadata for a file.
@@ -184,6 +200,13 @@ impl BuildCache {
         std::fs::write(&global_path, &self.global_hash)
             .map_err(|e| miette!("{}: {}", "Failed to save cache index".bold(), e))?;
 
+        // Write fingerprint signature
+        if let Some(sig) = &self.stored_fp_sig {
+            let fp_path = self.cache_dir.join(".fingerprint_hash");
+            std::fs::write(&fp_path, sig)
+                .map_err(|e| miette!("{}: {}", "Failed to save fingerprint signature".bold(), e))?;
+        }
+
         // Write each entry
         for (rel_path, entry) in &self.entries {
             let cache_path = self.cache_dir.join(rel_path).with_extension("json");
@@ -224,6 +247,15 @@ fn blake3_hash(content: &str) -> String {
 /// Reads the stored global hash from cache.
 fn read_global_hash(cache_dir: &Path) -> Option<String> {
     let path = cache_dir.join(".global_hash");
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.trim().to_string())
+}
+
+/// Reads the stored fingerprint signature from cache. Absent when the cache
+/// predates fingerprint-aware invalidation.
+fn read_fingerprint_sig(cache_dir: &Path) -> Option<String> {
+    let path = cache_dir.join(".fingerprint_hash");
     std::fs::read_to_string(path)
         .ok()
         .map(|s| s.trim().to_string())

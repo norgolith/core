@@ -103,11 +103,14 @@ impl ServerState {
         let config = self.config.read().await.clone();
         let posts = self.posts.read().await.clone();
         let mut cache = self.cache.write().await;
-        // NOTE(cache): fresh cache discards stale rendered_html on template rebuild
+        // NOTE(cache): fresh cache discards stale rendered_html on template rebuild.
+        // Fingerprint refresh rejects rendered HTML produced by `lith build`
+        // (its map is populated; dev's is empty), so dev re-renders un-hashed.
         if let Ok(fresh) = crate::cache::BuildCache::open(self.paths.config_file.parent().unwrap())
         {
             *cache = fresh;
         }
+        cache.refresh_fingerprint_sig(&crate::tera::fingerprint_signature());
 
         match render_all_pages(
             BuildContext {
@@ -453,6 +456,7 @@ pub(super) async fn setup_server_state(
     meta_spinner.finish_and_clear();
 
     let mut cache = crate::cache::BuildCache::open(&root_dir)?;
+    cache.refresh_fingerprint_sig(&crate::tera::fingerprint_signature());
 
     let plugin_mgr = plugin::PluginManager::load(&root_dir);
     if !plugin_mgr.is_empty() {

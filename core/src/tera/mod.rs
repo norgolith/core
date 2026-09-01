@@ -185,7 +185,28 @@ pub(crate) fn set_fingerprint_map(map: HashMap<String, String>) {
 }
 
 pub(crate) fn fingerprint_map() -> HashMap<String, String> {
-    FINGERPRINT_MAP.read().map(|g| g.clone()).unwrap_or_default()
+    FINGERPRINT_MAP
+        .read()
+        .map(|g| g.clone())
+        .unwrap_or_default()
+}
+
+/// Canonical hash of the current fingerprint map. Rendered HTML in the build
+/// cache is only valid for the snapshot that produced it: build has the map
+/// populated, dev keeps it empty, so their signatures differ and each side
+/// re-renders the other's cached HTML.
+pub(crate) fn fingerprint_signature() -> String {
+    let map = fingerprint_map();
+    let mut keys: Vec<&String> = map.keys().collect();
+    keys.sort_unstable();
+    let mut hasher = blake3::Hasher::new();
+    for key in keys {
+        hasher.update(key.as_bytes());
+        hasher.update(&[0]);
+        hasher.update(map[key].as_bytes());
+        hasher.update(&[0]);
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 impl Filter<&Value, TeraResult<Value>> for SliceFilter {

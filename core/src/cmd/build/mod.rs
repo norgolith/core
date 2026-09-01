@@ -737,6 +737,7 @@ pub fn build(minify: bool) -> Result<()> {
 
     // Populate fingerprint map for templates
     crate::tera::set_fingerprint_map(fingerprint_map.clone());
+    cache.refresh_fingerprint_sig(&crate::tera::fingerprint_signature());
 
     if fingerprint_enabled && !fingerprint_map.is_empty() {
         // Scan templates for | fingerprint usage
