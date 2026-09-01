@@ -184,6 +184,10 @@ pub(crate) fn set_fingerprint_map(map: HashMap<String, String>) {
     }
 }
 
+pub(crate) fn fingerprint_map() -> HashMap<String, String> {
+    FINGERPRINT_MAP.read().map(|g| g.clone()).unwrap_or_default()
+}
+
 impl Filter<&Value, TeraResult<Value>> for SliceFilter {
     fn call(&self, val: &Value, kwargs: Kwargs, _: &State) -> TeraResult<Value> {
         let arr = val

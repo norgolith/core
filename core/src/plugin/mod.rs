@@ -261,6 +261,7 @@ impl PluginManager {
                     "metadata": metadata,
                     "rel_path": rel_path.to_string_lossy(),
                     "config": plugin_config,
+                    "fingerprint_map": crate::tera::fingerprint_map(),
                 })
                 .to_string();
                 match self.call_hook(p, f, &input) {

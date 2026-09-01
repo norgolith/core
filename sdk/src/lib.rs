@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::OnceLock;
@@ -36,6 +37,11 @@ pub struct TransformContext {
     pub rel_path: String,
     #[serde(default)]
     pub config: Option<serde_json::Value>,
+    /// Content-hash fingerprint map (original asset path -> fingerprinted
+    /// path, e.g. "assets/css/app.css" -> "assets/css/app.abc12345.css").
+    /// Populated only when `[assets] fingerprint = true` is set.
+    #[serde(default)]
+    pub fingerprint_map: Option<HashMap<String, String>>,
 }
 
 /// Universal bridge function: reads C input → calls handler → returns JSON/NULL/error
