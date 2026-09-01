@@ -70,12 +70,13 @@ impl ServerState {
             .await
             .into_diagnostic()
             .wrap_err("Failed to read config file")?;
-        let new_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+        let mut new_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
             miette!("Failed to parse site configuration: {}", e).with_source_code(NamedSource::new(
                 self.paths.config_file.display().to_string(),
                 config_content,
             ))
         })?;
+        new_config.root_url = self.routes_url.clone();
 
         let new_posts = shared::collect_all_posts_metadata(
             &self.paths.content,
@@ -392,10 +393,13 @@ pub(super) async fn setup_server_state(
     debug!("Config file path: {:?}", root);
     debug!("Config content:\n{}", config_content);
     let config_content_for_validation = config_content.clone();
-    let site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
+    let mut site_config: config::SiteConfig = toml::from_str(&config_content).map_err(|e| {
         miette!("Failed to parse site configuration: {}", e)
             .with_source_code(NamedSource::new(root.display().to_string(), config_content))
     })?;
+    // INFO: dev serves on a local base URL; templates using config.rootUrl
+    // (navbars, og:url, feeds) must point at the dev server, not production
+    site_config.root_url = routes_url.clone();
     debug!("Parsed categories_dir: {}", site_config.categories_dir);
 
     let validation_errors = site_config.validate();
