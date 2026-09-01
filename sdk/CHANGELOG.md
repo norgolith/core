@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/norgolith/core/compare/norgolith-plugin-sdk-v1.1.1...norgolith-plugin-sdk-v1.2.0) (2026-09-01)
+
+
+### Features
+
+* **plugins:** expose fingerprint map to hooks ([47d728c](https://github.com/norgolith/core/commit/47d728ce20a95560cc69bdcef5664a78af090ce4))
+
 ## [1.1.0](https://github.com/norgolith/core/compare/norgolith-plugin-sdk-v1.0.0...norgolith-plugin-sdk-v1.1.0) (2026-07-10)
 
 

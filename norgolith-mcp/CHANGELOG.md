@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/norgolith/core/compare/norgolith-mcp-v1.1.0...norgolith-mcp-v1.2.0) (2026-09-01)
+
+
+### Features
+
+* **mcp:** add fix_diagnostic with interactive elicitation ([4751344](https://github.com/norgolith/core/commit/475134489c68a2229a853dfe2af370d0a556e589))
+* **mcp:** add run_check, run_build, and explain_error tools ([3d77721](https://github.com/norgolith/core/commit/3d77721547a6fa3f450abacc70b61a0789bd2bc2))
+
 ## [1.1.0](https://github.com/norgolith/core/compare/norgolith-mcp-v1.0.0...norgolith-mcp-v1.1.0) (2026-07-13)
 
 

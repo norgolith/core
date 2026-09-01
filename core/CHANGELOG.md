@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.4.0](https://github.com/norgolith/core/compare/norgolith-v1.3.1...norgolith-v1.4.0) (2026-09-01)
+
+
+### Features
+
+* **build:** add backlinks to page metadata ([9a8943c](https://github.com/norgolith/core/commit/9a8943cbf5de27ea48062e010bbf862e49958ed2))
+* **check:** add json and github output formats ([942fc96](https://github.com/norgolith/core/commit/942fc96019662f182128ca81e169f7e7c905e881))
+* **cli:** add lith check command for schema validation ([824e336](https://github.com/norgolith/core/commit/824e3365e27ff764714001aeddcdf6381bead537))
+* **dev:** restore schema validation as warnings in dev server ([200d416](https://github.com/norgolith/core/commit/200d4161059b5300aea91035c6632d021ad123e8))
+* **plugins:** expose fingerprint map to hooks ([47d728c](https://github.com/norgolith/core/commit/47d728ce20a95560cc69bdcef5664a78af090ce4))
+* **schema:** add datetime field type ([9a02bf1](https://github.com/norgolith/core/commit/9a02bf155c15ae252ee44f97ed8a130c0993d876))
+* **schema:** add error codes and severity to ValidationError ([3d531c9](https://github.com/norgolith/core/commit/3d531c9149b5a4878872761b6fa748ed9e792b67))
+* **schema:** add Integer and Float field types ([c77bad0](https://github.com/norgolith/core/commit/c77bad0cde5beec9807d8bb0f916a3ee44c7f5f4))
+* **schema:** add min_length option for String fields ([f58da5f](https://github.com/norgolith/core/commit/f58da5f8b71625faab770b46d23a854e922a527e))
+* **schema:** add not_required rule action ([0665f7c](https://github.com/norgolith/core/commit/0665f7c070a229ad881997937a4dd0a844ed6cc5))
+* **schema:** add one_of enum for string fields ([9b3a18d](https://github.com/norgolith/core/commit/9b3a18dd2b931e9967f4230bb6a1f07ad0d55878))
+* **schema:** add source labels and doc URLs to validation errors ([7fee2b2](https://github.com/norgolith/core/commit/7fee2b28352a8938596377331e8cce4a6bfbfe04))
+* **schema:** deny_unknown_fields on FieldDefinition ([6f179c1](https://github.com/norgolith/core/commit/6f179c1c3c953d028428215f28c10dbe796e857a))
+* **schema:** resolve spans for nested objects and array items ([902adde](https://github.com/norgolith/core/commit/902addea483222261d66c7064058034e2746294a))
+* **schema:** support * and ** wildcards in schema paths ([1c03391](https://github.com/norgolith/core/commit/1c03391ab37b981106dffee8a10891fcb465b756))
+* **schema:** support nested paths in rule conditions ([e30f277](https://github.com/norgolith/core/commit/e30f27783a64a2803e39ea6353986d28b8a30091))
+* **schema:** validate required fields have matching field defs ([e55ac02](https://github.com/norgolith/core/commit/e55ac027249be8c7e201df751226b88f28711cc5))
+* **schema:** warn on near-miss unknown field keys ([ffa5b2b](https://github.com/norgolith/core/commit/ffa5b2bb9d5c684242534fbd715200938d3ef213))
+* **theme:** add tangled support ([542a283](https://github.com/norgolith/core/commit/542a283fdb034c505a5405ff30232b16ea4a68db))
+
+
+### Bug Fixes
+
+* **cache:** key rendered HTML to fingerprint snapshot ([1f56c35](https://github.com/norgolith/core/commit/1f56c351dbcb23fed9e565fe26b5a3149b4c8f54))
+* **cli:** render full miette diagnostics in lith check ([132067d](https://github.com/norgolith/core/commit/132067d2b83771457f8255fc87bcd3ebae369680))
+* **converter:** slugify heading link anchors ([90a62a4](https://github.com/norgolith/core/commit/90a62a4052a81b740ed811594db64b5322464e66))
+* **dev:** point config.rootUrl at the dev server ([e3158b0](https://github.com/norgolith/core/commit/e3158b0693f778ed5fba0e3023177d7c4d8d6aeb)), closes [#216](https://github.com/norgolith/core/issues/216)
+* **dev:** skip missing dirs in file watcher ([2d39877](https://github.com/norgolith/core/commit/2d3987768209a63739cf7430c1b38ad59a4ecce3)), closes [#217](https://github.com/norgolith/core/issues/217)
+* **schema:** add Object field validation arm ([b05d4b1](https://github.com/norgolith/core/commit/b05d4b14338a188e2188eb56d9895e6e5e996050))
+* **schema:** anchor missing-field errors to the meta directive ([da9fd8a](https://github.com/norgolith/core/commit/da9fd8abac38727fd0748c83b6249ed6a3fb1906))
+* **schema:** show matched schema path in error label ([7104ac0](https://github.com/norgolith/core/commit/7104ac0a8ac0695c027fa97519cdaefc85612aab))
+* **seo:** dedup sitemap URLs and normalize lastmod ([a97ccaa](https://github.com/norgolith/core/commit/a97ccaa2d65f9cddb834e1e3591ce48a20ce8b75))
+
+
+### Refactoring
+
+* **schema:** thread file content for miette source snippets ([40497b0](https://github.com/norgolith/core/commit/40497b04d2bbdbb1d5a9e29befa877ed9ca3e9b4))
+
+
+### Miscellaneous
+
+* fix clippy warnings ([a1745c9](https://github.com/norgolith/core/commit/a1745c97a80561f395416f51c97e828bdee3525d))
+* format source code ([9e7abd3](https://github.com/norgolith/core/commit/9e7abd3be825bad4a3bf7b7e9afae289b7c79605))
+
+
+### Tests
+
+* **new:** verify template metadata passes schema validation ([6160368](https://github.com/norgolith/core/commit/6160368473a4a6e4515d231637c105cea4456afc))
+* **schema:** add tests for Object, serde round-trip ([e759ea0](https://github.com/norgolith/core/commit/e759ea0783caae308dc9c40f8bb3ae2ae77d82ef))
+* **schema:** cover slash-tolerant path resolution ([f0e12c6](https://github.com/norgolith/core/commit/f0e12c6cd2bf8b893506e556e3c91c8817a89b14))
+
 ## [1.3.1](https://github.com/norgolith/core/compare/norgolith-v1.3.0...norgolith-v1.3.1) (2026-07-29)
 
 
