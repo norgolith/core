@@ -40,7 +40,7 @@ walkdir = "2.5.0"
 minify-html-onepass = "0.18.1"
 regex = "1.11.1"
 semver = { version = "1.0.25", features = ["serde"] }
-git2 = { version = "0.20.4", features = ["vendored-libgit2", "vendored-openssl"] }
+git2 = { version = "0.21.0", features = ["vendored-libgit2", "vendored-openssl"] }
 tempfile = "3.17.1"
 inquire = { version = "0.9.4", features = ["chrono", "date"] }
 
